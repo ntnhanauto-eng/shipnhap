@@ -184,6 +184,7 @@ table {
 <input type="number" id="workers" placeholder="Số người">
 <input type="text" id="job" placeholder="Công việc">
 <button onclick="saveLog()">Lưu</button>
+  
 </div><div class="card">
 <h3>Bộ lọc</h3>
 <div class="flex">
@@ -191,6 +192,11 @@ table {
 <input type="date" id="fromDate">
 <input type="date" id="toDate">
 </div>
+  <select id="shipFilter">
+  <option value="all">Tất cả tàu</option>
+  <option value="tau_01">Tàu 01</option>
+  <option value="tau_02">Tàu 02</option>
+</select>
 <input type="text" id="jobFilter" placeholder="Lọc theo công việc">
 <select id="sortType">
   <option value="asc">📅 ↑ </option>
@@ -320,13 +326,15 @@ window.editItem = function(id){
 }
 
 // ================= FILTER =================
+const shipFilter = document.getElementById("shipFilter");
+
 window.applyFilter = function(){
   let data = Object.entries(rawData);
 
   let from = fromDate.value;
   let to = toDate.value;
   let jobF = jobFilter.value.toLowerCase();
-  let shipF = ship.value;
+  let shipF = shipFilter.value; // ✅ đúng
 
   let filtered = {};
 
@@ -396,6 +404,10 @@ sortTypeEl.addEventListener("change", () => {
     sortLabel.innerHTML = "📅 ↓ Sắp xếp ngày";
   }
 
+  applyFilter();
+});
+
+shipFilter.addEventListener("change", () => {
   applyFilter();
 });
    

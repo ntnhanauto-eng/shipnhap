@@ -279,23 +279,23 @@ let editId = null;
 // ================= SAVE =================
 window.saveLog = function(){
 
+  if(ship.value === 'all'){
+    alert("Vui lòng chọn tàu!");
+    return;
+  }
+
   let data = {
-    if(ship.value === 'all'){
-  alert("Vui lòng chọn tàu!");
-  return;
-}
+    ship_id: ship.value, // 🔥 thiếu cái này nên table bị undefined
     date: date.value,
     workers: Number(workers.value),
     job: job.value
   };
 
   if(editId){
-    // UPDATE
     update(ref(db, "logs/" + editId), data);
     editId = null;
     alert("Đã cập nhật");
   }else{
-    // CREATE
     push(ref(db, "logs"), data);
     alert("Đã lưu");
   }
@@ -335,7 +335,7 @@ let html = "<table><tr>\
 
  html += `<tr>
   <td class="stt-col">${index++}</td>
-  <td class="ship-col">${x.ship_id}</td>
+  <<td class="ship-col">${x.ship_id || "Chưa có"}</td>
   <td class="date-col">${x.date}</td>
   <td class="worker-col">${x.workers}</td>
   <td class="job-col">${x.job}</td>
@@ -455,17 +455,7 @@ function clearForm(){
 });
 
 const sortTypeEl = document.getElementById("sortType");
-const sortLabel = document.getElementById("sortLabel");
 
-sortTypeEl.addEventListener("change", () => {
-  if(sortTypeEl.value === "asc"){
-    sortLabel.innerHTML = "📅 ↑ Sắp xếp ngày";
-  }else{
-    sortLabel.innerHTML = "📅 ↓ Sắp xếp ngày";
-  }
-
-  applyFilter();
-});
 
 shipFilter.addEventListener("change", () => {
   applyFilter();
@@ -507,7 +497,7 @@ function renderWorkHours(){
       <tr>
         <td>${ship}</td>
         <td>
-          <input type="number" placeholder="Nhập giờ công" id="manual_${ship}">
+          <input type="number" placeholder="Nhập giờ công" id="manual_${ship.replace(/\s/g,'_')}">
         </td>
         <td>${realHours}</td>
       </tr>

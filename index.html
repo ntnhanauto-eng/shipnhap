@@ -161,7 +161,10 @@ table {
   width: 100%;
 }
 
-  
+
+  #sortType {
+  margin-top: 4px;
+}
   
 </style>
 
@@ -184,10 +187,15 @@ table {
 </div><div class="card">
 <h3>Bộ lọc</h3>
 <div class="flex">
+  
 <input type="date" id="fromDate">
 <input type="date" id="toDate">
 </div>
 <input type="text" id="jobFilter" placeholder="Lọc theo công việc">
+  <select id="sortType">
+  <option value="asc">Ngày xa → gần</option>
+  <option value="desc">Ngày gần → xa</option>
+</select>
 <button onclick="applyFilter()">Áp dụng lọc</button>
 </div><div class="card">
 <h3>Dữ liệu</h3>

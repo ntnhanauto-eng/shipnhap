@@ -238,7 +238,12 @@ tr:last-child td {
 </div><div class="card">
 <h3>Tổng hợp</h3>
 <button onclick="showSummary()">Tổng hợp</button>
+<button onclick="toggleWorkHours()">⏱️ Giờ công tàu</button>
 <div id="summary"></div>
+  <div id="workHoursBox" style="display:none; margin-top:10px;">
+  <h4>Nhập giờ công tàu</h4>
+  <div id="workHoursContent"></div>
+</div>
 </div>
   
  <script type="module">
@@ -465,6 +470,59 @@ sortTypeEl.addEventListener("change", () => {
 shipFilter.addEventListener("change", () => {
   applyFilter();
 });
+
+let workBoxVisible = false;
+
+window.toggleWorkHours = function(){
+  const box = document.getElementById("workHoursBox");
+
+  if(workBoxVisible){
+    box.style.display = "none";
+    workBoxVisible = false;
+    return;
+  }
+
+  renderWorkHours();
+  box.style.display = "block";
+  workBoxVisible = true;
+}
+
+function renderWorkHours(){
+  let result = {};
+
+  // gom dữ liệu theo tàu
+  Object.values(rawData).forEach(x=>{
+    if(!result[x.ship_id]){
+      result[x.ship_id] = 0;
+    }
+    result[x.ship_id] += Number(x.workers || 0);
+  });
+
+  let html = "<table><tr><th>Tàu</th><th>Giờ công tàu</th><th>Giờ công thực tế</th></tr>";
+
+  for(let ship in result){
+    let realHours = result[ship] * 8;
+
+    html += `
+      <tr>
+        <td>${ship}</td>
+        <td>
+          <input type="number" placeholder="Nhập giờ công" id="manual_${ship}">
+        </td>
+        <td>${realHours}</td>
+      </tr>
+    `;
+  }
+
+  html += "</table>";
+
+  document.getElementById("workHoursContent").innerHTML = html;
+}
+
+
+
+   
+
    
 </script>
 </body>

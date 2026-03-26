@@ -277,7 +277,6 @@ window.saveLog = function(){
 onValue(ref(db, "logs"), snapshot => {
   rawData = snapshot.val() || {};
   renderTable(rawData);
-  renderSummary(rawData);
 });
 
 function renderTable(dataObj){
@@ -372,7 +371,6 @@ window.applyFilter = function(){
   });
 
   renderTable(filtered);
-  renderSummary(filtered);
 }
 
 // ================= SUMMARY =================
@@ -433,55 +431,6 @@ sortTypeEl.addEventListener("change", () => {
 shipFilter.addEventListener("change", () => {
   applyFilter();
 });
-
-function renderSummary(dataObj){
-
-  let total = 0;
-  let byShip = {};
-  let byDate = {};
-  let byJob = {};
-
-  Object.values(dataObj).forEach(x=>{
-    let w = Number(x.workers || 0);
-    total += w;
-
-    // 👉 theo tàu
-    if(!byShip[x.ship_id]) byShip[x.ship_id] = 0;
-    byShip[x.ship_id] += w;
-
-    // 👉 theo ngày
-    if(!byDate[x.date]) byDate[x.date] = 0;
-    byDate[x.date] += w;
-
-    // 👉 theo công việc
-    if(!byJob[x.job]) byJob[x.job] = 0;
-    byJob[x.job] += w;
-  });
-
-  let html = `<h4>📊 Tổng toàn bộ: ${total} người</h4>`;
-
-  // 🚢 Theo tàu
-  html += "<h4>🚢 Theo tàu</h4>";
-  for(let k in byShip){
-    html += `<p>${k}: ${byShip[k]}</p>`;
-  }
-
-  // 📅 Theo ngày
-  html += "<h4>📅 Theo ngày</h4>";
-  for(let k in byDate){
-    html += `<p>${k}: ${byDate[k]}</p>`;
-  }
-
-  // 🛠️ Theo công việc
-  html += "<h4>🛠️ Theo công việc</h4>";
-  for(let k in byJob){
-    html += `<p>${k}: ${byJob[k]}</p>`;
-  }
-
-  summary.innerHTML = html;
-}
-
-
    
 </script>
 </body>

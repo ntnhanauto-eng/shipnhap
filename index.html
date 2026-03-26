@@ -191,7 +191,26 @@ tr:last-child td {
   padding: 4px !important;
 }
 
+#workHoursContent table {
+  width: 100%;
+  table-layout: fixed; /* 🔥 quan trọng */
+}
 
+#workHoursContent th,
+#workHoursContent td {
+  width: 33.33%;
+  text-align: center;
+}
+
+#workHoursContent input {
+  width: 90%;
+  padding: 6px;
+  font-size: 14px;
+}
+
+
+
+  
   
 </style>
 
@@ -477,10 +496,24 @@ window.toggleWorkHours = function(){
   workBoxVisible = true;
 }
 
+window.toggleWorkHours = function(){
+  const box = document.getElementById("workHoursBox");
+
+  if(workBoxVisible){
+    box.style.display = "none";
+    workBoxVisible = false;
+    return;
+  }
+
+  renderWorkHours();
+  box.style.display = "block";
+  workBoxVisible = true;
+}
+
+// 🔥 DÁN FUNCTION MỚI NGAY DƯỚI ĐÂY
 function renderWorkHours(){
   let result = {};
 
-  // gom dữ liệu theo tàu
   Object.values(rawData).forEach(x=>{
     if(!result[x.ship_id]){
       result[x.ship_id] = 0;
@@ -498,6 +531,11 @@ function renderWorkHours(){
         <td>${ship}</td>
         <td>
           <input type="number" placeholder="Nhập giờ công" id="manual_${ship.replace(/\s/g,'_')}">
+          <div style="margin-top:5px;">
+            <button onclick="saveWorkHours('${ship}')">💾</button>
+            <button onclick="editWorkHours('${ship}')">✏️</button>
+            <button onclick="deleteWorkHours('${ship}')">🗑️</button>
+          </div>
         </td>
         <td>${realHours}</td>
       </tr>
@@ -509,7 +547,23 @@ function renderWorkHours(){
   document.getElementById("workHoursContent").innerHTML = html;
 }
 
+window.saveWorkHours = function(ship){
+  let id = "manual_" + ship.replace(/\s/g,'_');
+  let value = document.getElementById(id).value;
 
+  if(!value){
+    alert("Nhập giờ công trước!");
+    return;
+  }
+
+  // 🔥 Lưu vào Firebase (node riêng)
+  update(ref(db, "workHours/" + ship.replace(/\s/g,'_')), {
+    ship: ship,
+    hours: Number(value)
+  });
+
+  alert("Đã lưu giờ công!");
+}
 
    
 

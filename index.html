@@ -63,8 +63,9 @@ button {
 
 /* TABLE RESPONSIVE */
 .table-wrap {
+  max-height: 420px;   /* ~10 dòng */
+  overflow-y: auto;
   overflow-x: auto;
-  padding-bottom: 5px;
 }
 
 /* Table */
@@ -313,11 +314,13 @@ let html = "<table><tr>\
   });
 
   let totalWorkers = 0; // 👉 tổng người
+  let index = 1;
 
   sorted.forEach(([id, x])=>{
     totalWorkers += Number(x.workers || 0);
 
-  html += `<tr>
+ html += `<tr>
+  <td class="small-col">${index++}</td>
   <td class="ship-col">${x.ship_id}</td>
   <td class="date-col">${x.date}</td>
   <td class="worker-col">${x.workers}</td>
@@ -334,7 +337,7 @@ let html = "<table><tr>\
   // 👉 THÊM HÀNG TỔNG
   html += `
     <tr style="background:#f1f1f1; font-weight:bold;">
-      <td colspan="2">TỔNG</td>
+      <td colspan="3">TỔNG</td>
       <td>${totalWorkers}</td>
       <td colspan="2"></td>
     </tr>

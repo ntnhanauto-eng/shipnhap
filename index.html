@@ -180,8 +180,8 @@ tr:last-child td {
 <h3>Chọn tàu</h3>
 <select id="ship">
 <option value="all">Tất cả</option>
-<option value="tau_01">Tàu 01</option>
-<option value="tau_02">Tàu 02</option>
+<option value="Casing_S57106">Casing S57106</option>
+<option value="Casing_J00106">Casing J00106</option>
 </select>
 </div><div class="card">
 <h3>Nhập công việc</h3>
@@ -199,8 +199,8 @@ tr:last-child td {
 </div>
   <select id="shipFilter">
   <option value="all">Tất cả tàu</option>
-  <option value="tau_01">Tàu 01</option>
-  <option value="tau_02">Tàu 02</option>
+<option value="Casing_S57106">Casing S57106</option>
+<option value="Casing_J00106">Casing J00106</option>
 </select>
 <input type="text" id="jobFilter" placeholder="Lọc theo công việc">
 <select id="sortType">
@@ -253,7 +253,7 @@ let editId = null;
 window.saveLog = function(){
 
   let data = {
-    ship_id: ship.value === 'all' ? 'tau_01' : ship.value,
+    ship_id: ship.value === 'all' ? 'Casing_S57106' : ship.value,
     date: date.value,
     workers: Number(workers.value),
     job: job.value

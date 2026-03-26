@@ -184,7 +184,12 @@ tr:last-child td {
   text-align: center;
 }
 
-
+.stt-col {
+  width: 40px;
+  max-width: 40px;
+  text-align: center;
+  padding: 4px !important;
+}
 
 
   
@@ -298,7 +303,7 @@ onValue(ref(db, "logs"), snapshot => {
 
 function renderTable(dataObj){
 let html = "<table><tr>\
-<th class='small-col'>STT</th>\
+<th class='stt-col'>STT</th>\
 <th class='ship-col'>Tàu</th>\
 <th>Ngày</th>\
 <th class='worker-col'>Người</th>\
@@ -321,7 +326,7 @@ let html = "<table><tr>\
     totalWorkers += Number(x.workers || 0);
 
  html += `<tr>
-  <td class="small-col">${index++}</td>
+  <td class="stt-col">${index++}</td>
   <td class="ship-col">${x.ship_id}</td>
   <td class="date-col">${x.date}</td>
   <td class="worker-col">${x.workers}</td>

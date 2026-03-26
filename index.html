@@ -275,7 +275,10 @@ let editId = null;
 window.saveLog = function(){
 
   let data = {
-    ship_id: ship.value === 'all' ? 'Casing S57106' : ship.value,
+    if(ship.value === 'all'){
+  alert("Vui lòng chọn tàu!");
+  return;
+}
     date: date.value,
     workers: Number(workers.value),
     job: job.value

@@ -1,0 +1,372 @@
+<!DOCTYPE html><html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quản Lý Tàu - Firebase (Filter + Summary)</title>
+  
+<style>
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: Arial;
+  margin: 0;
+  padding: 10px;
+  background: #f5f5f5;
+}
+
+/* Tiêu đề */
+h2 {
+  text-align: center;
+  font-size: 20px;
+}
+
+/* Card full width */
+.card {
+  background: #fff;
+  padding: 12px;
+  margin-bottom: 10px;
+  border-radius: 12px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+}
+
+/* Input full mobile */
+input, select, button {
+  width: 100%;
+  margin: 6px 0;
+  padding: 10px;
+  font-size: 16px;
+  border-radius: 8px;
+}
+
+/* Button đẹp hơn */
+button {
+  background: #007bff;
+  color: white;
+  border: none;
+}
+
+/* Grid mobile → 1 cột */
+.flex {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+/* Tablet trở lên */
+@media(min-width: 600px){
+  .flex {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* TABLE RESPONSIVE */
+.table-wrap {
+  overflow-x: auto;
+  padding-bottom: 5px;
+}
+
+/* Table */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 500px;
+}
+
+th, td {
+  border: 1px solid #ddd;
+  padding: 8px;
+  text-align: center;
+  font-size: 14px;
+}
+
+/* Nút trong bảng */
+td button {
+  padding: 5px 8px;
+  font-size: 12px;
+  margin: 2px;
+}
+
+/* Sticky header (rất hữu ích mobile) */
+th {
+  position: sticky;
+  top: 0;
+  background: #fff;
+}
+/* Canh trái toàn bộ dữ liệu */
+td {
+  text-align: left;
+  vertical-align: top;
+}
+
+/* Riêng tiêu đề vẫn ở giữa */
+th {
+  text-align: center;
+}
+
+/* Cột công việc xuống dòng đẹp */
+.job-col {
+  max-width: 140px;      /* Giới hạn chiều ngang */
+  word-wrap: break-word;
+  white-space: normal;
+}
+
+/* Cột nhỏ lại cho mobile */
+.small-col {
+  width: 70px;
+  white-space: nowrap;
+}
+
+/* Cột ngày */
+.date-col {
+  width: 100px;
+  white-space: nowrap;
+}
+
+.action-col {
+  width: 70px;              /* đủ chứa 2 icon */
+  min-width: 70px;
+  text-align: center;
+  padding: 4px !important;
+}
+
+.action-buttons {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+td button {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  font-size: 14px;
+  border-radius: 6px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+
+
+td button:hover {
+  background: #eee;
+}
+
+table {
+  table-layout: fixed;
+  width: 100%;
+}
+
+  
+  
+</style>
+
+
+  
+</head>
+<body><h2>🚢 Quản Lý Tàu (Filter + Tổng hợp)</h2><div class="card">
+<h3>Chọn tàu</h3>
+<select id="ship">
+<option value="all">Tất cả</option>
+<option value="tau_01">Tàu 01</option>
+<option value="tau_02">Tàu 02</option>
+</select>
+</div><div class="card">
+<h3>Nhập công việc</h3>
+<input type="date" id="date">
+<input type="number" id="workers" placeholder="Số người">
+<input type="text" id="job" placeholder="Công việc">
+<button onclick="saveLog()">Lưu</button>
+</div><div class="card">
+<h3>Bộ lọc</h3>
+<div class="flex">
+<input type="date" id="fromDate">
+<input type="date" id="toDate">
+</div>
+<input type="text" id="jobFilter" placeholder="Lọc theo công việc">
+<button onclick="applyFilter()">Áp dụng lọc</button>
+</div><div class="card">
+<h3>Dữ liệu</h3>
+<div class="table-wrap">
+  <div id="table"></div>
+</div>
+</div><div class="card">
+<h3>Tổng hợp</h3>
+<button onclick="showSummary()">Tổng hợp</button>
+<div id="summary"></div>
+</div>
+  
+ <script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getDatabase, ref, push, onValue, remove, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSy...",
+  authDomain: "ship-90534.firebaseapp.com",
+  databaseURL: "https://ship-90534-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "ship-90534"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+// DOM
+const ship = document.getElementById("ship");
+const date = document.getElementById("date");
+const workers = document.getElementById("workers");
+const job = document.getElementById("job");
+
+const fromDate = document.getElementById("fromDate");
+const toDate = document.getElementById("toDate");
+const jobFilter = document.getElementById("jobFilter");
+
+const table = document.getElementById("table");
+const summary = document.getElementById("summary");
+
+let rawData = {};
+let editId = null;
+
+// ================= SAVE =================
+window.saveLog = function(){
+
+  let data = {
+    ship_id: ship.value === 'all' ? 'tau_01' : ship.value,
+    date: date.value,
+    workers: Number(workers.value),
+    job: job.value
+  };
+
+  if(editId){
+    // UPDATE
+    update(ref(db, "logs/" + editId), data);
+    editId = null;
+    alert("Đã cập nhật");
+  }else{
+    // CREATE
+    push(ref(db, "logs"), data);
+    alert("Đã lưu");
+  }
+
+  clearForm();
+}
+
+// ================= LOAD =================
+onValue(ref(db, "logs"), snapshot => {
+  rawData = snapshot.val() || {};
+  renderTable(rawData);
+});
+
+function renderTable(dataObj){
+  let html = "<table><tr><th>Tàu</th><th>Ngày</th><th>Người</th><th>Công việc</th><th class='action-col'>Hành động</th></tr>";
+
+  // 👉 Convert + SORT theo ngày (xa nhất -> gần nhất)
+  let sorted = Object.entries(dataObj).sort((a, b) => {
+    return new Date(a[1].date) - new Date(b[1].date);
+  });
+
+  sorted.forEach(([id, x])=>{
+    html += `<tr>
+      <td class="small-col">${x.ship_id}</td>
+      <td class="date-col">${x.date}</td>
+      <td class="small-col">${x.workers}</td>
+      <td class="job-col">${x.job}</td>
+      <td class="action-col">
+        <div class="action-buttons">
+          <button onclick="editItem('${id}')">✏️</button>
+          <button onclick="deleteItem('${id}')">🗑️</button>
+        </div>
+      </td>
+    </tr>`;
+  });
+
+  html += "</table>";
+  table.innerHTML = html;
+}
+
+// ================= DELETE =================
+window.deleteItem = function(id){
+  if(confirm("Xoá dữ liệu này?")){
+    remove(ref(db, "logs/" + id));
+  }
+}
+
+// ================= EDIT =================
+window.editItem = function(id){
+  let x = rawData[id];
+
+  if(!x){
+    alert("Không tìm thấy dữ liệu!");
+    return;
+  }
+
+  ship.value = x.ship_id;
+  date.value = x.date;
+  workers.value = x.workers;
+  job.value = x.job;
+
+  editId = id;
+}
+
+// ================= FILTER =================
+window.applyFilter = function(){
+  let data = Object.entries(rawData);
+
+  let from = fromDate.value;
+  let to = toDate.value;
+  let jobF = jobFilter.value.toLowerCase();
+  let shipF = ship.value;
+
+  let filtered = {};
+
+  data.forEach(([id, x])=>{
+    let ok = true;
+
+    if(shipF !== 'all') ok = ok && x.ship_id === shipF;
+    if(from) ok = ok && x.date >= from;
+    if(to) ok = ok && x.date <= to;
+    if(jobF) ok = ok && x.job.toLowerCase().includes(jobF);
+
+    if(ok) filtered[id] = x;
+  });
+
+  renderTable(filtered);
+}
+
+// ================= SUMMARY =================
+window.showSummary = function(){
+  let result = {};
+
+  Object.values(rawData).forEach(x=>{
+    if(!result[x.ship_id]){
+      result[x.ship_id] = {
+        totalWorkers:0,
+        days:new Set()
+      }
+    }
+
+    result[x.ship_id].totalWorkers += Number(x.workers);
+    result[x.ship_id].days.add(x.date);
+  });
+
+  let html = "";
+
+  for(let ship in result){
+    html += `<p><b>${ship}</b>: Tổng người = ${result[ship].totalWorkers}, Số ngày = ${result[ship].days.size}</p>`;
+  }
+
+  summary.innerHTML = html;
+}
+
+// ================= CLEAR FORM =================
+function clearForm(){
+  date.value = "";
+  workers.value = "";
+  job.value = "";
+}
+</script>
+</body>
+</html>

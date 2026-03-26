@@ -165,6 +165,11 @@ table {
   #sortType {
   margin-top: 4px;
 }
+
+tr:last-child td {
+  color: #007bff;
+  font-size: 15px;
+}
   
 </style>
 
@@ -277,12 +282,19 @@ onValue(ref(db, "logs"), snapshot => {
 function renderTable(dataObj){
   let html = "<table><tr><th>Tàu</th><th>Ngày</th><th>Người</th><th>Công việc</th><th class='action-col'>Hành động</th></tr>";
 
-  // 👉 Convert + SORT theo ngày (xa nhất -> gần nhất)
+  let sortType = document.getElementById("sortType").value;
+
   let sorted = Object.entries(dataObj).sort((a, b) => {
-    return new Date(a[1].date) - new Date(b[1].date);
+    let d1 = new Date(a[1].date);
+    let d2 = new Date(b[1].date);
+    return sortType === "asc" ? d1 - d2 : d2 - d1;
   });
 
+  let totalWorkers = 0; // 👉 tổng người
+
   sorted.forEach(([id, x])=>{
+    totalWorkers += Number(x.workers || 0);
+
     html += `<tr>
       <td class="small-col">${x.ship_id}</td>
       <td class="date-col">${x.date}</td>
@@ -296,6 +308,15 @@ function renderTable(dataObj){
       </td>
     </tr>`;
   });
+
+  // 👉 THÊM HÀNG TỔNG
+  html += `
+    <tr style="background:#f1f1f1; font-weight:bold;">
+      <td colspan="2">TỔNG</td>
+      <td>${totalWorkers}</td>
+      <td colspan="2"></td>
+    </tr>
+  `;
 
   html += "</table>";
   table.innerHTML = html;

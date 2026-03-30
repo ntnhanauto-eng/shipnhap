@@ -267,7 +267,7 @@ tr:last-child td {
   
  <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getDatabase, ref, push, onValue, remove, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+import { getDatabase, ref, push, onValue, remove, update, set } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSy...",
@@ -561,6 +561,7 @@ function renderWorkHours(){
 }
 
 window.saveWorkHours = function(ship){
+
   let id = "manual_" + ship.replace(/\s/g,'_');
   let value = document.getElementById(id).value;
 
@@ -568,6 +569,20 @@ window.saveWorkHours = function(ship){
     alert("Nhập giờ công trước!");
     return;
   }
+
+  // 🔥 Dùng set thay vì update
+  import("https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js")
+  .then(({ set }) => {
+
+    set(ref(db, "workHours/" + ship.replace(/\s/g,'_')), {
+      ship: ship,
+      hours: Number(value)
+    });
+
+    alert("Đã lưu giờ công!");
+  });
+
+}}
 
   // 🔥 Lưu vào Firebase (node riêng)
   update(ref(db, "workHours/" + ship.replace(/\s/g,'_')), {

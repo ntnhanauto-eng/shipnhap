@@ -543,7 +543,7 @@ function renderWorkHours(){
       <tr>
         <td>${ship}</td>
         <td>
-          <input type="number" placeholder="Nhập giờ công" id="manual_${ship.replace(/\s/g,'_')}">
+          <input type="number" placeholder="Nhập giờ công" id="manual_${normalizeKey(ship)}">
           <div style="margin-top:5px;">
             <button onclick="saveWorkHours('${ship}')">💾</button>
             <button onclick="editWorkHours('${ship}')">✏️</button>
@@ -560,6 +560,12 @@ function renderWorkHours(){
   document.getElementById("workHoursContent").innerHTML = html;
 }
 
+function normalizeKey(str){
+  return str.replace(/\s/g,'_').replace(/[^\w]/g,'');
+}
+
+
+   
 window.saveWorkHours = function(ship){
 
   let id = "manual_" + normalizeKey(ship);

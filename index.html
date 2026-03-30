@@ -258,7 +258,7 @@ tr:last-child td {
 <h3>Tổng hợp</h3>
 <button onclick="showSummary()">Tổng hợp</button>
 <button onclick="toggleWorkHours()">⏱️ Giờ công tàu</button>
-<div id="summary"></div>
+<div id="summary" style="display:none;"></div>
   <div id="workHoursBox" style="display:none; margin-top:10px;">
   <h4>Nhập giờ công tàu</h4>
   <div id="workHoursContent"></div>
@@ -433,6 +433,21 @@ window.applyFilter = function(){
 
 // ================= SUMMARY =================
 window.showSummary = function(){
+
+  const summaryBox = document.getElementById("summary");
+  const workBox = document.getElementById("workHoursBox");
+
+  // 🔥 Nếu đang mở → đóng lại (toggle)
+  if(summaryVisible){
+    summaryBox.style.display = "none";
+    summaryVisible = false;
+    return;
+  }
+
+  // 🔥 Nếu mở summary → ẩn workHours
+  workBox.style.display = "none";
+  workBoxVisible = false;
+
   let result = {};
 
   Object.values(rawData).forEach(x=>{
@@ -453,7 +468,9 @@ window.showSummary = function(){
     html += `<p><b>${ship}</b>: Tổng người = ${result[ship].totalWorkers}, Số ngày = ${result[ship].days.size}</p>`;
   }
 
-  summary.innerHTML = html;
+  summaryBox.innerHTML = html;
+  summaryBox.style.display = "block";
+  summaryVisible = true;
 }
 
 // ================= CLEAR FORM =================
@@ -481,29 +498,25 @@ shipFilter.addEventListener("change", () => {
 });
 
 let workBoxVisible = false;
+let summaryVisible = false;
+
+
 
 window.toggleWorkHours = function(){
-  const box = document.getElementById("workHoursBox");
 
+  const box = document.getElementById("workHoursBox");
+  const summaryBox = document.getElementById("summary");
+
+  // 🔥 Toggle
   if(workBoxVisible){
     box.style.display = "none";
     workBoxVisible = false;
     return;
   }
 
-  renderWorkHours();
-  box.style.display = "block";
-  workBoxVisible = true;
-}
-
-window.toggleWorkHours = function(){
-  const box = document.getElementById("workHoursBox");
-
-  if(workBoxVisible){
-    box.style.display = "none";
-    workBoxVisible = false;
-    return;
-  }
+  // 🔥 Nếu mở workHours → ẩn summary
+  summaryBox.style.display = "none";
+  summaryVisible = false;
 
   renderWorkHours();
   box.style.display = "block";

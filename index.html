@@ -563,30 +563,38 @@ function renderWorkHours(){
 window.saveWorkHours = function(ship){
 
   let id = "manual_" + normalizeKey(ship);
-  let value = document.getElementById(id).value;
+  let input = document.getElementById(id);
+
+  if(!input){
+    alert("Không tìm thấy ô input!");
+    return;
+  }
+
+  let value = input.value;
 
   if(!value){
     alert("Nhập giờ công trước!");
     return;
   }
 
+  console.log("🚀 Đang lưu:", ship, value);
+
   set(ref(db, "workHours/" + normalizeKey(ship)), {
     ship: ship,
     hours: Number(value)
+  })
+  .then(()=>{
+    console.log("✅ Lưu thành công");
+    alert("Đã lưu giờ công!");
+  })
+  .catch(err=>{
+    console.error("❌ Lỗi Firebase:", err);
+    alert("Lỗi lưu: " + err.message);
   });
 
-  alert("Đã lưu giờ công!");
 }
 
-  // 🔥 Lưu vào Firebase (node riêng)
-  update(ref(db, "workHours/" + ship.replace(/\s/g,'_')), {
-    ship: ship,
-    hours: Number(value)
-  });
-
-  alert("Đã lưu giờ công!");
-}
-
+ 
    
 
    

@@ -271,8 +271,8 @@ tr:last-child td {
 </div>
 </div><div class="card">
 <h3>Tổng hợp</h3>
-<button onclick="showSummary()">Tổng hợp</button>
-<button onclick="toggleWorkHours()">⏱️ Giờ công tàu</button>
+<button id="btnSummary" onclick="showSummary()">Tổng hợp</button>
+<button id="btnWorkHours" onclick="toggleWorkHours()">⏱️ Giờ công tàu</button>
 <div id="summary" style="display:none;"></div>
   <div id="workHoursBox" style="display:none; margin-top:10px;">
   <h4>Nhập giờ công tàu</h4>
@@ -452,16 +452,22 @@ window.showSummary = function(){
   const summaryBox = document.getElementById("summary");
   const workBox = document.getElementById("workHoursBox");
 
-  // 🔥 Nếu đang mở → đóng lại (toggle)
+  const btnSummary = document.getElementById("btnSummary");
+  const btnWorkHours = document.getElementById("btnWorkHours");
+
+  // Toggle đóng
   if(summaryVisible){
     summaryBox.style.display = "none";
+    btnWorkHours.style.display = "inline-block"; // hiện lại nút kia
     summaryVisible = false;
     return;
   }
 
-  // 🔥 Nếu mở summary → ẩn workHours
+  // Mở summary
   workBox.style.display = "none";
   workBoxVisible = false;
+
+  btnWorkHours.style.display = "none"; // 🔥 ẨN nút kia
 
   let result = {};
 
@@ -487,7 +493,6 @@ window.showSummary = function(){
   summaryBox.style.display = "block";
   summaryVisible = true;
 }
-
 // ================= CLEAR FORM =================
 function clearForm(){
   date.value = "";
@@ -522,16 +527,22 @@ window.toggleWorkHours = function(){
   const box = document.getElementById("workHoursBox");
   const summaryBox = document.getElementById("summary");
 
-  // 🔥 Toggle
+  const btnSummary = document.getElementById("btnSummary");
+  const btnWorkHours = document.getElementById("btnWorkHours");
+
+  // Toggle đóng
   if(workBoxVisible){
     box.style.display = "none";
+    btnSummary.style.display = "inline-block"; // hiện lại nút kia
     workBoxVisible = false;
     return;
   }
 
-  // 🔥 Nếu mở workHours → ẩn summary
+  // Mở workHours
   summaryBox.style.display = "none";
   summaryVisible = false;
+
+  btnSummary.style.display = "none"; // 🔥 ẨN nút kia
 
   renderWorkHours();
   box.style.display = "block";

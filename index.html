@@ -3,11 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quản Lý Tàu Pro</title>
+    <title>Quản Lý Tàu Pro - Phân Quyền</title>
     <style>
         * { box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 10px; background: #f0f2f5; }
-        h2 { text-align: center; color: #1a73e8; }
+        
+        /* Header & Login */
+        .header-container { display: flex; justify-content: space-between; align-items: center; position: relative; margin-bottom: 10px; }
+        h2 { margin: 0; color: #1a73e8; flex-grow: 1; text-align: center; }
+        #authBtn { 
+            position: absolute; right: 0; top: 0;
+            width: auto; padding: 8px 15px; font-size: 13px; 
+            background: #34a853; border-radius: 5px;
+        }
+        .logout-mode { background: #dc3545 !important; }
+
         .card { background: #fff; padding: 15px; margin-bottom: 15px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
         input, select, button { width: 100%; margin: 8px 0; padding: 12px; font-size: 15px; border-radius: 8px; border: 1px solid #ddd; }
         button { background: #1a73e8; color: white; border: none; font-weight: bold; cursor: pointer; transition: 0.3s; }
@@ -20,7 +30,6 @@
         th, td { border-bottom: 1px solid #eee; padding: 10px; text-align: left; font-size: 14px; word-wrap: break-word; }
         th { background: #f8f9fa; position: sticky; top: 0; z-index: 10; }
 
-        /* Cột cố định */
         .stt-col { width: 45px; text-align: center; }
         .ship-col { width: 80px; font-weight: bold; }
         .date-col { width: 100px; }
@@ -34,13 +43,22 @@
         
         .summary-item { border-bottom: 1px solid #eee; padding: 10px 0; }
         .total-row { background: #e8f0fe; font-weight: bold; color: #1a73e8; }
+
+        /* PHÂN QUYỀN CSS */
+        .admin-only { display: none; } /* Mặc định ẩn các tính năng admin */
+        body.is-admin .admin-only { display: block; }
+        body.is-admin .admin-inline { display: table-cell; }
+        .admin-inline { display: none; }
     </style>
 </head>
-<body>
+<body id="mainBody">
 
-    <h2>🚢 Quản Lý Công Việc Tàu</h2>
+    <div class="header-container">
+        <h2>🚢 Quản Lý Công Việc Tàu</h2>
+        <button id="authBtn" onclick="handleAuth()">🔑 Admin Đăng Nhập</button>
+    </div>
 
-    <div class="card">
+    <div class="card admin-only">
         <h3>Nhập Dữ Liệu</h3>
         <div class="flex">
             <select id="ship">
@@ -82,14 +100,13 @@
     </div>
 
     <div class="card">
-        <div class="table-wrap" id="tableContainer">
-            </div>
+        <div class="table-wrap" id="tableContainer"></div>
     </div>
 
     <div class="card">
         <div class="flex">
             <button id="btnSummary" onclick="showSummary()">📊 Xem Tổng Hợp</button>
-            <button id="btnWorkHours" onclick="toggleWorkHours()">⏱️ Giờ Công Tàu</button>
+            <button id="btnWorkHours" class="admin-only" onclick="toggleWorkHours()">⏱️ Giờ Công Tàu</button>
         </div>
         
         <div id="summary" style="display:none; margin-top:15px;"></div>
@@ -103,24 +120,58 @@
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getDatabase, ref, push, onValue, remove, update, set } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+    import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-   const firebaseConfig = {
-  apiKey: "AIzaSy...",
-  authDomain: "ship-90534.firebaseapp.com",
-  databaseURL: "https://ship-90534-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "ship-90534"
-};
+    const firebaseConfig = {
+        apiKey: "AIzaSy...", // GIỮ NGUYÊN API KEY CỦA BẠN
+        authDomain: "ship-90534.firebaseapp.com",
+        databaseURL: "https://ship-90534-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "ship-90534"
+    };
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
+    const auth = getAuth(app);
 
     let rawData = {};
     let ppData = {};
     let editId = null;
-    let workBoxVisible = false;
-    let summaryVisible = false;
+    let isAdmin = false;
 
-    // --- SAVE ---
+    // --- XỬ LÝ ĐĂNG NHẬP ---
+    window.handleAuth = function() {
+        if (isAdmin) {
+            signOut(auth).then(() => alert("Đã đăng xuất!"));
+        } else {
+            const email = prompt("Nhập email Admin:");
+            const pass = prompt("Nhập mật khẩu:");
+            if (email && pass) {
+                signInWithEmailAndPassword(auth, email, pass)
+                .catch(err => alert("Lỗi: " + err.message));
+            }
+        }
+    }
+
+    // Theo dõi trạng thái đăng nhập
+    onAuthStateChanged(auth, (user) => {
+        const body = document.getElementById("mainBody");
+        const btn = document.getElementById("authBtn");
+        if (user) {
+            isAdmin = true;
+            body.classList.add("is-admin");
+            btn.innerText = "🚀 Thoát Admin";
+            btn.classList.add("logout-mode");
+        } else {
+            isAdmin = false;
+            body.classList.remove("is-admin");
+            btn.innerText = "🔑 Admin Đăng Nhập";
+            btn.classList.remove("logout-mode");
+            document.getElementById("workHoursBox").style.display = "none";
+        }
+        applyFilter(); // Vẽ lại bảng để hiện/ẩn cột Sửa/Xóa
+    });
+
+    // --- CÁC HÀM CỦA BẠN (GIỮ NGUYÊN LOGIC) ---
     window.saveLog = function(){
         const shipVal = document.getElementById("ship").value;
         const dateVal = document.getElementById("date").value;
@@ -132,12 +183,7 @@
             return;
         }
 
-        let data = {
-            ship_id: shipVal,
-            date: dateVal,
-            workers: Number(workerVal),
-            job: jobVal
-        };
+        let data = { ship_id: shipVal, date: dateVal, workers: Number(workerVal), job: jobVal };
 
         if(editId){
             update(ref(db, "logs/" + editId), data).then(() => {
@@ -153,7 +199,6 @@
         }
     }
 
-    // --- LOAD DATA ---
     onValue(ref(db, "logs"), snapshot => {
         rawData = snapshot.val() || {};
         applyFilter();
@@ -161,9 +206,9 @@
 
     onValue(ref(db, "workHours"), snapshot => {
         ppData = snapshot.val() || {};
+        if(document.getElementById("summary").style.display === "block") showSummary();
     });
 
-    // --- RENDER TABLE ---
     window.applyFilter = function(){
         const from = document.getElementById("fromDate").value;
         const to = document.getElementById("toDate").value;
@@ -176,7 +221,7 @@
             if(shipF !== 'all') ok = ok && x.ship_id === shipF;
             if(from) ok = ok && x.date >= from;
             if(to) ok = ok && x.date <= to;
-            if(jobF) ok = ok && x.job.toLowerCase().includes(jobF);
+            if(jobF) ok = ok && (x.job || "").toLowerCase().includes(jobF);
             return ok;
         });
 
@@ -197,7 +242,7 @@
                 <th class="date-col">Ngày</th>
                 <th class="worker-col">Người</th>
                 <th>Công việc</th>
-                <th class="action-col">Sửa/Xóa</th>
+                <th class="action-col admin-inline">Sửa/Xóa</th>
             </tr>`;
 
         let totalWorkers = 0;
@@ -209,7 +254,7 @@
                 <td class="date-col">${x.date}</td>
                 <td class="worker-col">${x.workers}</td>
                 <td>${x.job}</td>
-                <td class="action-col">
+                <td class="action-col admin-inline">
                     <div class="action-buttons">
                         <button class="btn-edit" onclick="editItem('${id}')">✏️</button>
                         <button class="btn-delete" onclick="deleteItem('${id}')">🗑️</button>
@@ -221,14 +266,14 @@
         html += `<tr class="total-row">
             <td colspan="3" style="text-align:right">TỔNG CỘNG:</td>
             <td class="worker-col">${totalWorkers}</td>
-            <td colspan="2">người</td>
+            <td colspan="${isAdmin ? 2 : 1}">${isAdmin ? 'người' : 'người'}</td>
         </tr></table>`;
         
         document.getElementById("tableContainer").innerHTML = html;
     }
 
-    // --- EDIT / DELETE ---
     window.editItem = function(id){
+        if(!isAdmin) return;
         let x = rawData[id];
         document.getElementById("ship").value = x.ship_id;
         document.getElementById("date").value = x.date;
@@ -239,29 +284,24 @@
     }
 
     window.deleteItem = function(id){
+        if(!isAdmin) return;
         if(confirm("Bạn chắc chắn muốn xóa dòng này?")){
             remove(ref(db, "logs/" + id));
         }
     }
 
-    // --- SUMMARY ---
     window.showSummary = function(){
         const box = document.getElementById("summary");
-        summaryVisible = !summaryVisible;
-        
-        if(!summaryVisible) {
-            box.style.display = "none";
-            return;
-        }
+        box.style.display = (box.style.display === "none") ? "block" : "none";
+        if(box.style.display === "none") return;
 
         let result = {};
         Object.values(rawData).forEach(x => {
-            if(!result[x.ship_id]) result[x.ship_id] = { totalWorkers:0, days: new Set() };
+            if(!result[x.ship_id]) result[x.ship_id] = { totalWorkers:0 };
             result[x.ship_id].totalWorkers += Number(x.workers);
-            result[x.ship_id].days.add(x.date);
         });
 
-        let html = "<h4>Báo cáo tổng hợp theo tàu</h4>";
+        let html = "<h4>📊 Báo cáo tổng hợp</h4>";
         for(let s in result){
             let key = s.replace(/\s/g,'_');
             let savedPP = ppData[key]?.hours || 0;
@@ -270,26 +310,20 @@
             html += `<div class="summary-item">
                 <b>🚢 Tàu: ${s}</b><br>
                 - Tổng nhân công: ${result[s].totalWorkers} lượt người<br>
-                - Tổng giờ thực tế (x8h): ${realHours.toLocaleString()} giờ<br>
-                - Giờ công PP định mức: <b>${savedPP.toLocaleString()}</b> giờ
+                - Tổng giờ thực tế: ${realHours.toLocaleString()} giờ<br>
+                - Giờ định mức PP: <b>${savedPP.toLocaleString()}</b> giờ
             </div>`;
         }
         box.innerHTML = html;
-        box.style.display = "block";
         document.getElementById("workHoursBox").style.display = "none";
-        workBoxVisible = false;
     }
 
     window.toggleWorkHours = function(){
-        workBoxVisible = !workBoxVisible;
         const box = document.getElementById("workHoursBox");
-        if(workBoxVisible){
+        box.style.display = (box.style.display === "none") ? "block" : "none";
+        if(box.style.display === "block") {
             renderWorkHoursInputs();
-            box.style.display = "block";
             document.getElementById("summary").style.display = "none";
-            summaryVisible = false;
-        } else {
-            box.style.display = "none";
         }
     }
 
@@ -313,18 +347,13 @@
         let key = shipName.replace(/\s/g,'_');
         let val = document.getElementById("pp_" + key).value.replace(/,/g,'');
         if(!val) return alert("Nhập số giờ!");
-        
-        set(ref(db, "workHours/" + key), {
-            ship: shipName,
-            hours: Number(val)
-        }).then(() => alert("Đã cập nhật giờ công định mức cho " + shipName));
+        set(ref(db, "workHours/" + key), { ship: shipName, hours: Number(val) })
+        .then(() => alert("Đã cập nhật cho " + shipName));
     }
 
     window.formatInput = function(input){
         let val = input.value.replace(/,/g,'');
-        if(!isNaN(val) && val !== "") {
-            input.value = Number(val).toLocaleString('en-US');
-        }
+        if(!isNaN(val) && val !== "") input.value = Number(val).toLocaleString('en-US');
     }
 
     function clearForm(){
@@ -332,7 +361,7 @@
         document.getElementById("job").value = "";
     }
 
-    // Listeners cho bộ lọc
+    // Listeners
     document.getElementById("sortType").addEventListener("change", applyFilter);
     document.getElementById("shipFilter").addEventListener("change", applyFilter);
     document.getElementById("jobFilter").addEventListener("input", applyFilter);

@@ -114,27 +114,28 @@ input[type="date"] {
         <button onclick="saveLog()">💾 Lưu Thông Tin</button>
     </div>
 
-    <div class="card">
-        <h3>Bộ Lọc & Tìm Kiếm</h3>
-        <div class="flex">
-            <input type="date" id="fromDate">
-            <input type="date" id="toDate">
-        </div>
-        <div class="flex" style="margin-top: 10px;">
-            <select id="shipFilter">
-                <option value="all">Tất cả tàu</option>
-                <option value="S571">S571</option>
-                <option value="J002">J002</option>
-                <option value="S577">S577</option>
-                <option value="S579">S579</option>
-            </select>
-            <input type="text" id="jobFilter" placeholder="Tìm tên công việc...">
-        </div>
-        <select id="sortType">
-            <option value="desc">📅 Mới nhất trước</option>
-            <option value="asc">📅 Cũ nhất trước</option>
-        </select>
+   <div class="card">
+    <h3>Bộ Lọc & Tìm Kiếm</h3>
+    <div class="date-row">
+        <input type="date" id="fromDate" placeholder="Từ ngày">
+        <input type="date" id="toDate" placeholder="Đến ngày">
     </div>
+    
+    <div class="flex" style="margin-top: 10px;">
+        <select id="shipFilter">
+            <option value="all">Tất cả tàu</option>
+            <option value="S571">S571</option>
+            <option value="J002">J002</option>
+            <option value="S577">S577</option>
+            <option value="S579">S579</option>
+        </select>
+        <input type="text" id="jobFilter" placeholder="Tìm tên công việc...">
+    </div>
+    <select id="sortType">
+        <option value="desc">📅 Mới nhất trước</option>
+        <option value="asc">📅 Cũ nhất trước</option>
+    </select>
+</div>
 
     <div class="card">
         <div class="table-wrap" id="tableContainer"></div>

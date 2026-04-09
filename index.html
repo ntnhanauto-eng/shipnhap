@@ -338,10 +338,18 @@ window.saveLog = function(){
 }
 
 // ================= LOAD =================
-onValue(ref(db, "logs"), snapshot => {
+let rawData = {};
+let ppData = {};
+   onValue(ref(db, "logs"), snapshot => {
   rawData = snapshot.val() || {};
   renderTable(rawData);
 });
+
+
+onValue(ref(db, "ppHours"), snapshot => {
+  ppData = snapshot.val() || {};
+});
+   
 
 function renderTable(dataObj){
 let html = "<table><tr>\
@@ -486,19 +494,34 @@ window.showSummary = function(){
   let html = "";
 
   for(let ship in result){
+  let key = ship.replace(/\s/g,'_');
+  let saved = ppData[key]?.hours || "";
   let totalWorkers = result[ship].totalWorkers;
   let totalDays = result[ship].days.size;
 
   let totalRealHours = totalWorkers * totalDays * 8; // 🔥 công thức mới
 
-  html += `
+ html += `
+  <div style="margin-bottom:10px; padding:8px; border:1px solid #ddd; border-radius:8px;">
     <p>
-      <b>${ship}</b>:
-      Tổng người = ${totalWorkers},
-      Số ngày = ${totalDays},
+      <b>${ship}</b><br>
+      Tổng người = ${totalWorkers} <br>
+      Số ngày = ${totalDays} <br>
       Tổng giờ thực tế = ${totalRealHours}
     </p>
-  `;
+
+    <div style="display:flex; gap:6px; align-items:center;">
+     <input 
+  type="text"
+  value="${saved ? saved.toLocaleString() : ''}"
+  placeholder="Giờ công PP"
+  id="pp_${key}"
+  oninput="formatNumber(this)"
+>
+      <button onclick="savePP('${ship}')">💾</button>
+    </div>
+  </div>
+`;
 }
 
   summaryBox.innerHTML = html;
@@ -616,8 +639,30 @@ window.saveWorkHours = function(ship){
   alert("Đã lưu giờ công!");
 }
 
-   
+// định dạng phần nghìn
+   window.formatNumber = function(input){
+  let value = input.value.replace(/,/g, '').replace(/\D/g, '');
+  input.value = value.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
 
+
+   // SAVE PP
+window.savePP = function(ship){
+  let id = "pp_" + ship.replace(/\s/g,'_');
+  let raw = document.getElementById(id).value.replace(/,/g,'');
+
+  if(!raw){
+    alert("Nhập giờ công PP trước!");
+    return;
+  }
+
+  update(ref(db, "ppHours/" + ship.replace(/\s/g,'_')), {
+    ship: ship,
+    hours: Number(raw)
+  });
+
+  alert("Đã lưu giờ công PP!");
+}
    
 </script>
 </body>

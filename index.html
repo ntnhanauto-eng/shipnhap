@@ -108,7 +108,8 @@ th {
 
 /* Cột công việc xuống dòng đẹp */
 .job-col {
-  max-width: 140px;      /* Giới hạn chiều ngang */
+  width: auto;           /* cho phép ăn phần còn lại */
+  max-width: none;
   word-wrap: break-word;
   white-space: normal;
 }
@@ -121,12 +122,10 @@ th {
 
 /* Cột ngày */
 .date-col {
-  width: 80px;        /* giảm chiều rộng */
-  max-width: 80px;
-  font-size: 13px;    /* nhỏ chữ lại chút */
+  width: 75px;
+  max-width: 75px;
+  font-size: 12px;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis; /* nếu dài thì ... */
 }
 
 .action-col {
@@ -177,9 +176,12 @@ tr:last-child td {
 }
 
   .ship-col {
-  width: 90px;
-  max-width: 90px;
+  width: 70px;
+  max-width: 70px;
+  font-size: 13px;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .worker-col {

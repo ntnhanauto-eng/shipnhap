@@ -1,680 +1,344 @@
-<!DOCTYPE html><html lang="vi">
+<!DOCTYPE html>
+<html lang="vi">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Quản Lý Tàu</title>
-  
-<style>
-* {
-  box-sizing: border-box;
-}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản Lý Tàu Pro</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 10px; background: #f0f2f5; }
+        h2 { text-align: center; color: #1a73e8; }
+        .card { background: #fff; padding: 15px; margin-bottom: 15px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        input, select, button { width: 100%; margin: 8px 0; padding: 12px; font-size: 15px; border-radius: 8px; border: 1px solid #ddd; }
+        button { background: #1a73e8; color: white; border: none; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        button:hover { background: #1557b0; }
+        .flex { display: grid; grid-template-columns: 1fr; gap: 10px; }
+        @media(min-width: 600px){ .flex { grid-template-columns: 1fr 1fr; } }
+        
+        .table-wrap { max-height: 500px; overflow: auto; border: 1px solid #eee; border-radius: 8px; }
+        table { width: 100%; border-collapse: collapse; min-width: 600px; table-layout: fixed; }
+        th, td { border-bottom: 1px solid #eee; padding: 10px; text-align: left; font-size: 14px; word-wrap: break-word; }
+        th { background: #f8f9fa; position: sticky; top: 0; z-index: 10; }
 
-body {
-  font-family: Arial;
-  margin: 0;
-  padding: 10px;
-  background: #f5f5f5;
-}
-
-/* Tiêu đề */
-h2 {
-  text-align: center;
-  font-size: 20px;
-}
-
-/* Card full width */
-.card {
-  background: #fff;
-  padding: 12px;
-  margin-bottom: 10px;
-  border-radius: 12px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-}
-
-/* Input full mobile */
-input, select, button {
-  width: 100%;
-  margin: 6px 0;
-  padding: 10px;
-  font-size: 16px;
-  border-radius: 8px;
-}
-
-/* Button đẹp hơn */
-button {
-  background: #007bff;
-  color: white;
-  border: none;
-}
-
-/* Grid mobile → 1 cột */
-.flex {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 8px;
-}
-
-/* Tablet trở lên */
-@media(min-width: 600px){
-  .flex {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-
-/* TABLE RESPONSIVE */
-.table-wrap {
-  max-height: 650px;   /* ~10 dòng */
-  overflow-y: auto;
-  overflow-x: auto;
-}
-
-/* Table */
-table {
-  width: 100%;
-  border-collapse: collapse;
-  min-width: 500px;
-}
-
-th, td {
-  border: 1px solid #ddd;
-  padding: 8px;
-  text-align: center;
-  font-size: 14px;
-}
-
-/* Nút trong bảng */
-td button {
-  padding: 5px 8px;
-  font-size: 12px;
-  margin: 2px;
-}
-
-/* Sticky header (rất hữu ích mobile) */
-th {
-  position: sticky;
-  top: 0;
-  background: #fff;
-}
-/* Canh trái toàn bộ dữ liệu */
-td {
-  text-align: left;
-  vertical-align: top;
-}
-
-/* Riêng tiêu đề vẫn ở giữa */
-th {
-  text-align: center;
-}
-
-/* Cột công việc xuống dòng đẹp */
-.job-col {
-  width: auto;           /* cho phép ăn phần còn lại */
-  max-width: none;
-  word-wrap: break-word;
-  white-space: normal;
-}
-
-/* Cột nhỏ lại cho mobile */
-.small-col {
-  width: 70px;
-  white-space: nowrap;
-}
-
-/* Cột ngày */
-.date-col {
-  width: 40px;
-  min-width: 40px;   /* 🔥 thêm dòng này */
-  max-width: 40px;
-  font-size: 13px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  padding: 2px !important;
-}
-
-.action-col {
-  width: 70px;              /* đủ chứa 2 icon */
-  min-width: 70px;
-  text-align: center;
-  padding: 4px !important;
-}
-
-.action-buttons {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-}
-
-td button {
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  font-size: 14px;
-  border-radius: 6px;
-  line-height: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-
-
-td button:hover {
-  background: #eee;
-}
-
-table {
-  table-layout: fixed;
-  width: 100%;
-}
-
-
-  #sortType {
-  margin-top: 4px;
-}
-
-tr:last-child td {
-  color: #007bff;
-  font-size: 15px;
-}
-
-  .ship-col {
-  width: 70px;
-  max-width: 70px;
-  font-size: 13px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.worker-col {
-  width: 60px;
-  max-width: 60px;
-  text-align: center;
-}
-
-.stt-col {
-  width: 40px;
-  max-width: 40px;
-  text-align: center;
-  padding: 4px !important;
-}
-
-#workHoursContent table {
-  width: 100%;
-  table-layout: fixed; /* 🔥 quan trọng */
-}
-
-#workHoursContent th,
-#workHoursContent td {
-  width: 33.33%;
-  text-align: center;
-}
-
-#workHoursContent input {
-  width: 90%;
-  padding: 6px;
-  font-size: 14px;
-}
-
-
-
-  
-  
-</style>
-
-
-  
+        /* Cột cố định */
+        .stt-col { width: 45px; text-align: center; }
+        .ship-col { width: 80px; font-weight: bold; }
+        .date-col { width: 100px; }
+        .worker-col { width: 70px; text-align: center; }
+        .action-col { width: 90px; text-align: center; }
+        
+        .action-buttons { display: flex; gap: 5px; justify-content: center; }
+        .action-buttons button { width: 35px; height: 35px; padding: 0; margin: 0; }
+        .btn-edit { background: #ffc107; }
+        .btn-delete { background: #dc3545; }
+        
+        .summary-item { border-bottom: 1px solid #eee; padding: 10px 0; }
+        .total-row { background: #e8f0fe; font-weight: bold; color: #1a73e8; }
+    </style>
 </head>
-<body><h2>🚢 Quản Lý Tàu</h2><div class="card">
-<h3>Chọn tàu</h3>
-<select id="ship">
-<option value="all">Tất cả</option>
-<option value="S571">S571</option>
-<option value="J002">J002</option>
-<option value="S577">S577</option>
-<option value="S579">S579</option>
-</select>
-</div><div class="card">
-<h3>Nhập công việc</h3>
-<input type="date" id="date">
-<input type="number" id="workers" placeholder="Số người">
-<input type="text" id="job" placeholder="Công việc">
-<button onclick="saveLog()">Lưu</button>
-  
-</div><div class="card">
-<h3>Bộ lọc</h3>
-<div class="flex">
-  
-<input type="date" id="fromDate">
-<input type="date" id="toDate">
-</div>
-  <select id="shipFilter">
-  <option value="all">Tất cả tàu</option>
-<option value="all">Tất cả</option>
-<option value="S571">S571</option>
-<option value="J002">J002</option>
-<option value="S577">S577</option>
-<option value="S579">S579</option>
-</select>
-<input type="text" id="jobFilter" placeholder="Lọc theo công việc">
-<select id="sortType">
-  <option value="asc">📅 ↑ tăng dần </option>
-  <option value="desc">📅 ↓ giảm dần </option>
-</select>
-<button onclick="applyFilter()">Áp dụng lọc</button>
-</div><div class="card">
-<h3>Dữ liệu</h3>
-<div class="table-wrap">
-  <div id="table"></div>
-</div>
-</div><div class="card">
-<h3>Tổng hợp</h3>
-<button id="btnSummary" onclick="showSummary()">Tổng hợp</button>
-<button id="btnWorkHours" onclick="toggleWorkHours()">⏱️ Giờ công tàu</button>
-<div id="summary" style="display:none;"></div>
-  <div id="workHoursBox" style="display:none; margin-top:10px;">
-  <h4>Nhập giờ công tàu</h4>
-  <div id="workHoursContent"></div>
-</div>
-</div>
-  
- <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getDatabase, ref, push, onValue, remove, update, set } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+<body>
 
-const firebaseConfig = {
-  apiKey: "AIzaSy...",
-  authDomain: "ship-90534.firebaseapp.com",
-  databaseURL: "https://ship-90534-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "ship-90534"
-};
+    <h2>🚢 Quản Lý Công Việc Tàu</h2>
 
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
-
-// DOM
-const ship = document.getElementById("ship");
-const date = document.getElementById("date");
-const workers = document.getElementById("workers");
-const job = document.getElementById("job");
-
-const fromDate = document.getElementById("fromDate");
-const toDate = document.getElementById("toDate");
-const jobFilter = document.getElementById("jobFilter");
-
-const table = document.getElementById("table");
-const summary = document.getElementById("summary");
-
-let rawData = {};
-let ppData = {};
-let editId = null;
-
-// ================= SAVE =================
-window.saveLog = function(){
-
-  if(ship.value === 'all'){
-    alert("Vui lòng chọn tàu!");
-    return;
-  }
-
-  let data = {
-    ship_id: ship.value, // 🔥 thiếu cái này nên table bị undefined
-    date: date.value,
-    workers: Number(workers.value),
-    job: job.value
-  };
-
-  if(editId){
-    update(ref(db, "logs/" + editId), data);
-    editId = null;
-    alert("Đã cập nhật");
-  }else{
-    push(ref(db, "logs"), data);
-    alert("Đã lưu");
-  }
-
-  clearForm();
-}
-
-// ================= LOAD =================
-onValue(ref(db, "logs"), snapshot => {
-  rawData = snapshot.val() || {};
-  renderTable(rawData);
-});
-
-onValue(ref(db, "workHours"), snapshot => {
-  ppData = snapshot.val() || {};
-});
-
-function renderTable(dataObj){
-let html = "<table><tr>\
-<th class='stt-col'>STT</th>\
-<th class='ship-col'>Tàu</th>\
-<th>Ngày</th>\
-<th class='worker-col'>Người</th>\
-<th>Công việc</th>\
-<th class='action-col'>Hành động</th>\
-</tr>";
-
-  let sortType = document.getElementById("sortType").value;
-
-  let sorted = Object.entries(dataObj).sort((a, b) => {
-    let d1 = new Date(a[1].date);
-    let d2 = new Date(b[1].date);
-    return sortType === "asc" ? d1 - d2 : d2 - d1;
-  });
-
-  let totalWorkers = 0; // 👉 tổng người
-  let index = 1;
-
-  sorted.forEach(([id, x])=>{
-    totalWorkers += Number(x.workers || 0);
-
- html += `<tr>
-  <td class="stt-col">${index++}</td>
-  <td class="ship-col">${x.ship_id || "Chưa có"}</td>
-  <td class="date-col">${x.date}</td>
-  <td class="worker-col">${x.workers}</td>
-  <td class="job-col">${x.job}</td>
-      <td class="action-col">
-        <div class="action-buttons">
-          <button onclick="editItem('${id}')">✏️</button>
-          <button onclick="deleteItem('${id}')">🗑️</button>
+    <div class="card">
+        <h3>Nhập Dữ Liệu</h3>
+        <div class="flex">
+            <select id="ship">
+                <option value="all">-- Chọn Tàu --</option>
+                <option value="S571">S571</option>
+                <option value="J002">J002</option>
+                <option value="S577">S577</option>
+                <option value="S579">S579</option>
+            </select>
+            <input type="date" id="date">
         </div>
-      </td>
-    </tr>`;
-  });
-
-  // 👉 THÊM HÀNG TỔNG
-  html += `
-    <tr style="background:#f1f1f1; font-weight:bold;">
-      <td colspan="3">TỔNG</td>
-      <td>${totalWorkers}</td>
-      <td colspan="2"></td>
-    </tr>
-  `;
-
-  html += "</table>";
-  table.innerHTML = html;
-}
-
-// ================= DELETE =================
-window.deleteItem = function(id){
-  if(confirm("Xoá dữ liệu này?")){
-    remove(ref(db, "logs/" + id));
-  }
-}
-
-// ================= EDIT =================
-window.editItem = function(id){
-  let x = rawData[id];
-
-  if(!x){
-    alert("Không tìm thấy dữ liệu!");
-    return;
-  }
-
-  ship.value = x.ship_id;
-  date.value = x.date;
-  workers.value = x.workers;
-  job.value = x.job;
-
-  editId = id;
-}
-
-// ================= FILTER =================
-const shipFilter = document.getElementById("shipFilter");
-
-window.applyFilter = function(){
-  let data = Object.entries(rawData);
-
-  let from = fromDate.value;
-  let to = toDate.value;
-  let jobF = jobFilter.value.toLowerCase();
-  let shipF = shipFilter.value; // ✅ đúng
-
-  let filtered = {};
-
-  data.forEach(([id, x])=>{
-    let ok = true;
-
-    if(shipF !== 'all') ok = ok && x.ship_id === shipF;
-    if(from) ok = ok && x.date >= from;
-    if(to) ok = ok && x.date <= to;
-    if(jobF) ok = ok && x.job.toLowerCase().includes(jobF);
-
-    if(ok) filtered[id] = x;
-  });
-
-  renderTable(filtered);
-}
-
-// ================= SUMMARY =================
-window.showSummary = function(){
-
-  const summaryBox = document.getElementById("summary");
-  const workBox = document.getElementById("workHoursBox");
-
-  const btnSummary = document.getElementById("btnSummary");
-  const btnWorkHours = document.getElementById("btnWorkHours");
-
-  // Toggle đóng
-  if(summaryVisible){
-    summaryBox.style.display = "none";
-    btnWorkHours.style.display = "inline-block"; // hiện lại nút kia
-    summaryVisible = false;
-    return;
-  }
-
-  // Mở summary
-  workBox.style.display = "none";
-  workBoxVisible = false;
-
-  btnWorkHours.style.display = "none"; // 🔥 ẨN nút kia
-
-  let result = {};
-
-  Object.values(rawData).forEach(x=>{
-    if(!result[x.ship_id]){
-      result[x.ship_id] = {
-        totalWorkers:0,
-        days:new Set()
-      }
-    }
-
-    result[x.ship_id].totalWorkers += Number(x.workers);
-    result[x.ship_id].days.add(x.date);
-  });
-
-  let html = "";
-
- for(let ship in result){
-
-  let totalWorkers = result[ship].totalWorkers;
-  let totalDays = result[ship].days.size;
-
-  let totalRealHours = totalWorkers * totalDays * 8;
-
-  let key = ship.replace(/\s/g,'_');
-  let saved = ppData[key]?.hours || "";
-
-  html += `
-    <div style="margin-bottom:10px; padding:8px; border-bottom:1px solid #eee;">
-      <p>
-        <b>${ship}</b><br>
-        Tổng người = ${totalWorkers}<br>
-        Số ngày = ${totalDays}<br>
-        Tổng giờ thực tế = ${totalRealHours}
-      </p>
-
-     <div style="display:flex; gap:5px; align-items:center;">
-  <input 
-    type="text"
-    placeholder="Giờ công PP"
-    id="pp_${key}"
-    value="${saved ? saved.toLocaleString() : ''}"
-    style="width:120px; padding:5px; font-size:13px;"
-    oninput="formatNumber(this)"
-  >
-
-  <button 
-    onclick="savePP('${ship}')"
-    style="width:40px; height:30px; padding:0; font-size:14px;"
-  >💾</button>
-</div>
-       
-      </div>
+        <div class="flex">
+            <input type="number" id="workers" placeholder="Số người thực hiện">
+            <input type="text" id="job" placeholder="Nội dung công việc">
+        </div>
+        <button onclick="saveLog()">💾 Lưu Thông Tin</button>
     </div>
-  `;
-}
 
-  summaryBox.innerHTML = html;
-  summaryBox.style.display = "block";
-  summaryVisible = true;
-}
-// ================= CLEAR FORM =================
-function clearForm(){
-  date.value = "";
-  workers.value = "";
-  job.value = "";
-}
+    <div class="card">
+        <h3>Bộ Lọc & Tìm Kiếm</h3>
+        <div class="flex">
+            <input type="date" id="fromDate">
+            <input type="date" id="toDate">
+        </div>
+        <div class="flex" style="margin-top: 10px;">
+            <select id="shipFilter">
+                <option value="all">Tất cả tàu</option>
+                <option value="S571">S571</option>
+                <option value="J002">J002</option>
+                <option value="S577">S577</option>
+                <option value="S579">S579</option>
+            </select>
+            <input type="text" id="jobFilter" placeholder="Tìm tên công việc...">
+        </div>
+        <select id="sortType">
+            <option value="desc">📅 Mới nhất trước</option>
+            <option value="asc">📅 Cũ nhất trước</option>
+        </select>
+    </div>
 
- document.getElementById("sortType").addEventListener("change", () => {
-  applyFilter(); // tự render lại ngay
-});
+    <div class="card">
+        <div class="table-wrap" id="tableContainer">
+            </div>
+    </div>
 
-   [fromDate, toDate, jobFilter].forEach(el => {
-  el.addEventListener("input", () => {
-    applyFilter();
-  });
-});
+    <div class="card">
+        <div class="flex">
+            <button id="btnSummary" onclick="showSummary()">📊 Xem Tổng Hợp</button>
+            <button id="btnWorkHours" onclick="toggleWorkHours()">⏱️ Giờ Công Tàu</button>
+        </div>
+        
+        <div id="summary" style="display:none; margin-top:15px;"></div>
+        
+        <div id="workHoursBox" style="display:none; margin-top:15px;">
+            <h4>Nhập Giờ Công Theo Định Mức</h4>
+            <div id="workHoursContent"></div>
+        </div>
+    </div>
 
-const sortTypeEl = document.getElementById("sortType");
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getDatabase, ref, push, onValue, remove, update, set } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
+    const firebaseConfig = {
+        apiKey: "AIzaSy...", // Thay bằng Key thật của bạn
+        authDomain: "ship-90534.firebaseapp.com",
+        databaseURL: "https://ship-90534-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "ship-90534"
+    };
 
-shipFilter.addEventListener("change", () => {
-  applyFilter();
-});
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
 
-let workBoxVisible = false;
-let summaryVisible = false;
+    let rawData = {};
+    let ppData = {};
+    let editId = null;
+    let workBoxVisible = false;
+    let summaryVisible = false;
 
+    // --- SAVE ---
+    window.saveLog = function(){
+        const shipVal = document.getElementById("ship").value;
+        const dateVal = document.getElementById("date").value;
+        const workerVal = document.getElementById("workers").value;
+        const jobVal = document.getElementById("job").value;
 
+        if(shipVal === 'all' || !dateVal || !workerVal) {
+            alert("Vui lòng nhập đầy đủ Tàu, Ngày và Số người!");
+            return;
+        }
 
-window.toggleWorkHours = function(){
+        let data = {
+            ship_id: shipVal,
+            date: dateVal,
+            workers: Number(workerVal),
+            job: jobVal
+        };
 
-  const box = document.getElementById("workHoursBox");
-  const summaryBox = document.getElementById("summary");
-
-  const btnSummary = document.getElementById("btnSummary");
-  const btnWorkHours = document.getElementById("btnWorkHours");
-
-  // Toggle đóng
-  if(workBoxVisible){
-    box.style.display = "none";
-    btnSummary.style.display = "inline-block"; // hiện lại nút kia
-    workBoxVisible = false;
-    return;
-  }
-
-  // Mở workHours
-  summaryBox.style.display = "none";
-  summaryVisible = false;
-
-  btnSummary.style.display = "none"; // 🔥 ẨN nút kia
-
-  renderWorkHours();
-  box.style.display = "block";
-  workBoxVisible = true;
-}
-
-// 🔥 DÁN FUNCTION MỚI NGAY DƯỚI ĐÂY
-function renderWorkHours(){
-  let result = {};
-
-  Object.values(rawData).forEach(x=>{
-    if(!result[x.ship_id]){
-      result[x.ship_id] = 0;
+        if(editId){
+            update(ref(db, "logs/" + editId), data).then(() => {
+                editId = null;
+                alert("Cập nhật thành công!");
+                clearForm();
+            });
+        } else {
+            push(ref(db, "logs"), data).then(() => {
+                alert("Đã lưu!");
+                clearForm();
+            });
+        }
     }
-    result[x.ship_id] += Number(x.workers || 0);
-  });
 
-  let html = "<table><tr><th>Tàu</th><th>Giờ công tàu</th><th>Giờ công thực tế</th></tr>";
+    // --- LOAD DATA ---
+    onValue(ref(db, "logs"), snapshot => {
+        rawData = snapshot.val() || {};
+        applyFilter();
+    });
 
-  for(let ship in result){
-    let realHours = result[ship] * 8;
+    onValue(ref(db, "workHours"), snapshot => {
+        ppData = snapshot.val() || {};
+    });
 
-    html += `
-      <tr>
-        <td>${ship}</td>
-        <td>
-          <input type="number" placeholder="Nhập giờ công" id="manual_${ship.replace(/\s/g,'_')}">
-          <div style="margin-top:5px;">
-            <button onclick="saveWorkHours('${ship}')">💾</button>
-            <button onclick="editWorkHours('${ship}')">✏️</button>
-            <button onclick="deleteWorkHours('${ship}')">🗑️</button>
-          </div>
-        </td>
-        <td>${realHours}</td>
-      </tr>
-    `;
-  }
+    // --- RENDER TABLE ---
+    window.applyFilter = function(){
+        const from = document.getElementById("fromDate").value;
+        const to = document.getElementById("toDate").value;
+        const jobF = document.getElementById("jobFilter").value.toLowerCase();
+        const shipF = document.getElementById("shipFilter").value;
+        const sortType = document.getElementById("sortType").value;
 
-  html += "</table>";
+        let filteredArray = Object.entries(rawData).filter(([id, x]) => {
+            let ok = true;
+            if(shipF !== 'all') ok = ok && x.ship_id === shipF;
+            if(from) ok = ok && x.date >= from;
+            if(to) ok = ok && x.date <= to;
+            if(jobF) ok = ok && x.job.toLowerCase().includes(jobF);
+            return ok;
+        });
 
-  document.getElementById("workHoursContent").innerHTML = html;
-}
+        filteredArray.sort((a, b) => {
+            let d1 = new Date(a[1].date);
+            let d2 = new Date(b[1].date);
+            return sortType === "asc" ? d1 - d2 : d2 - d1;
+        });
 
-window.saveWorkHours = function(ship){
-  let id = "manual_" + ship.replace(/\s/g,'_');
-  let value = document.getElementById(id).value;
+        renderTableUI(filteredArray);
+    }
 
-  if(!value){
-    alert("Nhập giờ công trước!");
-    return;
-  }
+    function renderTableUI(dataArray) {
+        let html = `<table>
+            <tr>
+                <th class="stt-col">STT</th>
+                <th class="ship-col">Tàu</th>
+                <th class="date-col">Ngày</th>
+                <th class="worker-col">Người</th>
+                <th>Công việc</th>
+                <th class="action-col">Sửa/Xóa</th>
+            </tr>`;
 
-  // 🔥 Lưu vào Firebase (node riêng)
-  update(ref(db, "workHours/" + ship.replace(/\s/g,'_')), {
-    ship: ship,
-    hours: Number(value)
-  });
+        let totalWorkers = 0;
+        dataArray.forEach(([id, x], index) => {
+            totalWorkers += Number(x.workers || 0);
+            html += `<tr>
+                <td class="stt-col">${index + 1}</td>
+                <td class="ship-col">${x.ship_id}</td>
+                <td class="date-col">${x.date}</td>
+                <td class="worker-col">${x.workers}</td>
+                <td>${x.job}</td>
+                <td class="action-col">
+                    <div class="action-buttons">
+                        <button class="btn-edit" onclick="editItem('${id}')">✏️</button>
+                        <button class="btn-delete" onclick="deleteItem('${id}')">🗑️</button>
+                    </div>
+                </td>
+            </tr>`;
+        });
 
-  alert("Đã lưu giờ công!");
-}
+        html += `<tr class="total-row">
+            <td colspan="3" style="text-align:right">TỔNG CỘNG:</td>
+            <td class="worker-col">${totalWorkers}</td>
+            <td colspan="2">người</td>
+        </tr></table>`;
+        
+        document.getElementById("tableContainer").innerHTML = html;
+    }
 
-window.savePP = function(ship){
-  let key = ship.replace(/\s/g,'_');
+    // --- EDIT / DELETE ---
+    window.editItem = function(id){
+        let x = rawData[id];
+        document.getElementById("ship").value = x.ship_id;
+        document.getElementById("date").value = x.date;
+        document.getElementById("workers").value = x.workers;
+        document.getElementById("job").value = x.job;
+        editId = id;
+        window.scrollTo(0,0);
+    }
 
-  let raw = document.getElementById("pp_" + key).value;
-  let value = raw.replace(/,/g,'');
+    window.deleteItem = function(id){
+        if(confirm("Bạn chắc chắn muốn xóa dòng này?")){
+            remove(ref(db, "logs/" + id));
+        }
+    }
 
-  if(!value){
-    alert("Nhập giờ công PP!");
-    return;
-  }
+    // --- SUMMARY ---
+    window.showSummary = function(){
+        const box = document.getElementById("summary");
+        summaryVisible = !summaryVisible;
+        
+        if(!summaryVisible) {
+            box.style.display = "none";
+            return;
+        }
 
-  set(ref(db, "workHours/" + key), {
-    ship: ship,
-    hours: Number(value)
-  });
+        let result = {};
+        Object.values(rawData).forEach(x => {
+            if(!result[x.ship_id]) result[x.ship_id] = { totalWorkers:0, days: new Set() };
+            result[x.ship_id].totalWorkers += Number(x.workers);
+            result[x.ship_id].days.add(x.date);
+        });
 
-  alert("Đã lưu giờ công PP!");
-}
+        let html = "<h4>Báo cáo tổng hợp theo tàu</h4>";
+        for(let s in result){
+            let key = s.replace(/\s/g,'_');
+            let savedPP = ppData[key]?.hours || 0;
+            let realHours = result[s].totalWorkers * 8;
+            
+            html += `<div class="summary-item">
+                <b>🚢 Tàu: ${s}</b><br>
+                - Tổng nhân công: ${result[s].totalWorkers} lượt người<br>
+                - Tổng giờ thực tế (x8h): ${realHours.toLocaleString()} giờ<br>
+                - Giờ công PP định mức: <b>${savedPP.toLocaleString()}</b> giờ
+            </div>`;
+        }
+        box.innerHTML = html;
+        box.style.display = "block";
+        document.getElementById("workHoursBox").style.display = "none";
+        workBoxVisible = false;
+    }
 
- //định dạng 0,000  
-window.formatNumber = function(input){
-  let value = input.value.replace(/,/g,''); // bỏ dấu ,
+    window.toggleWorkHours = function(){
+        workBoxVisible = !workBoxVisible;
+        const box = document.getElementById("workHoursBox");
+        if(workBoxVisible){
+            renderWorkHoursInputs();
+            box.style.display = "block";
+            document.getElementById("summary").style.display = "none";
+            summaryVisible = false;
+        } else {
+            box.style.display = "none";
+        }
+    }
 
-  if(isNaN(value)) return;
+    function renderWorkHoursInputs(){
+        let ships = ["S571", "J002", "S577", "S579"];
+        let html = "<table><tr><th>Tàu</th><th>Giờ PP</th><th>Lưu</th></tr>";
+        ships.forEach(s => {
+            let key = s.replace(/\s/g,'_');
+            let val = ppData[key]?.hours || "";
+            html += `<tr>
+                <td>${s}</td>
+                <td><input type="text" id="pp_${key}" value="${val.toLocaleString()}" oninput="window.formatInput(this)"></td>
+                <td><button onclick="savePP('${s}')" style="width:50px">💾</button></td>
+            </tr>`;
+        });
+        html += "</table>";
+        document.getElementById("workHoursContent").innerHTML = html;
+    }
 
-  input.value = Number(value).toLocaleString('en-US');
-}
+    window.savePP = function(shipName){
+        let key = shipName.replace(/\s/g,'_');
+        let val = document.getElementById("pp_" + key).value.replace(/,/g,'');
+        if(!val) return alert("Nhập số giờ!");
+        
+        set(ref(db, "workHours/" + key), {
+            ship: shipName,
+            hours: Number(val)
+        }).then(() => alert("Đã cập nhật giờ công định mức cho " + shipName));
+    }
 
-   
-   
+    window.formatInput = function(input){
+        let val = input.value.replace(/,/g,'');
+        if(!isNaN(val) && val !== "") {
+            input.value = Number(val).toLocaleString('en-US');
+        }
+    }
+
+    function clearForm(){
+        document.getElementById("workers").value = "";
+        document.getElementById("job").value = "";
+    }
+
+    // Listeners cho bộ lọc
+    document.getElementById("sortType").addEventListener("change", applyFilter);
+    document.getElementById("shipFilter").addEventListener("change", applyFilter);
+    document.getElementById("jobFilter").addEventListener("input", applyFilter);
+    document.getElementById("fromDate").addEventListener("input", applyFilter);
+    document.getElementById("toDate").addEventListener("input", applyFilter);
+
 </script>
 </body>
 </html>

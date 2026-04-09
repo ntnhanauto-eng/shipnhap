@@ -122,13 +122,14 @@ th {
 
 /* Cột ngày */
 .date-col {
-  width: 40px;          /* giảm thêm */
+  width: 40px;
+  min-width: 40px;   /* 🔥 thêm dòng này */
   max-width: 40px;
-  font-size: 13px;      /* chữ nhỏ hơn */
+  font-size: 12px;
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis; /* nếu dài thì ... */
-  padding: 4px !important; /* giảm padding để tiết kiệm không gian */
+  text-overflow: ellipsis;
+  padding: 2px !important;
 }
 
 .action-col {

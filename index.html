@@ -601,15 +601,43 @@ function renderWorkHours(){
     result[x.ship_id] += Number(x.workers || 0);
   });
 
-  let html = "<table><tr><th>Tàu</th><th>Giờ công tàu</th><th>Giờ công thực tế</th></tr>";
+ let html = "<table><tr>\
+<th>Tàu</th>\
+<th>Giờ công tàu</th>\
+<th>Giờ công thực tế</th>\
+<th>Hiệu quả (%)</th>\
+</tr>";
 
-  for(let ship in result){
-    let realHours = result[ship] * 8;
+for(let ship in result){
+  let realHours = result[ship] * 8;
 
-    html += `
-      <tr>
-        <td>${ship}</td>
-        <td>
+  let key = ship.replace(/\s/g,'_');
+  let saved = ppData[key]?.hours || 0;
+
+  let efficiency = 0;
+  if(saved > 0){
+    efficiency = (realHours / saved) * 100;
+  }
+
+   html += `
+  <tr>
+    <td>${ship}</td>
+    <td>
+      <input type="number" placeholder="Nhập giờ công" id="manual_${key}">
+      <div style="margin-top:5px;">
+        <button onclick="saveWorkHours('${ship}')">💾</button>
+        <button onclick="editWorkHours('${ship}')">✏️</button>
+        <button onclick="deleteWorkHours('${ship}')">🗑️</button>
+      </div>
+    </td>
+    <td>${realHours}</td>
+    <td>
+      ${saved > 0 
+        ? efficiency.toFixed(1) + "%" 
+        : "—"}
+    </td>
+  </tr>
+`;
           <input type="number" placeholder="Nhập giờ công" id="manual_${ship.replace(/\s/g,'_')}">
           <div style="margin-top:5px;">
             <button onclick="saveWorkHours('${ship}')">💾</button>

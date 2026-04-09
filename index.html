@@ -221,8 +221,10 @@ tr:last-child td {
 <h3>Chọn tàu</h3>
 <select id="ship">
 <option value="all">Tất cả</option>
-<option value="Casing S57106">Casing S57106</option>
-<option value="Casing J00106">Casing J00106</option>
+<option value="S571">S571</option>
+<option value="J002">J002</option>
+<option value="S577">S577</option>
+<option value="S579">S579</option>
 </select>
 </div><div class="card">
 <h3>Nhập công việc</h3>
@@ -240,8 +242,11 @@ tr:last-child td {
 </div>
   <select id="shipFilter">
   <option value="all">Tất cả tàu</option>
-<option value="Casing S57106">Casing S57106</option>
-<option value="Casing J00106">Casing J00106</option>
+<option value="all">Tất cả</option>
+<option value="S571">S571</option>
+<option value="J002">J002</option>
+<option value="S577">S577</option>
+<option value="S579">S579</option>
 </select>
 <input type="text" id="jobFilter" placeholder="Lọc theo công việc">
 <select id="sortType">
@@ -267,7 +272,7 @@ tr:last-child td {
   
  <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getDatabase, ref, push, onValue, remove, update, set } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+import { getDatabase, ref, push, onValue, remove, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSy...",
@@ -543,7 +548,7 @@ function renderWorkHours(){
       <tr>
         <td>${ship}</td>
         <td>
-          <input type="number" placeholder="Nhập giờ công" id="manual_${normalizeKey(ship)}">
+          <input type="number" placeholder="Nhập giờ công" id="manual_${ship.replace(/\s/g,'_')}">
           <div style="margin-top:5px;">
             <button onclick="saveWorkHours('${ship}')">💾</button>
             <button onclick="editWorkHours('${ship}')">✏️</button>
@@ -560,47 +565,24 @@ function renderWorkHours(){
   document.getElementById("workHoursContent").innerHTML = html;
 }
 
-function normalizeKey(str){
-  return str.replace(/\s/g,'_').replace(/[^\w]/g,'');
-}
-
-
-   
 window.saveWorkHours = function(ship){
-
-  let id = "manual_" + normalizeKey(ship);
-  let input = document.getElementById(id);
-
-  if(!input){
-    alert("Không tìm thấy ô input!");
-    return;
-  }
-
-  let value = input.value;
+  let id = "manual_" + ship.replace(/\s/g,'_');
+  let value = document.getElementById(id).value;
 
   if(!value){
     alert("Nhập giờ công trước!");
     return;
   }
 
-  console.log("🚀 Đang lưu:", ship, value);
-
-  set(ref(db, "workHours/" + normalizeKey(ship)), {
+  // 🔥 Lưu vào Firebase (node riêng)
+  update(ref(db, "workHours/" + ship.replace(/\s/g,'_')), {
     ship: ship,
     hours: Number(value)
-  })
-  .then(()=>{
-    console.log("✅ Lưu thành công");
-    alert("Đã lưu giờ công!");
-  })
-  .catch(err=>{
-    console.error("❌ Lỗi Firebase:", err);
-    alert("Lỗi lưu: " + err.message);
   });
 
+  alert("Đã lưu giờ công!");
 }
 
- 
    
 
    

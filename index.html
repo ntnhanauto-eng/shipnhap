@@ -342,6 +342,11 @@ onValue(ref(db, "logs"), snapshot => {
   rawData = snapshot.val() || {};
   renderTable(rawData);
 });
+onValue(ref(db, "workHours"), snapshot => {
+  workHoursData = snapshot.val() || {};
+  renderWorkHours(); // 🔥 render lại khi có data
+});
+   
 
 function renderTable(dataObj){
 let html = "<table><tr>\
@@ -381,6 +386,9 @@ let html = "<table><tr>\
       </td>
     </tr>`;
   });
+
+
+  
 
   // 👉 THÊM HÀNG TỔNG
   html += `
@@ -581,7 +589,14 @@ function renderWorkHours(){
       <tr>
         <td>${ship}</td>
         <td>
-          <input type="number" placeholder="Nhập giờ công" id="manual_${ship.replace(/\s/g,'_')}">
+          let key = ship.replace(/\s/g,'_');
+let saved = workHoursData[key]?.hours || "";
+
+<input 
+  type="number" 
+  value="${saved}" 
+  placeholder="Nhập giờ công" 
+  id="manual_${key}">
           <div style="margin-top:5px;">
             <button onclick="saveWorkHours('${ship}')">💾</button>
             <button onclick="editWorkHours('${ship}')">✏️</button>
@@ -608,7 +623,7 @@ window.saveWorkHours = function(ship){
   }
 
   // 🔥 Lưu vào Firebase (node riêng)
-  update(ref(db, "workHours/" + ship.replace(/\s/g,'_')), {
+ import { set } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
     ship: ship,
     hours: Number(value)
   });
@@ -616,9 +631,21 @@ window.saveWorkHours = function(ship){
   alert("Đã lưu giờ công!");
 }
 
-   
+ let workHoursData = {};  
 
-   
+window.deleteWorkHours = function(ship){
+  let key = ship.replace(/\s/g,'_');
+  remove(ref(db, "workHours/" + key));
+}
+
+window.editWorkHours = function(ship){
+  let key = ship.replace(/\s/g,'_');
+  let data = workHoursData[key];
+
+  if(data){
+    document.getElementById("manual_" + key).value = data.hours;
+  }
+}   
 </script>
 </body>
 </html>

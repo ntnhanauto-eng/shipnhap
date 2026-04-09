@@ -486,8 +486,20 @@ window.showSummary = function(){
   let html = "";
 
   for(let ship in result){
-    html += `<p><b>${ship}</b>: Tổng người = ${result[ship].totalWorkers}, Số ngày = ${result[ship].days.size}</p>`;
-  }
+  let totalWorkers = result[ship].totalWorkers;
+  let totalDays = result[ship].days.size;
+
+  let totalRealHours = totalWorkers * totalDays * 8; // 🔥 công thức mới
+
+  html += `
+    <p>
+      <b>${ship}</b>:
+      Tổng người = ${totalWorkers},
+      Số ngày = ${totalDays},
+      Tổng giờ thực tế = ${totalRealHours}
+    </p>
+  `;
+}
 
   summaryBox.innerHTML = html;
   summaryBox.style.display = "block";

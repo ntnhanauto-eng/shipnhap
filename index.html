@@ -104,12 +104,12 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getDatabase, ref, push, onValue, remove, update, set } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-    const firebaseConfig = {
-        apiKey: "AIzaSy...", // Thay bằng Key thật của bạn
-        authDomain: "ship-90534.firebaseapp.com",
-        databaseURL: "https://ship-90534-default-rtdb.asia-southeast1.firebasedatabase.app",
-        projectId: "ship-90534"
-    };
+   const firebaseConfig = {
+  apiKey: "AIzaSy...",
+  authDomain: "ship-90534.firebaseapp.com",
+  databaseURL: "https://ship-90534-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "ship-90534"
+};
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);

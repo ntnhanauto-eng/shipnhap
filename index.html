@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Quản Lý Tàu Pro</title>
     <style>
-        /* GIỮ NGUYÊN CSS CŨ CỦA BẠN VÀ THÊM CÁC DÒNG DƯỚI ĐÂY */
         * { box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 10px; background: #f0f2f5; }
         h2 { text-align: center; color: #1a73e8; }
@@ -21,6 +20,7 @@
         th, td { border-bottom: 1px solid #eee; padding: 10px; text-align: left; font-size: 14px; word-wrap: break-word; }
         th { background: #f8f9fa; position: sticky; top: 0; z-index: 10; }
 
+        /* Cột cố định */
         .stt-col { width: 45px; text-align: center; }
         .ship-col { width: 80px; font-weight: bold; }
         .date-col { width: 100px; }
@@ -34,29 +34,13 @@
         
         .summary-item { border-bottom: 1px solid #eee; padding: 10px 0; }
         .total-row { background: #e8f0fe; font-weight: bold; color: #1a73e8; }
-
-        /* ============ PHẦN MỚI CHO PHÂN QUYỀN ============ */
-        /* Mặc định ẩn các phần quản trị */
-        .admin-only { display: none !important; }
-
-        /* Khi body có class is-admin thì hiện lên */
-        body.is-admin .admin-only { display: block !important; }
-
-        /* Nút đăng nhập ẩn ở góc dưới màn hình */
-        .btn-auth-trigger {
-            position: fixed; bottom: 5px; right: 5px; width: auto; padding: 5px 10px;
-            font-size: 10px; opacity: 0.2; background: none; color: #000; border: none;
-        }
-        .btn-auth-trigger:hover { opacity: 1; background: #eee; }
     </style>
 </head>
 <body>
 
-    <button class="btn-auth-trigger" id="authBtn" onclick="toggleAuth()">🔐 Login</button>
-
     <h2>🚢 Quản Lý Công Việc Tàu</h2>
 
-    <div class="card admin-only">
+    <div class="card">
         <h3>Nhập Dữ Liệu</h3>
         <div class="flex">
             <select id="ship">
@@ -98,13 +82,14 @@
     </div>
 
     <div class="card">
-        <div class="table-wrap" id="tableContainer"></div>
+        <div class="table-wrap" id="tableContainer">
+            </div>
     </div>
 
     <div class="card">
         <div class="flex">
             <button id="btnSummary" onclick="showSummary()">📊 Xem Tổng Hợp</button>
-            <button id="btnWorkHours" class="admin-only" onclick="toggleWorkHours()">⏱️ Giờ Công Tàu</button>
+            <button id="btnWorkHours" onclick="toggleWorkHours()">⏱️ Giờ Công Tàu</button>
         </div>
         
         <div id="summary" style="display:none; margin-top:15px;"></div>
@@ -119,12 +104,12 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getDatabase, ref, push, onValue, remove, update, set } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-    const firebaseConfig = {
-        apiKey: "AIzaSy...",
-        authDomain: "ship-90534.firebaseapp.com",
-        databaseURL: "https://ship-90534-default-rtdb.asia-southeast1.firebasedatabase.app",
-        projectId: "ship-90534"
-    };
+   const firebaseConfig = {
+  apiKey: "AIzaSy...",
+  authDomain: "ship-90534.firebaseapp.com",
+  databaseURL: "https://ship-90534-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "ship-90534"
+};
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
@@ -135,34 +120,8 @@
     let workBoxVisible = false;
     let summaryVisible = false;
 
-    // ================= PHẦN PHÂN QUYỀN =================
-    window.toggleAuth = function() {
-        if (document.body.classList.contains('is-admin')) {
-            if (confirm("Đăng xuất quyền Admin?")) {
-                localStorage.removeItem("shipAdmin");
-                location.reload();
-            }
-        } else {
-            const pass = prompt("Nhập mật khẩu Admin:");
-            if (pass === "1234") { // THAY MẬT KHẨU TẠI ĐÂY
-                localStorage.setItem("shipAdmin", "true");
-                location.reload();
-            } else {
-                alert("Sai mật khẩu!");
-            }
-        }
-    }
-
-    // Kiểm tra trạng thái admin khi load trang
-    if (localStorage.getItem("shipAdmin") === "true") {
-        document.body.classList.add("is-admin");
-        document.getElementById("authBtn").innerText = "🔓 Logout Admin";
-    }
-
-    // --- SAVE (CHỈ CHẠY NẾU LÀ ADMIN) ---
+    // --- SAVE ---
     window.saveLog = function(){
-        if (!document.body.classList.contains('is-admin')) return;
-        
         const shipVal = document.getElementById("ship").value;
         const dateVal = document.getElementById("date").value;
         const workerVal = document.getElementById("workers").value;
@@ -204,7 +163,7 @@
         ppData = snapshot.val() || {};
     });
 
-    // --- RENDER TABLE (CÓ ĐIỀU KIỆN ADMIN) ---
+    // --- RENDER TABLE ---
     window.applyFilter = function(){
         const from = document.getElementById("fromDate").value;
         const to = document.getElementById("toDate").value;
@@ -231,8 +190,6 @@
     }
 
     function renderTableUI(dataArray) {
-        const isAdmin = document.body.classList.contains('is-admin');
-        
         let html = `<table>
             <tr>
                 <th class="stt-col">STT</th>
@@ -240,7 +197,7 @@
                 <th class="date-col">Ngày</th>
                 <th class="worker-col">Người</th>
                 <th>Công việc</th>
-                ${isAdmin ? '<th class="action-col">Sửa/Xóa</th>' : ''}
+                <th class="action-col">Sửa/Xóa</th>
             </tr>`;
 
         let totalWorkers = 0;
@@ -252,28 +209,26 @@
                 <td class="date-col">${x.date}</td>
                 <td class="worker-col">${x.workers}</td>
                 <td>${x.job}</td>
-                ${isAdmin ? `
                 <td class="action-col">
                     <div class="action-buttons">
                         <button class="btn-edit" onclick="editItem('${id}')">✏️</button>
                         <button class="btn-delete" onclick="deleteItem('${id}')">🗑️</button>
                     </div>
-                </td>` : ''}
+                </td>
             </tr>`;
         });
 
         html += `<tr class="total-row">
             <td colspan="3" style="text-align:right">TỔNG CỘNG:</td>
             <td class="worker-col">${totalWorkers}</td>
-            <td colspan="${isAdmin ? '2' : '1'}">người</td>
+            <td colspan="2">người</td>
         </tr></table>`;
         
         document.getElementById("tableContainer").innerHTML = html;
     }
 
-    // --- EDIT / DELETE (KIỂM TRA QUYỀN) ---
+    // --- EDIT / DELETE ---
     window.editItem = function(id){
-        if(!document.body.classList.contains('is-admin')) return;
         let x = rawData[id];
         document.getElementById("ship").value = x.ship_id;
         document.getElementById("date").value = x.date;
@@ -284,7 +239,6 @@
     }
 
     window.deleteItem = function(id){
-        if(!document.body.classList.contains('is-admin')) return;
         if(confirm("Bạn chắc chắn muốn xóa dòng này?")){
             remove(ref(db, "logs/" + id));
         }
@@ -327,7 +281,6 @@
     }
 
     window.toggleWorkHours = function(){
-        if(!document.body.classList.contains('is-admin')) return;
         workBoxVisible = !workBoxVisible;
         const box = document.getElementById("workHoursBox");
         if(workBoxVisible){
@@ -357,7 +310,6 @@
     }
 
     window.savePP = function(shipName){
-        if(!document.body.classList.contains('is-admin')) return;
         let key = shipName.replace(/\s/g,'_');
         let val = document.getElementById("pp_" + key).value.replace(/,/g,'');
         if(!val) return alert("Nhập số giờ!");
@@ -380,6 +332,7 @@
         document.getElementById("job").value = "";
     }
 
+    // Listeners cho bộ lọc
     document.getElementById("sortType").addEventListener("change", applyFilter);
     document.getElementById("shipFilter").addEventListener("change", applyFilter);
     document.getElementById("jobFilter").addEventListener("input", applyFilter);

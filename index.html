@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quản Lý Casingn</title>
+    <title>Quản Lý Casing</title>
     <style>
         * { box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 10px; background: #f0f2f5; }
@@ -49,6 +49,43 @@
         body.is-admin .admin-only { display: block; }
         body.is-admin .admin-inline { display: table-cell; }
         .admin-inline { display: none; }
+
+        /* Tối ưu lại input để không bị tràn và hiển thị đẹp trên mobile */
+input, select, button { 
+    width: 100%; 
+    margin: 8px 0; 
+    padding: 12px; 
+    font-size: 14px; /* Giảm nhẹ font size cho mobile */
+    border-radius: 8px; 
+    border: 1px solid #ccc; 
+    -webkit-appearance: none; /* Giúp hiển thị đồng nhất trên iOS */
+}
+
+/* Fix lỗi ô Date bị dài hoặc không hiện định dạng */
+input[type="date"] {
+    position: relative;
+    min-height: 45px;
+}
+
+/* Tạo hàng riêng cho 2 ô ngày để chúng nằm cạnh nhau thay vì chồng lên nhau */
+.date-row {
+    display: flex;
+    gap: 10px;
+}
+.date-row input {
+    flex: 1; /* Chia đều 50-50 */
+    min-width: 0; /* Ngăn chặn input phá vỡ layout flex */
+}
+
+/* Giữ Grid cho các thành phần khác */
+.flex { display: grid; grid-template-columns: 1fr; gap: 10px; }
+@media(min-width: 600px){ 
+    .flex { grid-template-columns: 1fr 1fr; } 
+}
+
+
+
+        
     </style>
 </head>
 <body id="mainBody">

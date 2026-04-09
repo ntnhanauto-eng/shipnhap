@@ -509,7 +509,21 @@ window.showSummary = function(){
         Tổng giờ thực tế = ${totalRealHours}
       </p>
 
-      <div style="display:flex; gap:5px;">
+     <div style="display:flex; gap:5px; align-items:center;">
+  <input 
+    type="text"
+    placeholder="Giờ công PP"
+    id="pp_${key}"
+    value="${saved ? saved.toLocaleString() : ''}"
+    style="width:120px; padding:5px; font-size:13px;"
+    oninput="formatNumber(this)"
+  >
+
+  <button 
+    onclick="savePP('${ship}')"
+    style="width:40px; height:30px; padding:0; font-size:14px;"
+  >💾</button>
+</div>
         <input 
           type="number"
           placeholder="Giờ công PP"
@@ -640,7 +654,13 @@ window.saveWorkHours = function(ship){
 
 window.savePP = function(ship){
   let key = ship.replace(/\s/g,'_');
-  let value = document.getElementById("pp_" + key).value;
+let raw = document.getElementById("pp_" + key).value;
+let value = raw.replace(/,/g,''); // bỏ dấu ,
+
+if(!value){
+  alert("Nhập giờ công PP!");
+  return;
+}
 
   if(!value){
     alert("Nhập giờ công PP!");
@@ -655,6 +675,16 @@ window.savePP = function(ship){
   alert("Đã lưu giờ công PP!");
 }   
 
+ //định dạng 0,000  
+window.formatNumber = function(input){
+  let value = input.value.replace(/,/g,''); // bỏ dấu ,
+
+  if(isNaN(value)) return;
+
+  input.value = Number(value).toLocaleString('en-US');
+}
+
+   
    
 </script>
 </body>

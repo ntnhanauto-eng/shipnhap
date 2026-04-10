@@ -11,11 +11,29 @@
         /* Header & Login */
         .header-container { display: flex; justify-content: space-between; align-items: center; position: relative; margin-bottom: 10px; }
         h2 { margin: 0; color: #1a73e8; flex-grow: 1; text-align: center; }
-        #authBtn { 
-            position: absolute; right: 0; top: 0;
-            width: auto; padding: 8px 15px; font-size: 13px; 
-            background: #34a853; border-radius: 5px;
-        }
+        
+       #authBtn { 
+    position: absolute; 
+    right: 0; 
+    top: 8px; /* hạ xuống một chút */
+
+    width: auto; 
+    padding: 6px 12px; 
+    font-size: 12px; 
+
+    background: rgba(52, 168, 83, 0.5); /* màu mờ */
+    color: #fff;
+
+    border-radius: 5px;
+    opacity: 0.7; /* làm mờ tổng thể */
+}
+
+    #authBtn:hover {
+    opacity: 1;
+    background: rgba(52, 168, 83, 0.9);
+}
+
+        
         .logout-mode { background: #dc3545 !important; }
 
         .card { background: #fff; padding: 15px; margin-bottom: 15px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }

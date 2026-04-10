@@ -306,13 +306,16 @@ h2 {
             <h4>Nhập Giờ Công Theo Định Mức</h4>
             <div id="workHoursContent"></div>
             </div>
-        <div id="shipManagerBox" class="card admin-only" style="display:none; margin-top:15px;">
-    <h4>Quản Lý Danh Sách Tàu</h4>
-    <div class="flex">
-        <input type="text" id="newShipName" placeholder="Nhập tên tàu mới (VD: S580)">
-        <button onclick="addShip()">➕ Thêm Tàu</button>
+       <div id="shipManagerBox" class="card admin-only" style="display:none; margin-top:15px; border: 2px solid #28a745;">
+    <h4 style="color: #28a745; margin-top: 0;">🚢 Quản Lý Danh Sách Tàu</h4>
+    
+    <div style="display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center;">
+        <input type="text" id="newShipName" placeholder="Tên tàu (VD: S580)" style="margin: 0;">
+        <button onclick="addShip()" style="background: #28a745; margin: 0; width: 100px;">➕ Thêm</button>
     </div>
-    <div id="shipListContent" style="margin-top:10px;"></div>
+
+    <div id="shipListContent" style="margin-top:15px; max-height: 300px; overflow-y: auto;">
+        </div>
 </div>
     </div>
 

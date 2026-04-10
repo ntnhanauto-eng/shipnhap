@@ -201,7 +201,36 @@ h2 {
     to { transform: translateY(0); opacity: 1; }
 }
 
-        
+/* Định dạng riêng cho bảng quản lý tàu */
+#shipListContent table {
+    width: 100%;
+    margin-top: 10px;
+    border-collapse: collapse;
+    background: #fff;
+}
+
+#shipListContent th, #shipListContent td {
+    padding: 12px 8px;
+    border: 1px solid #eee;
+    text-align: left;
+}
+
+/* Thu nhỏ cột nút xóa */
+#shipListContent td:last-child {
+    width: 60px;
+    text-align: center;
+}
+
+/* Làm nút xóa nhỏ gọn và canh giữa */
+#shipListContent .btn-delete {
+    width: 35px;
+    height: 35px;
+    line-height: 35px;
+    padding: 0;
+    margin: 0 auto;
+    display: block;
+    font-size: 14px;
+}        
         
         
     </style>

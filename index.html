@@ -421,6 +421,11 @@ input[type="date"] {
 if(realHours > 0){
     efficiency = (savedPP / realHours) * 100;
 }
+
+      let color = "red";
+if(efficiency >= 100) color = "green";
+else if(efficiency >= 70) color = "orange";
+
             
            html += `<div class="summary-item">
     <b>🚢 Tàu: ${s}</b><br>
@@ -486,10 +491,7 @@ if(realHours > 0){
 
 
 
-let color = "black";
-if(efficiency >= 100) color = "green";
-else if(efficiency >= 70) color = "orange";
-else color = "red";
+
 
 
     

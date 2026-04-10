@@ -298,14 +298,12 @@ input[type="date"] {
 
         let data = { ship_id: shipVal, date: dateVal, workers: Number(workerVal), job: jobVal };
 
-       if(editId){
-    if(!confirm("Bạn muốn cập nhật dữ liệu này?")) return;
-
-    update(ref(db, "logs/" + editId), data).then(() => {
-        editId = null;
-        alert("Cập nhật thành công!");
-        clearForm();
-    });
+        if(editId){
+            update(ref(db, "logs/" + editId), data).then(() => {
+                editId = null;
+                alert("Cập nhật thành công!");
+                clearForm();
+            });
         } else {
             push(ref(db, "logs"), data).then(() => {
                 alert("Đã lưu!");
@@ -531,10 +529,7 @@ data.push({
     XLSX.writeFile(wb, "BaoCao_Loc.xlsx");
 }
 
-if (workerVal <= 0 || isNaN(workerVal)) {
-    alert("Số người không hợp lệ!");
-    return;
-}
+
 
     
 </script>

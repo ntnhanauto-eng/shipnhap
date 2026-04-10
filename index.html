@@ -435,7 +435,7 @@ else if(efficiency >= 70) color = "orange";
     - Tổng nhân công: ${result[s].totalWorkers} lượt người<br>
     - Tổng giờ thực tế: ${realHours.toLocaleString()} giờ<br>
     - Giờ định mức PP: <b>${savedPP.toLocaleString()}</b> giờ<br>
-    - Hiệu quả tàu: <b>${efficiency.toFixed(1)}%</b>
+    - Hiệu quả tàu: <b style="color:${color}">${efficiency.toFixed(1)}%</b>
 </div>`;
         }
         box.innerHTML = html;

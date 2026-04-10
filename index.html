@@ -113,49 +113,36 @@ input[type="date"] {
     margin-bottom: 3px;
 }
 
-@media (max-width: 600px) {
-    #workHoursContent table,
-    #workHoursContent thead,
-    #workHoursContent tbody,
-    #workHoursContent tr,
-    #workHoursContent th,
-    #workHoursContent td {
-        display: block;
-        width: 100%;
-    }
+/* Fix bảng giờ công mobile */
+#workHoursBox {
+    overflow-x: auto;
+}
 
-    #workHoursContent tr {
-        background: #fff;
-        margin-bottom: 10px;
-        padding: 10px;
-        border-radius: 10px;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-    }
+#workHoursBox table {
+    min-width: 400px;
+    width: 100%;
+    border-collapse: collapse;
+}
 
-    #workHoursContent td {
-        border: none;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 6px 0;
-    }
+#workHoursBox th, 
+#workHoursBox td {
+    padding: 8px;
+    font-size: 13px;
+    text-align: center;
+}
 
-    #workHoursContent td::before {
-        font-weight: bold;
-    }
+#workHoursBox input {
+    padding: 8px;
+    font-size: 13px;
+    width: 100%;
+    min-width: 80px;
+    box-sizing: border-box;
+}
 
-    #workHoursContent td:nth-child(1)::before { content: "Tàu"; }
-    #workHoursContent td:nth-child(2)::before { content: "Giờ PP"; }
-    #workHoursContent td:nth-child(3)::before { content: "Lưu"; }
-
-    #workHoursContent input {
-        width: 60%;
-    }
-
-    #workHoursContent button {
-        width: auto;
-        padding: 6px 10px;
-    }
+/* Nút nhỏ lại cho mobile */
+#workHoursBox button {
+    padding: 6px;
+    font-size: 12px;
 }
 
 

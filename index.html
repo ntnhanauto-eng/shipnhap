@@ -108,15 +108,19 @@ input[type="date"] {
     <div class="card admin-only">
         <h3>Nhập Dữ Liệu</h3>
         <div class="flex">
-            <select id="ship">
-                <option value="all">-- Chọn Tàu --</option>
-                <option value="S571">S571</option>
-                <option value="J002">J002</option>
-                <option value="S577">S577</option>
-                <option value="S579">S579</option>
-            </select>
-            <input type="date" id="date">
-        </div>
+    <select id="ship">
+        <option value="all">-- Chọn Tàu --</option>
+        <option value="J002">J002</option>
+         <option value="S571">S571</option>
+        <option value="S577">S577</option>
+        <option value="S579">S579</option>
+    </select>
+
+    <div class="date-field">
+        <label for="date">Chọn ngày</label>
+        <input type="date" id="date">
+    </div>
+</div>
         <div class="flex">
             <input type="number" id="workers" placeholder="Số người thực hiện">
             <input type="text" id="job" placeholder="Nội dung công việc">
@@ -140,10 +144,10 @@ input[type="date"] {
     <div class="flex" style="margin-top: 10px;">
         <select id="shipFilter">
             <option value="all">Tất cả tàu</option>
-            <option value="S571">S571</option>
-            <option value="J002">J002</option>
-            <option value="S577">S577</option>
-            <option value="S579">S579</option>
+             <option value="J002">J002</option>
+             <option value="S571">S571</option>
+             <option value="S577">S577</option>
+             <option value="S579">S579</option>
         </select>
         <input type="text" id="jobFilter" placeholder="Tìm tên công việc...">
     </div>

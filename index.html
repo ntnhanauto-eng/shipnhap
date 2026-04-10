@@ -364,6 +364,7 @@ h2 {
         }
     }
 
+    document.getElementById("tableContainer").innerHTML = "Đang tải dữ liệu...";
     onValue(ref(db, "logs"), snapshot => {
         rawData = snapshot.val() || {};
         applyFilter();

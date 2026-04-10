@@ -403,14 +403,25 @@ window.deleteShip = function(shipId) {
 
 // 6. Hàm hiển thị danh sách tàu kèm nút Xóa
 function renderShipManagerList() {
-    let html = `<table><tr><th>Tên Tàu</th><th style="width:60px">Xóa</th></tr>`;
+    let html = `<table>
+        <thead>
+            <tr>
+                <th>Tên Tàu</th>
+                <th>Xóa</th>
+            </tr>
+        </thead>
+        <tbody>`;
+    
     Object.keys(shipsData).sort().forEach(shipId => {
         html += `<tr>
-            <td><b>${shipId}</b></td>
-            <td><button class="btn-delete" onclick="deleteShip('${shipId}')" style="margin:0; padding:5px;">🗑️</button></td>
+            <td style="font-weight: bold;">${shipId}</td>
+            <td>
+                <button class="btn-delete" onclick="deleteShip('${shipId}')">🗑️</button>
+            </td>
         </tr>`;
     });
-    html += "</table>";
+    
+    html += "</tbody></table>";
     document.getElementById("shipListContent").innerHTML = html;
 }
 

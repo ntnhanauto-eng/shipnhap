@@ -164,6 +164,43 @@ h2 {
     padding-top: 2px;
     padding-bottom: 2px;
 }
+
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 2000;
+    left: 0; top: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.4);
+}
+
+.modal-content {
+    background: #fff;
+    margin: 15% auto;
+    padding: 20px;
+    width: 90%;
+    max-width: 350px;
+    border-radius: 12px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+    text-align: center;
+    animation: fadeIn 0.3s ease;
+}
+
+.modal-content h3 {
+    margin-bottom: 10px;
+}
+
+.close {
+    float: right;
+    font-size: 22px;
+    cursor: pointer;
+}
+
+@keyframes fadeIn {
+    from { transform: translateY(-20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
         
         
         
@@ -272,18 +309,13 @@ h2 {
     let currentFiltered = [];
 
     // --- XỬ LÝ ĐĂNG NHẬP ---
-    window.handleAuth = function() {
-        if (isAdmin) {
-            signOut(auth).then(() => alert("Đã đăng xuất!"));
-        } else {
-            const email = prompt("Nhập email Admin:");
-            const pass = prompt("Nhập mật khẩu:");
-            if (email && pass) {
-                signInWithEmailAndPassword(auth, email, pass)
-                .catch(err => alert("Lỗi: " + err.message));
-            }
-        }
+   window.handleAuth = function() {
+    if (isAdmin) {
+        signOut(auth).then(() => alert("Đã đăng xuất!"));
+    } else {
+        document.getElementById("loginModal").style.display = "block";
     }
+}
 
     // Theo dõi trạng thái đăng nhập
     onAuthStateChanged(auth, (user) => {
@@ -550,9 +582,50 @@ data.push({
 }
 
 
+window.closeLogin = function(){
+    document.getElementById("loginModal").style.display = "none";
+}
 
+window.loginAdmin = function(){
+    const email = document.getElementById("loginEmail").value;
+    const pass = document.getElementById("loginPass").value;
+
+    if(!email || !pass){
+        alert("Vui lòng nhập đầy đủ!");
+        return;
+    }
+
+    signInWithEmailAndPassword(auth, email, pass)
+    .then(() => {
+        closeLogin();
+        document.getElementById("loginEmail").value = "";
+        document.getElementById("loginPass").value = "";
+    })
+    .catch(err => alert("Lỗi: " + err.message));
+}
+
+    /* Đóng modal khi click ra ngoài */
+window.onclick = function(event) {
+    let modal = document.getElementById("loginModal");
+    if (event.target === modal) {
+        modal.style.display = "none";
+    }
+}
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+    
+    /*Cải tiến đăng nhập */
+    <div id="loginModal" class="modal">
+  <div class="modal-content">
+    <span class="close" onclick="closeLogin()">&times;</span>
+    <h3>🔐 Đăng nhập Admin</h3>
+    
+    <input type="email" id="loginEmail" placeholder="Email">
+    <input type="password" id="loginPass" placeholder="Mật khẩu">
+    
+    <button onclick="loginAdmin()">Đăng nhập</button>
+  </div>
+</div>
 </body>
 </html>

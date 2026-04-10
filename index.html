@@ -218,11 +218,7 @@ h2 {
         <div class="flex">
     <select id="ship">
         <option value="all">-- Chọn Tàu --</option>
-        <option value="J002">J002</option>
-         <option value="S571">S571</option>
-        <option value="S577">S577</option>
-        <option value="S579">S579</option>
-    </select>
+     </select>
 
     <div class="date-field">
         <label for="date">Chọn ngày</label>
@@ -252,10 +248,6 @@ h2 {
     <div class="flex" style="margin-top: 10px;">
         <select id="shipFilter">
             <option value="all">Tất cả tàu</option>
-             <option value="J002">J002</option>
-             <option value="S571">S571</option>
-             <option value="S577">S577</option>
-             <option value="S579">S579</option>
         </select>
         <input type="text" id="jobFilter" placeholder="Tìm tên công việc...">
     </div>
@@ -273,6 +265,7 @@ h2 {
         <div class="flex">
             <button onclick="exportExcel()">📥 Xuất Excel</button>
             <button id="btnWorkHours" class="admin-only" onclick="toggleWorkHours()">⏱️ Giờ Công Tàu</button>
+            <button id="btnManageShips" class="admin-only" onclick="toggleShipManager()">🚢 Quản Lý Danh Sách Tàu</button>
             <button id="btnSummary" onclick="showSummary()">📊 Xem BÁO CÁO</button>
             
           
@@ -283,7 +276,15 @@ h2 {
         <div id="workHoursBox" style="display:none; margin-top:15px;">
             <h4>Nhập Giờ Công Theo Định Mức</h4>
             <div id="workHoursContent"></div>
-        </div>
+            </div>
+        <div id="shipManagerBox" class="card admin-only" style="display:none; margin-top:15px;">
+    <h4>Quản Lý Danh Sách Tàu</h4>
+    <div class="flex">
+        <input type="text" id="newShipName" placeholder="Nhập tên tàu mới (VD: S580)">
+        <button onclick="addShip()">➕ Thêm Tàu</button>
+    </div>
+    <div id="shipListContent" style="margin-top:10px;"></div>
+</div>
     </div>
 
 <script type="module">
@@ -307,6 +308,79 @@ h2 {
     let editId = null;
     let isAdmin = false;
     let currentFiltered = [];
+    let shipsData = {}; // Biến lưu danh sách tàu từ Firebase
+
+// 1. Lắng nghe danh sách tàu từ Firebase
+onValue(ref(db, "ships"), snapshot => {
+    shipsData = snapshot.val() || {};
+    renderShipSelects(); // Cập nhật các ô chọn tàu
+    // Nếu đang mở bảng quản lý tàu thì vẽ lại bảng đó luôn
+    if(document.getElementById("shipManagerBox").style.display === "block") {
+        renderShipManagerList();
+    }
+});
+
+// 2. Hàm tự động điền tên tàu vào các ô Select
+function renderShipSelects() {
+    const shipSelect = document.getElementById("ship");
+    const filterSelect = document.getElementById("shipFilter");
+    
+    let options = `<option value="all">-- Chọn Tàu --</option>`;
+    let filterOptions = `<option value="all">Tất cả tàu</option>`;
+    
+    // Sắp xếp tên tàu theo bảng chữ cái và tạo danh sách option
+    Object.keys(shipsData).sort().forEach(shipId => {
+        options += `<option value="${shipId}">${shipId}</option>`;
+        filterOptions += `<option value="${shipId}">${shipId}</option>`;
+    });
+    
+    shipSelect.innerHTML = options;
+    filterSelect.innerHTML = filterOptions;
+}
+
+// 3. Hàm Đóng/Mở khung quản lý tàu
+window.toggleShipManager = function() {
+    const box = document.getElementById("shipManagerBox");
+    box.style.display = (box.style.display === "none") ? "block" : "none";
+    if(box.style.display === "block") {
+        renderShipManagerList();
+        document.getElementById("summary").style.display = "none";
+        document.getElementById("workHoursBox").style.display = "none";
+    }
+}
+
+// 4. Hàm Thêm tàu mới lên Firebase
+window.addShip = function() {
+    const name = document.getElementById("newShipName").value.trim().toUpperCase();
+    if(!name) return alert("Vui lòng nhập tên tàu!");
+    if(shipsData[name]) return alert("Tàu này đã tồn tại!");
+    
+    set(ref(db, "ships/" + name), { name: name })
+    .then(() => {
+        document.getElementById("newShipName").value = "";
+        alert("Đã thêm tàu " + name);
+    });
+}
+
+// 5. Hàm Xóa tàu khỏi danh sách
+window.deleteShip = function(shipId) {
+    if(confirm(`Xác nhận xóa tàu ${shipId}?`)) {
+        remove(ref(db, "ships/" + shipId));
+    }
+}
+
+// 6. Hàm hiển thị danh sách tàu kèm nút Xóa
+function renderShipManagerList() {
+    let html = `<table><tr><th>Tên Tàu</th><th style="width:60px">Xóa</th></tr>`;
+    Object.keys(shipsData).sort().forEach(shipId => {
+        html += `<tr>
+            <td><b>${shipId}</b></td>
+            <td><button class="btn-delete" onclick="deleteShip('${shipId}')" style="margin:0; padding:5px;">🗑️</button></td>
+        </tr>`;
+    });
+    html += "</table>";
+    document.getElementById("shipListContent").innerHTML = html;
+}
 
     // --- XỬ LÝ ĐĂNG NHẬP ---
    window.handleAuth = function() {
@@ -503,21 +577,22 @@ else if(efficiency >= 70) color = "orange";
         }
     }
 
-    function renderWorkHoursInputs(){
-        let ships = ["J002", "S571", "S577", "S579"];
-        let html = "<table><tr><th>Tàu</th><th>Giờ PP</th><th>Lưu</th></tr>";
-        ships.forEach(s => {
-            let key = s.replace(/\s/g,'_');
-            let val = ppData[key]?.hours || "";
-            html += `<tr>
-                <td>${s}</td>
-                <td><input type="text" id="pp_${key}" value="${val.toLocaleString()}" oninput="window.formatInput(this)"></td>
-                <td><button onclick="savePP('${s}')" style="width:50px">💾</button></td>
-            </tr>`;
-        });
-        html += "</table>";
-        document.getElementById("workHoursContent").innerHTML = html;
-    }
+   function renderWorkHoursInputs(){
+    // Lấy danh sách tàu thực tế từ shipsData thay vì ghi tay
+    let ships = Object.keys(shipsData).sort(); 
+    let html = "<table><tr><th>Tàu</th><th>Giờ PP</th><th>Lưu</th></tr>";
+    ships.forEach(s => {
+        let key = s.replace(/\s/g,'_');
+        let val = ppData[key]?.hours || "";
+        html += `<tr>
+            <td>${s}</td>
+            <td><input type="text" id="pp_${key}" value="${val.toLocaleString()}" oninput="window.formatInput(this)"></td>
+            <td><button onclick="savePP('${s}')" style="width:50px">💾</button></td>
+        </tr>`;
+    });
+    html += "</table>";
+    document.getElementById("workHoursContent").innerHTML = html;
+}
 
     window.savePP = function(shipName){
         let key = shipName.replace(/\s/g,'_');

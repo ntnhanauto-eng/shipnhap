@@ -145,27 +145,9 @@ input[type="date"] {
     font-size: 12px;
 }
 
-.action-row {
-    display: flex;
-    gap: 8px;
-    width: 100%;
-}
 
-/* 2 nút chính chia đều */
-.action-row button {
-    flex: 1;
-}
 
-/* Nút export nhỏ lại */
-#btnExport {
-    flex: 0 0 45px; /* cố định chiều rộng */
-    padding: 0;
-    font-size: 16px;
-}
-
- .action-row button:active {
-    transform: scale(0.97);
-}       
+        
         
     </style>
 </head>
@@ -236,7 +218,7 @@ input[type="date"] {
         <div class="flex">
             <button id="btnSummary" onclick="showSummary()">📊 Xem BÁO CÁO</button>
             <button id="btnWorkHours" class="admin-only" onclick="toggleWorkHours()">⏱️ Giờ Công Tàu</button>
-            <button id="btnExport" onclick="exportExcel()">📥</button>
+            <button onclick="exportExcel()">📥 Xuất Excel</button>
         </div>
         
         <div id="summary" style="display:none; margin-top:15px;"></div>

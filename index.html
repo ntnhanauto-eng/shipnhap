@@ -417,13 +417,18 @@ input[type="date"] {
             let key = s.replace(/\s/g,'_');
             let savedPP = ppData[key]?.hours || 0;
             let realHours = result[s].totalWorkers * 8;
+            let efficiency = 0;
+if(realHours > 0){
+    efficiency = (savedPP / realHours) * 100;
+}
             
-            html += `<div class="summary-item">
-                <b>🚢 Tàu: ${s}</b><br>
-                - Tổng nhân công: ${result[s].totalWorkers} lượt người<br>
-                - Tổng giờ thực tế: ${realHours.toLocaleString()} giờ<br>
-                - Giờ định mức PP: <b>${savedPP.toLocaleString()}</b> giờ
-            </div>`;
+           html += `<div class="summary-item">
+    <b>🚢 Tàu: ${s}</b><br>
+    - Tổng nhân công: ${result[s].totalWorkers} lượt người<br>
+    - Tổng giờ thực tế: ${realHours.toLocaleString()} giờ<br>
+    - Giờ định mức PP: <b>${savedPP.toLocaleString()}</b> giờ<br>
+    - Hiệu quả tàu: <b>${efficiency.toFixed(1)}%</b>
+</div>`;
         }
         box.innerHTML = html;
         document.getElementById("workHoursBox").style.display = "none";
@@ -479,6 +484,15 @@ input[type="date"] {
     document.getElementById("fromDate").addEventListener("input", applyFilter);
     document.getElementById("toDate").addEventListener("input", applyFilter);
 
+
+
+let color = "black";
+if(efficiency >= 100) color = "green";
+else if(efficiency >= 70) color = "orange";
+else color = "red";
+
+
+    
 </script>
 </body>
 </html>

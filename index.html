@@ -249,6 +249,7 @@ input[type="date"] {
     let ppData = {};
     let editId = null;
     let isAdmin = false;
+    let currentFiltered = [];
 
     // --- XỬ LÝ ĐĂNG NHẬP ---
     window.handleAuth = function() {
@@ -342,6 +343,7 @@ input[type="date"] {
             let d2 = new Date(b[1].date);
             return sortType === "asc" ? d1 - d2 : d2 - d1;
         });
+        currentFiltered = filteredArray;
 
         renderTableUI(filteredArray);
     }
@@ -496,7 +498,7 @@ else if(efficiency >= 70) color = "orange";
 window.exportExcel = function() {
     let data = [];
 
-    Object.values(rawData).forEach(x => {
+    currentFiltered.forEach(([id, x]) => {
         data.push({
             "Tàu": x.ship_id,
             "Ngày": x.date,
@@ -505,20 +507,26 @@ window.exportExcel = function() {
         });
     });
 
+data.push({
+    "Tàu": "TỔNG",
+    "Ngày": "",
+    "Số người": data.reduce((sum, r) => sum + r["Số người"], 0),
+    "Công việc": ""
+});
+
+
+
+    
     if(data.length === 0){
         alert("Không có dữ liệu để xuất!");
         return;
     }
 
-    // Tạo worksheet
     let ws = XLSX.utils.json_to_sheet(data);
-
-    // Tạo workbook
     let wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "BaoCao");
 
-    // Xuất file
-    XLSX.writeFile(wb, "BaoCao_Casing.xlsx");
+    XLSX.writeFile(wb, "BaoCao_Loc.xlsx");
 }
 
 

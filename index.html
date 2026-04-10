@@ -231,6 +231,67 @@ h2 {
     display: block;
     font-size: 14px;
 }        
+
+/* Khung quản lý tàu chuyên dụng */
+#shipManagerBox {
+    border: 1px solid #28a745;
+    background: #ffffff;
+}
+
+.ship-input-group {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.ship-input-group input {
+    flex: 2; /* Ô nhập chiếm 2 phần */
+    margin: 0;
+}
+
+.ship-input-group button {
+    flex: 1; /* Nút bấm chiếm 1 phần */
+    margin: 0;
+    background: #28a745;
+    white-space: nowrap;
+}
+
+/* Bảng danh sách tàu */
+.ship-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.ship-table th {
+    background: #f8f9fa;
+    color: #333;
+    font-size: 13px;
+    padding: 10px;
+    border-bottom: 2px solid #28a745;
+}
+
+.ship-table td {
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+    vertical-align: middle;
+}
+
+.ship-table .ship-name {
+    font-weight: bold;
+    color: #1a73e8;
+}
+
+.btn-delete-small {
+    background: #dc3545 !important;
+    width: 35px !important;
+    height: 35px !important;
+    padding: 0 !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    margin: 0 auto !important;
+}
         
         
     </style>

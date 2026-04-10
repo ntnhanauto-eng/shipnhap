@@ -218,6 +218,8 @@ h2 {
 <h4>➕ Thêm tàu mới</h4>
 <input type="text" id="newShip" placeholder="Nhập tên tàu (VD: S580)">
 <button onclick="addShip()">Thêm tàu</button>
+        <h4>⚙️ Quản lý tàu</h4>
+<div id="shipManager"></div>
         <h3>Nhập Dữ Liệu</h3>
         <div class="flex">
    <select id="ship"></select>
@@ -367,7 +369,19 @@ h2 {
     onValue(ref(db, "ships"), snapshot => {
     let data = snapshot.val() || {};
 
-    shipList = Object.values(data).map(x => x.name);
+    let shipList = [];
+
+onValue(ref(db, "ships"), snapshot => {
+    let data = snapshot.val() || {};
+
+    shipList = Object.entries(data).map(([id, x]) => ({
+        id: id,
+        name: x.name
+    }));
+
+    renderShipOptions();
+    renderShipManager(); // thêm dòng này
+});
 
     renderShipOptions();
 });
@@ -410,10 +424,10 @@ h2 {
     let shipHTML = `<option value="all">-- Chọn Tàu --</option>`;
     let filterHTML = `<option value="all">Tất cả tàu</option>`;
 
-    shipList.forEach(s => {
-        shipHTML += `<option value="${s}">${s}</option>`;
-        filterHTML += `<option value="${s}">${s}</option>`;
-    });
+   shipList.forEach(s => {
+    shipHTML += `<option value="${s.name}">${s.name}</option>`;
+    filterHTML += `<option value="${s.name}">${s.name}</option>`;
+});
 
     document.getElementById("ship").innerHTML = shipHTML;
     document.getElementById("shipFilter").innerHTML = filterHTML;
@@ -654,9 +668,44 @@ window.addShip = function(){
     });
 }
 
+function renderShipManager(){
+    let html = "";
+
+    shipList.forEach(s => {
+        html += `
+        <div style="display:flex; gap:5px; margin-bottom:5px;">
+            <input value="${s.name}" id="edit_${s.id}">
+            <button onclick="updateShip('${s.id}')">✏️</button>
+            <button onclick="deleteShip('${s.id}')">❌</button>
+        </div>
+        `;
+    });
+
+    document.getElementById("shipManager").innerHTML = html;
+}
+
+window.updateShip = function(id){
+    let newName = document.getElementById("edit_" + id).value.trim();
+
+    if(!newName){
+        alert("Tên tàu không hợp lệ!");
+        return;
+    }
+
+    update(ref(db, "ships/" + id), { name: newName })
+    .then(() => alert("Đã cập nhật!"));
+}
+
+window.deleteShip = function(id){
+    if(!confirm("Xóa tàu này?")) return;
+
+    remove(ref(db, "ships/" + id))
+    .then(() => alert("Đã xóa!"));
+}
 
 
 
+    
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

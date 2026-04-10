@@ -113,6 +113,56 @@ input[type="date"] {
     margin-bottom: 3px;
 }
 
+/* Bảng giờ công tối ưu mobile */
+.pp-table {
+    width: 100%;
+    table-layout: fixed;
+}
+
+.pp-table th,
+.pp-table td {
+    padding: 6px;
+    font-size: 13px;
+    text-align: center;
+}
+
+/* Cột tàu */
+.pp-table th:nth-child(1),
+.pp-table td:nth-child(1) {
+    width: 25%;
+    font-weight: bold;
+}
+
+/* Cột giờ PP */
+.pp-table th:nth-child(2),
+.pp-table td:nth-child(2) {
+    width: 45%;
+}
+
+/* Input nhỏ lại */
+.pp-table input {
+    width: 100%;
+    padding: 6px;
+    font-size: 13px;
+}
+
+/* Cột nút lưu */
+.pp-table th:nth-child(3),
+.pp-table td:nth-child(3) {
+    width: 30%;
+}
+
+/* Nút nhỏ gọn */
+.pp-table button {
+    width: 100%;
+    padding: 6px;
+    font-size: 13px;
+}
+
+
+
+
+        
         
     </style>
 </head>
@@ -405,7 +455,7 @@ input[type="date"] {
 
     function renderWorkHoursInputs(){
         let ships = ["S571", "J002", "S577", "S579"];
-        let html = "<table><tr><th>Tàu</th><th>Giờ PP</th><th>Lưu</th></tr>";
+        html = "<table class='pp-table'><tr><th>Tàu</th><th>Giờ PP</th><th>Lưu</th></tr>";
         ships.forEach(s => {
             let key = s.replace(/\s/g,'_');
             let val = ppData[key]?.hours || "";

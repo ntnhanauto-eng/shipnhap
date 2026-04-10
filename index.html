@@ -155,7 +155,7 @@ input[type="date"] {
 
     <div class="header-container">
         <h2>🚢 E/R CASING</h2>
-        <button id="authBtn" onclick="handleAuth()">🔑 Admin Đăng Nhập</button>
+        <button id="authBtn" onclick="handleAuth()">🔐 Admin Đăng Nhập</button>
     </div>
 
     <div class="card admin-only">
@@ -270,12 +270,12 @@ input[type="date"] {
         if (user) {
             isAdmin = true;
             body.classList.add("is-admin");
-            btn.innerText = "🚀 Thoát Admin";
+            btn.innerText = "🔐 Thoát Admin";
             btn.classList.add("logout-mode");
         } else {
             isAdmin = false;
             body.classList.remove("is-admin");
-            btn.innerText = "🔑 Admin Đăng Nhập";
+            btn.innerText = "🔐 Admin Đăng Nhập";
             btn.classList.remove("logout-mode");
             document.getElementById("workHoursBox").style.display = "none";
         }

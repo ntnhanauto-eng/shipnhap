@@ -214,14 +214,13 @@ h2 {
     </div>
 
     <div class="card admin-only">
+        <hr>
+<h4>➕ Thêm tàu mới</h4>
+<input type="text" id="newShip" placeholder="Nhập tên tàu (VD: S580)">
+<button onclick="addShip()">Thêm tàu</button>
         <h3>Nhập Dữ Liệu</h3>
         <div class="flex">
-    <select id="ship">
-        <option value="all">-- Chọn Tàu --</option>
-        <option value="J002">J002</option>
-         <option value="S571">S571</option>
-        <option value="S577">S577</option>
-        <option value="S579">S579</option>
+   <select id="ship"></select>
     </select>
 
     <div class="date-field">
@@ -250,13 +249,7 @@ h2 {
 </div>
     
     <div class="flex" style="margin-top: 10px;">
-        <select id="shipFilter">
-            <option value="all">Tất cả tàu</option>
-             <option value="J002">J002</option>
-             <option value="S571">S571</option>
-             <option value="S577">S577</option>
-             <option value="S579">S579</option>
-        </select>
+       <select id="shipFilter"></select>
         <input type="text" id="jobFilter" placeholder="Tìm tên công việc...">
     </div>
     <select id="sortType">
@@ -303,6 +296,7 @@ h2 {
     const auth = getAuth(app);
 
     let rawData = {};
+    let shipList = [];
     let ppData = {};
     let editId = null;
     let isAdmin = false;
@@ -370,6 +364,14 @@ h2 {
         applyFilter();
     });
 
+    onValue(ref(db, "ships"), snapshot => {
+    let data = snapshot.val() || {};
+
+    shipList = Object.values(data).map(x => x.name);
+
+    renderShipOptions();
+});
+    
     onValue(ref(db, "workHours"), snapshot => {
         ppData = snapshot.val() || {};
         if(document.getElementById("summary").style.display === "block") showSummary();
@@ -391,6 +393,9 @@ h2 {
             return ok;
         });
 
+     
+        
+
         filteredArray.sort((a, b) => {
             let d1 = new Date(a[1].date);
             let d2 = new Date(b[1].date);
@@ -400,6 +405,22 @@ h2 {
 
         renderTableUI(filteredArray);
     }
+
+  function renderShipOptions(){
+    let shipHTML = `<option value="all">-- Chọn Tàu --</option>`;
+    let filterHTML = `<option value="all">Tất cả tàu</option>`;
+
+    shipList.forEach(s => {
+        shipHTML += `<option value="${s}">${s}</option>`;
+        filterHTML += `<option value="${s}">${s}</option>`;
+    });
+
+    document.getElementById("ship").innerHTML = shipHTML;
+    document.getElementById("shipFilter").innerHTML = filterHTML;
+}
+
+
+    
 
     function renderTableUI(dataArray) {
         let html = `<table>
@@ -505,7 +526,7 @@ else if(efficiency >= 70) color = "orange";
     }
 
     function renderWorkHoursInputs(){
-        let ships = ["J002", "S571", "S577", "S579"];
+        let ships = shipList;
         let html = "<table><tr><th>Tàu</th><th>Giờ PP</th><th>Lưu</th></tr>";
         ships.forEach(s => {
             let key = s.replace(/\s/g,'_');
@@ -612,6 +633,30 @@ window.onclick = function(event) {
         modal.style.display = "none";
     }
 }
+
+window.addShip = function(){
+    let name = document.getElementById("newShip").value.trim();
+
+    if(!name){
+        alert("Nhập tên tàu!");
+        return;
+    }
+
+    if(shipList.includes(name)){
+        alert("Tàu đã tồn tại!");
+        return;
+    }
+
+    push(ref(db, "ships"), { name: name })
+    .then(() => {
+        alert("Đã thêm tàu!");
+        document.getElementById("newShip").value = "";
+    });
+}
+
+
+
+
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

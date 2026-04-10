@@ -113,6 +113,54 @@ input[type="date"] {
     margin-bottom: 3px;
 }
 
+@media (max-width: 600px) {
+    #workHoursContent table,
+    #workHoursContent thead,
+    #workHoursContent tbody,
+    #workHoursContent tr,
+    #workHoursContent th,
+    #workHoursContent td {
+        display: block;
+        width: 100%;
+    }
+
+    #workHoursContent tr {
+        background: #fff;
+        margin-bottom: 10px;
+        padding: 10px;
+        border-radius: 10px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+
+    #workHoursContent td {
+        border: none;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 6px 0;
+    }
+
+    #workHoursContent td::before {
+        font-weight: bold;
+    }
+
+    #workHoursContent td:nth-child(1)::before { content: "Tàu"; }
+    #workHoursContent td:nth-child(2)::before { content: "Giờ PP"; }
+    #workHoursContent td:nth-child(3)::before { content: "Lưu"; }
+
+    #workHoursContent input {
+        width: 60%;
+    }
+
+    #workHoursContent button {
+        width: auto;
+        padding: 6px 10px;
+    }
+}
+
+
+
+        
         
     </style>
 </head>

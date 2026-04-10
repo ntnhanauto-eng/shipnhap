@@ -83,7 +83,17 @@ input[type="date"] {
     .flex { grid-template-columns: 1fr 1fr; } 
 }
 
+.date-field {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
 
+.date-field label {
+    font-size: 13px;
+    color: #555;
+    margin-bottom: 3px;
+}
 
         
     </style>
@@ -117,9 +127,15 @@ input[type="date"] {
    <div class="card">
     <h3>Bộ Lọc & Tìm Kiếm</h3>
     <div class="date-row">
-        <input type="date" id="fromDate" placeholder="Từ ngày">
-        <input type="date" id="toDate" placeholder="Đến ngày">
+    <div class="date-field">
+        <label for="fromDate">Từ ngày</label>
+        <input type="date" id="fromDate">
     </div>
+    <div class="date-field">
+        <label for="toDate">Đến ngày</label>
+        <input type="date" id="toDate">
+    </div>
+</div>
     
     <div class="flex" style="margin-top: 10px;">
         <select id="shipFilter">

@@ -423,7 +423,6 @@ h2 {
     let isAdmin = false;
     let currentFiltered = [];
     let shipsData = {}; // Biến lưu danh sách tàu từ Firebase
-    let checkData = {};
 
 // 1. Lắng nghe danh sách tàu từ Firebase
 onValue(ref(db, "ships"), snapshot => {
@@ -433,11 +432,6 @@ onValue(ref(db, "ships"), snapshot => {
     if(document.getElementById("shipManagerBox").style.display === "block") {
         renderShipManagerList();
     }
-});
-
-    onValue(ref(db, "checks"), snapshot => {
-    checkData = snapshot.val() || {};
-    if(document.getElementById("summary").style.display === "block") showSummary();
 });
 
 // 2. Hàm tự động điền tên tàu vào các ô Select
@@ -515,26 +509,20 @@ window.deleteShip = function(shipId) {
 function renderShipManagerList() {
     let html = `<table>
         <thead>
-    <tr>
-        <th>Tên Tàu</th>
-        <th>Xóa</th>
-        <th>Kiểm tra</th>
-    </tr>
-</thead>
+            <tr>
+                <th>Tên Tàu</th>
+                <th>Xóa</th>
+            </tr>
+        </thead>
         <tbody>`;
     
     Object.keys(shipsData).sort().forEach(shipId => {
-       html += `<tr>
-    <td style="font-weight: bold;">${shipId}</td>
-
-    <td>
-        <button class="btn-delete" onclick="deleteShip('${shipId}')">🗑️</button>
-    </td>
-
-    <td>
-        <button onclick="saveCheck('${shipId}')">📝</button>
-    </td>
-</tr>`;
+        html += `<tr>
+            <td style="font-weight: bold;">${shipId}</td>
+            <td>
+                <button class="btn-delete" onclick="deleteShip('${shipId}')">🗑️</button>
+            </td>
+        </tr>`;
     });
     
     html += "</tbody></table>";
@@ -717,30 +705,27 @@ function renderShipManagerList() {
     });
 
     let html = "<h4>📊 Báo cáo tổng hợp</h4>";
-   for(let s in result){
-    let key = s.replace(/\s/g,'_');
-    let savedPP = ppData[key]?.hours || 0;
-    let realHours = result[s].totalWorkers * 8;
+    for(let s in result){
+        let key = s.replace(/\s/g,'_');
+        let savedPP = ppData[key]?.hours || 0;
+        let realHours = result[s].totalWorkers * 8;
 
-    let efficiency = realHours > 0 ? (savedPP / realHours) * 100 : 0;
+        let efficiency = realHours > 0 ? (savedPP / realHours) * 100 : 0;
 
-    let color = "red";
-    if(efficiency >= 100) color = "green";
-    else if(efficiency >= 70) color = "orange";
+        let color = "red";
+        if(efficiency >= 100) color = "green";
+        else if(efficiency >= 70) color = "orange";
 
-    let checkKey = s.replace(/\s/g,'_');
-    let checkText = checkData[checkKey]?.text || "Chưa có kiểm tra";
+        html += `<div class="summary-item">
+            <b>🚢 Tàu: ${s}</b><br>
+            - Tổng nhân công: ${result[s].totalWorkers} lượt người<br>
+            - Tổng giờ thực tế: ${realHours.toLocaleString()} giờ<br>
+            - Giờ định mức PP: <b>${savedPP.toLocaleString()}</b> giờ<br>
+            - Hiệu quả tàu: <b style="color:${color}">${efficiency.toFixed(1)}%</b>
+        </div>`;
+    }
 
-    html += `
-    <div class="summary-item">
-        <b>🚢 Tàu: ${s}</b><br>
-        - Tổng nhân công: ${result[s].totalWorkers} lượt người<br>
-        - Tổng giờ thực tế: ${realHours.toLocaleString()} giờ<br>
-        - Giờ định mức PP: <b>${savedPP.toLocaleString()}</b> giờ<br>
-        - Hiệu quả tàu: <b style="color:${color}">${efficiency.toFixed(1)}%</b><br>
-        - 📝 Mục kiểm tra: <i>${checkText}</i>
-    </div>
-    `;
+    box.innerHTML = html;
 }
 
   window.toggleWorkHours = function(){
@@ -875,18 +860,6 @@ window.onclick = function(event) {
         modal.style.display = "none";
     }
 }
-
-window.saveCheck = function(shipName){
-    let key = shipName.replace(/\s/g,'_');
-    let text = prompt("Nhập nội dung kiểm tra cho " + shipName);
-    if(!text) return;
-
-    set(ref(db, "checks/" + key), {
-        ship: shipName,
-        text: text
-    }).then(() => alert("Đã lưu kiểm tra!"));
-}
-
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

@@ -600,13 +600,14 @@ function renderShipManagerList() {
         if(document.getElementById("summary").style.display === "block") showSummary();
     });
 
-    onValue(ref(db, "shipChecks"), snap => {
+   onValue(ref(db, "shipChecks"), snap => {
     shipChecks = snap.val() || {};
-     const box = document.getElementById("shipManagerBox");
-    if(box.style.display === "block"){
+    const box = document.getElementById("shipManagerBox");
+    
+    if (box.style.display === "block") {
         renderShipManagerList();
+    }
 });
-
 onValue(ref(db, "checkStatus"), snap => {
     checkStatus = snap.val() || {};
 });

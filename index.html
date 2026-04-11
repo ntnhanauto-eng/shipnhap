@@ -602,6 +602,9 @@ function renderShipManagerList() {
 
     onValue(ref(db, "shipChecks"), snap => {
     shipChecks = snap.val() || {};
+     const box = document.getElementById("shipManagerBox");
+    if(box.style.display === "block"){
+        renderShipManagerList();
 });
 
 onValue(ref(db, "checkStatus"), snap => {
@@ -943,7 +946,7 @@ window.showCheckManager = function(ship){
         <h4>⚙️ Hạng mục - ${ship}</h4>
 
         <div style="display:flex; gap:5px;">
-            <input id="newCheckItem" placeholder="Tên hạng mục">
+            <input id="newCheckItem_${ship}" placeholder="Tên hạng mục">
             <button onclick="addCheckItem('${ship}')">➕</button>
         </div>
     `;
@@ -961,14 +964,14 @@ window.showCheckManager = function(ship){
 }
 
   window.addCheckItem = function(ship){
-    let val = document.getElementById("newCheckItem").value.trim();
+    let val = document.getElementById(`newCheckItem_${ship}`).value.trim();
     if(!val) return;
 
     let id = "item" + Date.now();
 
     set(ref(db, `shipChecks/${ship}/${id}`), val)
     .then(() => {
-        document.getElementById("newCheckItem").value = "";
+        document.getElementById(`newCheckItem_${ship}`).value = "";
         showCheckManager(ship); // 🔥 refresh lại UI
     });
 }

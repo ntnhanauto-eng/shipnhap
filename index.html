@@ -405,15 +405,16 @@ h2 {
             <h4>Nhập Giờ Công Theo Định Mức</h4>
             <div id="workHoursContent"></div>
             </div>
-       <div id="shipManagerBox" class="card admin-only" style="display:none; margin-top:15px; border: 2px solid #28a745;">
+      <div id="shipManagerBox" class="card admin-only" style="display:none; margin-top:15px; border: 2px solid #28a745;">
     <h4 style="color: #28a745; margin-top: 0;">🚢 Quản Lý Danh Sách Tàu</h4>
-    
-    <div style="display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center;">
-        <input type="text" id="newShipName" placeholder="Tên tàu (VD: S580)" style="margin: 0;">
-        <button onclick="addShip()" style="background: #28a745; margin: 0; width: 100px;">➕ Thêm</button>
+    <div class="ship-input-group">
+        <input type="text" id="newShipName" placeholder="Tên tàu (VD: S580)">
+        <button onclick="addShip()">➕ Thêm</button>
+    </div>
+    <div id="shipListContent"></div>
+</div>
 
-
-       <div id="checklistManagerBox" class="card admin-only" style="display:none; margin-top:15px; border: 2px solid #17a2b8;">
+<div id="checklistManagerBox" class="card admin-only" style="display:none; margin-top:15px; border: 2px solid #17a2b8;">
     <h4 style="color: #17a2b8; margin: 0 0 10px 0;">📋 Quản Lý Hạng Mục Kiểm Tra</h4>
     <select id="selectShipForChecklist" onchange="renderChecklistManager()"></select>
     <div style="display: flex; gap: 8px; margin-top: 10px;">
@@ -1006,6 +1007,96 @@ window.toggleChecklist = function() {
     select.innerHTML = options;
     renderChecklistManager();
 }
+
+// Biến lưu checklist từ Firebase
+let allChecklists = {};
+
+// 1. Lắng nghe dữ liệu checklist từ Firebase
+onValue(ref(db, "checklists"), snapshot => {
+    allChecklists = snapshot.val() || {};
+    // Vẽ lại checklist nếu box đang mở
+    if(document.getElementById("checklistManagerBox").style.display === "block") {
+        renderChecklistManager();
+    }
+    // Cập nhật lại BÁO CÁO nếu đang mở
+    if(document.getElementById("summary").style.display === "block") {
+        renderSummaryContent();
+    }
+});
+
+// 2. Hàm thêm hạng mục (Đảm bảo gọi đúng ref)
+window.addCheckItem = function() {
+    const shipId = document.getElementById("selectShipForChecklist").value;
+    const item = document.getElementById("newCheckItem").value.trim();
+    if(!shipId || shipId === "undefined") return alert("Vui lòng chọn tàu trước!");
+    if(!item) return alert("Vui lòng nhập tên hạng mục!");
+    
+    // Đẩy dữ liệu vào firebase theo nhánh: checklists / tên_tàu / id_tự_tạo
+    push(ref(db, `checklists/${shipId}`), { name: item })
+    .then(() => {
+        document.getElementById("newCheckItem").value = "";
+    });
+}
+
+// 3. Hàm xóa hạng mục
+window.deleteCheckItem = function(shipId, itemId) {
+    if(confirm("Xóa hạng mục này?")) {
+        remove(ref(db, `checklists/${shipId}/${itemId}`));
+    }
+}
+
+// 4. Vẽ danh sách quản lý
+window.renderChecklistManager = function() {
+    const shipId = document.getElementById("selectShipForChecklist").value;
+    const items = allChecklists[shipId] || {};
+    
+    let html = "<ul style='padding-left: 20px; margin: 10px 0;'>";
+    if(Object.keys(items).length === 0) html += "<li>Chưa có hạng mục nào.</li>";
+    
+    Object.entries(items).forEach(([id, val]) => {
+        html += `<li style="margin-bottom: 5px;">
+            ${val.name} 
+            <button onclick="deleteCheckItem('${shipId}','${id}')" style="width: auto; padding: 2px 8px; background: #dc3545; color: white; border: none; cursor: pointer; border-radius: 4px; margin-left: 10px;">Xóa</button>
+        </li>`;
+    });
+    html += "</ul>";
+    document.getElementById("checklistContent").innerHTML = html;
+}
+
+// 5. Toggle Checklist (Đảm bảo load đúng danh sách tàu)
+window.toggleChecklist = function() {
+    const box = document.getElementById("checklistManagerBox");
+    const btn = document.getElementById("btnChecklist");
+    const isOpen = box.style.display === "block";
+
+    resetActiveButtons(); // Reset các nút khác
+
+    if(isOpen){
+        box.style.display = "none";
+        btn.classList.remove("btn-active");
+        return;
+    }
+
+    box.style.display = "block";
+    btn.classList.add("btn-active");
+
+    // Đóng các box khác
+    document.getElementById("summary").style.display = "none";
+    document.getElementById("workHoursBox").style.display = "none";
+    document.getElementById("shipManagerBox").style.display = "none";
+
+    // Load danh sách tàu vào select
+    const select = document.getElementById("selectShipForChecklist");
+    let options = "";
+    Object.keys(shipsData).sort().forEach(s => {
+        options += `<option value="${s}">${s}</option>`;
+    });
+    select.innerHTML = options;
+    renderChecklistManager();
+}
+
+
+
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

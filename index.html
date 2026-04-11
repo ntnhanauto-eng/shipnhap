@@ -760,37 +760,6 @@ function renderSummaryContent(){
 
     
 
-    let result = {};
-    Object.values(rawData).forEach(x => {
-        if(!result[x.ship_id]) result[x.ship_id] = { totalWorkers:0 };
-        result[x.ship_id].totalWorkers += Number(x.workers);
-    });
-
-    let html = "<h4>📊 Báo cáo tổng hợp</h4>";
-    for(let s in result){
-        let key = s.replace(/\s/g,'_');
-        let savedPP = ppData[key]?.hours || 0;
-        let realHours = result[s].totalWorkers * 8;
-
-        let efficiency = realHours > 0 ? (savedPP / realHours) * 100 : 0;
-
-        let color = "red";
-        if(efficiency >= 100) color = "green";
-        else if(efficiency >= 70) color = "orange";
-
-       html += `<div class="summary-item">
-    <b>🚢 Tàu: ${s}</b><br>
-    - Tổng nhân công: ${result[s].totalWorkers} lượt người<br>
-    - Tổng giờ thực tế: ${realHours.toLocaleString()} giờ<br>
-    - Giờ định mức PP: <b>${savedPP.toLocaleString()}</b> giờ<br>
-    - Hiệu quả tàu: <b style="color:${color}">${efficiency.toFixed(1)}%</b><br>
-    - Các hạng mục kiểm tra: <i>(chưa cập nhật)</i>
-</div>`;
-    }
-
-    box.innerHTML = html;
-}
-
   window.toggleWorkHours = function(){
     const box = document.getElementById("workHoursBox");
     const btn = document.getElementById("btnWorkHours");

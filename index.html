@@ -814,7 +814,7 @@ window.renderSummaryByShip = function(){
 }
 
     function renderChecklist(ship){
-    const list = shipChecks[ship] || {};
+  const list = shipChecks[shipKey(ship)] || {};
     const today = new Date().toISOString().slice(0,10); // ✅ THÊM DÒNG NÀY
 
     let html = "<h4>🧾 Hạng mục kiểm tra</h4>";
@@ -984,19 +984,18 @@ window.showCheckManager = function(ship){
 
 window.addCheckItem = function(){
     const ship = currentShipCheck;
+    const key = shipKey(ship);
 
-    if(!ship){
-        alert("Chưa chọn tàu!");
+    const input = document.getElementById(`newCheckItem_${key}`);
+    if(!input){
+        alert("Không tìm thấy ô nhập!");
         return;
     }
 
-    const key = shipKey(ship);
-    let input = document.getElementById(`newCheckItem_${key}`);
-
-    let val = input.value.trim();
+    const val = input.value.trim();
     if(!val) return;
 
-    let id = "item" + Date.now();
+    const id = "item" + Date.now();
 
     set(ref(db, `shipChecks/${key}/${id}`), val)
     .then(() => {
@@ -1013,7 +1012,11 @@ window.addCheckItem = function(){
 }
 
 function shipKey(ship){
-    return (ship || "").trim().toUpperCase();
+    return (ship || "")
+        .trim()
+        .toUpperCase()
+        .replace(/\s+/g,'_')
+        .replace(/[^A-Z0-9_]/g,'');
 }
     
 </script>

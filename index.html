@@ -610,7 +610,7 @@ function renderShipManagerList() {
 });
 onValue(ref(db, "checkStatus"), snap => {
     checkStatus = snap.val() || {};
-});
+}); 
 
     window.applyFilter = function(){
         const from = document.getElementById("fromDate").value;

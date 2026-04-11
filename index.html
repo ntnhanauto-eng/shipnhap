@@ -753,8 +753,7 @@ window.renderSummaryByShip = function(){
     else if(efficiency >= 70) color = "orange";
 
     // 🔥 gọi thêm phần checklist
-    renderChecklist(ship);
-
+    
     box.innerHTML = `
         <div class="summary-item">
             <b>🚢 Tàu: ${ship}</b><br>
@@ -766,6 +765,7 @@ window.renderSummaryByShip = function(){
 
         <div id="checklistBox"></div>
     `;
+    renderChecklist(ship);
 }
 
 
@@ -960,17 +960,22 @@ window.showCheckManager = function(ship){
     document.getElementById("shipListContent").innerHTML = html;
 }
 
-   window.addCheckItem = function(ship){
+  window.addCheckItem = function(ship){
     let val = document.getElementById("newCheckItem").value.trim();
     if(!val) return;
 
     let id = "item" + Date.now();
 
-    set(ref(db, `shipChecks/${ship}/${id}`), val);
+    set(ref(db, `shipChecks/${ship}/${id}`), val)
+    .then(() => {
+        document.getElementById("newCheckItem").value = "";
+        showCheckManager(ship); // 🔥 refresh lại UI
+    });
 }
 
-    window.deleteCheckItem = function(ship, id){
-    remove(ref(db, `shipChecks/${ship}/${id}`));
+   window.deleteCheckItem = function(ship, id){
+    remove(ref(db, `shipChecks/${ship}/${id}`))
+    .then(() => showCheckManager(ship)); // 🔥 refresh
 }
 
 

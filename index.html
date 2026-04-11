@@ -603,7 +603,24 @@ function renderShipManagerList() {
 
    onValue(ref(db, "shipChecks"), snap => {
     shipChecks = snap.val() || {};
-    const box = document.getElementById("shipManagerBox");
+
+    // Nếu đang mở quản lý tàu → reload lại
+    const checkBox = document.getElementById("checkManagerBox");
+    if (checkBox && checkBox.innerHTML !== "") {
+        // Lấy tên tàu đang mở từ tiêu đề
+        const title = checkBox.querySelector("h4");
+        if (title) {
+            const ship = title.innerText.replace("⚙️ Hạng mục - ", "");
+            showCheckManager(ship);
+        }
+    }
+
+    // Nếu đang mở báo cáo → cập nhật checklist luôn
+    const reportShip = document.getElementById("reportShip");
+    if (reportShip && reportShip.value !== "all") {
+        renderChecklist(reportShip.value);
+    }
+});
     
    
 });
@@ -799,7 +816,7 @@ window.renderSummaryByShip = function(){
 
     function renderChecklist(ship){
     const list = shipChecks[ship] || {};
-    const today = new Date().toISOString().slice(0,10);
+    let checked = checkStatus?.[ship]?.[today]?.[id] || false;
 
     let html = "<h4>🧾 Hạng mục kiểm tra</h4>";
 

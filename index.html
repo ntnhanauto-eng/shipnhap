@@ -716,13 +716,14 @@ function renderShipManagerList() {
         if(efficiency >= 100) color = "green";
         else if(efficiency >= 70) color = "orange";
 
-        html += `<div class="summary-item">
-            <b>🚢 Tàu: ${s}</b><br>
-            - Tổng nhân công: ${result[s].totalWorkers} lượt người<br>
-            - Tổng giờ thực tế: ${realHours.toLocaleString()} giờ<br>
-            - Giờ định mức PP: <b>${savedPP.toLocaleString()}</b> giờ<br>
-            - Hiệu quả tàu: <b style="color:${color}">${efficiency.toFixed(1)}%</b>
-        </div>`;
+       html += `<div class="summary-item">
+    <b>🚢 Tàu: ${s}</b><br>
+    - Tổng nhân công: ${result[s].totalWorkers} lượt người<br>
+    - Tổng giờ thực tế: ${realHours.toLocaleString()} giờ<br>
+    - Giờ định mức PP: <b>${savedPP.toLocaleString()}</b> giờ<br>
+    - Hiệu quả tàu: <b style="color:${color}">${efficiency.toFixed(1)}%</b><br>
+    - Các hạng mục kiểm tra: <i>(chưa cập nhật)</i>
+</div>`;
     }
 
     box.innerHTML = html;

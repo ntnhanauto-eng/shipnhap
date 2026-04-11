@@ -426,6 +426,7 @@ h2 {
     let shipsData = {}; // Biến lưu danh sách tàu từ Firebase
     let shipChecks = {};
     let checkStatus = {};
+    let currentShipCheck = null;
 
 // 1. Lắng nghe danh sách tàu từ Firebase
 onValue(ref(db, "ships"), snapshot => {
@@ -955,6 +956,8 @@ window.onclick = function(event) {
 }
 
 window.showCheckManager = function(ship){
+    currentShipCheck = ship; // ⭐ lưu lại tàu đang mở
+
     const key = shipKey(ship);
     let list = shipChecks[key] || {};
 
@@ -963,7 +966,7 @@ window.showCheckManager = function(ship){
 
         <div style="display:flex; gap:5px; margin-bottom:10px;">
             <input id="newCheckItem_${key}" placeholder="Tên hạng mục">
-            <button onclick="addCheckItem('${ship}')">➕</button>
+            <button onclick="addCheckItem()">➕</button>
         </div>
     `;
 
@@ -979,14 +982,16 @@ window.showCheckManager = function(ship){
     document.getElementById("checkManagerBox").innerHTML = html;
 }
 
-window.addCheckItem = function(ship){
-    const key = shipKey(ship);
-    let input = document.getElementById(`newCheckItem_${key}`);
+window.addCheckItem = function(){
+    const ship = currentShipCheck;
 
-    if(!input) {
-        alert("Không tìm thấy input!");
+    if(!ship){
+        alert("Chưa chọn tàu!");
         return;
     }
+
+    const key = shipKey(ship);
+    let input = document.getElementById(`newCheckItem_${key}`);
 
     let val = input.value.trim();
     if(!val) return;
@@ -1001,7 +1006,9 @@ window.addCheckItem = function(ship){
 }
 
   window.deleteCheckItem = function(ship, id){
-    remove(ref(db, `shipChecks/${ship}/${id}`))
+    const key = shipKey(ship);
+
+    remove(ref(db, `shipChecks/${key}/${id}`))
     .then(() => showCheckManager(ship));
 }
 

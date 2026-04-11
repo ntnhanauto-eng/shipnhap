@@ -622,8 +622,6 @@ function renderShipManagerList() {
     }
 });
     
-   
-});
 onValue(ref(db, "checkStatus"), snap => {
     checkStatus = snap.val() || {};
 }); 
@@ -816,7 +814,7 @@ window.renderSummaryByShip = function(){
 
     function renderChecklist(ship){
     const list = shipChecks[ship] || {};
-    let checked = checkStatus?.[ship]?.[today]?.[id] || false;
+    const today = new Date().toISOString().slice(0,10); // ✅ THÊM DÒNG NÀY
 
     let html = "<h4>🧾 Hạng mục kiểm tra</h4>";
 

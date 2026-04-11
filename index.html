@@ -955,13 +955,14 @@ window.onclick = function(event) {
 }
 
 window.showCheckManager = function(ship){
+    const key = shipKey(ship);
     let list = shipChecks[ship] || {};
 
     let html = `
         <h4>⚙️ Hạng mục - ${ship}</h4>
 
         <div style="display:flex; gap:5px; margin-bottom:10px;">
-            <input id="newCheckItem_${ship}" placeholder="Tên hạng mục">
+            <input id="newCheckItem_${key}" placeholder="Tên hạng mục">
             <button onclick="addCheckItem('${ship}')">➕</button>
         </div>
     `;
@@ -979,8 +980,15 @@ window.showCheckManager = function(ship){
     document.getElementById("checkManagerBox").innerHTML = html;
 }
 
- window.addCheckItem = function(ship){
-    let input = document.getElementById(`newCheckItem_${ship}`);
+window.addCheckItem = function(ship){
+    const key = shipKey(ship);
+    let input = document.getElementById(`newCheckItem_${key}`);
+
+    if(!input){
+        alert("Không tìm thấy ô nhập dữ liệu!");
+        return;
+    }
+
     let val = input.value.trim();
     if(!val) return;
 
@@ -989,7 +997,7 @@ window.showCheckManager = function(ship){
     set(ref(db, `shipChecks/${ship}/${id}`), val)
     .then(() => {
         input.value = "";
-        showCheckManager(ship); // reload lại đúng vùng
+        showCheckManager(ship);
     });
 }
 

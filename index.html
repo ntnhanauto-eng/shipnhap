@@ -745,14 +745,12 @@ function renderShipManagerList() {
     select.onchange = renderSummaryContent;
 }
 
-function renderSummaryContent(){
+window.renderSummaryContent = function(){
     const selectedShip = document.getElementById("summaryShipFilter").value;
 
     let result = {};
-
     Object.values(rawData).forEach(x => {
         if(selectedShip !== "all" && x.ship_id !== selectedShip) return;
-
         if(!result[x.ship_id]) result[x.ship_id] = { totalWorkers:0 };
         result[x.ship_id].totalWorkers += Number(x.workers);
     });
@@ -763,29 +761,26 @@ function renderSummaryContent(){
         let key = s.replace(/\s/g,'_');
         let savedPP = ppData[key]?.hours || 0;
         let realHours = result[s].totalWorkers * 8;
-
         let efficiency = realHours > 0 ? (savedPP / realHours) * 100 : 0;
+        let color = efficiency >= 100 ? "green" : (efficiency >= 70 ? "orange" : "red");
 
-        let color = "red";
-        if(efficiency >= 100) color = "green";
-        else if(efficiency >= 70) color = "orange";
+        // Lấy checklist của tàu tương ứng
+        let items = allChecklists[s] || {};
+        let checklistHtml = Object.values(items).length > 0 
+            ? Object.values(items).map(x => `• ${x.name}`).join("<br>") 
+            : "Chưa có hạng mục";
 
-       // Trong vòng lặp for(let s in result)
-let shipKey = s;
-let items = allChecklists[shipKey] || {};
-let checklistHtml = Object.values(items).map(x => `• ${x.name}`).join("<br>");
-
-html += `<div class="summary-item">
-    <b>🚢 Tàu: ${s}</b><br>
-    - Tổng nhân công: ${result[s].totalWorkers} lượt người<br>
-    - Hiệu quả: <b style="color:${color}">${efficiency.toFixed(1)}%</b><br>
-    - <b>Hạng mục kiểm tra:</b><br>${checklistHtml || "Chưa có hạng mục"}
-</div>`;
+        html += `<div class="summary-item">
+             <b>🚢 Tàu: ${s}</b><br>
+            - Tổng nhân công: ${result[s].totalWorkers} lượt người<br>
+            - Tổng giờ thực tế: ${realHours.toLocaleString()} giờ<br>
+            - Giờ định mức PP: <b>${savedPP.toLocaleString()}</b> giờ<br>
+            - Hiệu quả: <b style="color:${color}">${efficiency.toFixed(1)}%</b><br>
+            - <b>📋 Checklist kiểm tra:</b><br><small>${checklistHtml}</small>
+        </div>`;
     }
-
     document.getElementById("summaryContent").innerHTML = html;
 }
-
 
     
 
@@ -932,8 +927,10 @@ onValue(ref(db, "checklists"), snapshot => {
     if(document.getElementById("checklistManagerBox").style.display === "block") {
         renderChecklistManager();
     }
-    // Cập nhật báo cáo nếu đang hiển thị
-    if(document.getElementById("summary").style.display === "block") renderSummaryContent();
+   // Cập nhật BÁO CÁO nếu đang mở
+    if(document.getElementById("summary").style.display === "block") {
+        renderSummaryContent();
+    }
 });
 
 // Hàm thêm hạng mục
@@ -955,9 +952,15 @@ window.deleteCheckItem = function(shipId, itemId) {
 window.renderChecklistManager = function() {
     const shipId = document.getElementById("selectShipForChecklist").value;
     const items = allChecklists[shipId] || {};
-    let html = "<ul>";
+    
+    let html = "<ul style='padding-left: 20px; margin: 10px 0;'>";
+    if(Object.keys(items).length === 0) html += "<li>Chưa có hạng mục nào.</li>";
+    
     Object.entries(items).forEach(([id, val]) => {
-        html += `<li>${val.name} <button onclick="deleteCheckItem('${shipId}','${id}')">❌</button></li>`;
+        html += `<li style="margin-bottom: 5px;">
+            ${val.name} 
+            <button onclick="deleteCheckItem('${shipId}','${id}')" style="width: auto; padding: 2px 8px; background: #dc3545; font-size: 12px; margin-left: 10px;">Xóa</button>
+        </li>`;
     });
     html += "</ul>";
     document.getElementById("checklistContent").innerHTML = html;

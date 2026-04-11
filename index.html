@@ -397,6 +397,7 @@ h2 {
     </div>
 
     <div id="shipListContent" style="margin-top:15px; max-height: 300px; overflow-y: auto;">
+        <div id="checkManagerBox" style="margin-top:15px;"></div>
         </div>
 </div>
     </div>
@@ -946,7 +947,7 @@ window.showCheckManager = function(ship){
     let html = `
         <h4>⚙️ Hạng mục - ${ship}</h4>
 
-        <div style="display:flex; gap:5px;">
+        <div style="display:flex; gap:5px; margin-bottom:10px;">
             <input id="newCheckItem_${ship}" placeholder="Tên hạng mục">
             <button onclick="addCheckItem('${ship}')">➕</button>
         </div>
@@ -961,25 +962,27 @@ window.showCheckManager = function(ship){
         `;
     });
 
-    document.getElementById("shipListContent").innerHTML = html;
+    // 👉 CHỈ render vào vùng riêng
+    document.getElementById("checkManagerBox").innerHTML = html;
 }
 
-  window.addCheckItem = function(ship){
-    let val = document.getElementById(`newCheckItem_${ship}`).value.trim();
+ window.addCheckItem = function(ship){
+    let input = document.getElementById(`newCheckItem_${ship}`);
+    let val = input.value.trim();
     if(!val) return;
 
     let id = "item" + Date.now();
 
     set(ref(db, `shipChecks/${ship}/${id}`), val)
     .then(() => {
-        document.getElementById(`newCheckItem_${ship}`).value = "";
-        showCheckManager(ship); // 🔥 refresh lại UI
+        input.value = "";
+        showCheckManager(ship); // reload lại đúng vùng
     });
 }
 
-   window.deleteCheckItem = function(ship, id){
+  window.deleteCheckItem = function(ship, id){
     remove(ref(db, `shipChecks/${ship}/${id}`))
-    .then(() => showCheckManager(ship)); // 🔥 refresh
+    .then(() => showCheckManager(ship));
 }
 
 

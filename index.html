@@ -617,14 +617,11 @@ function renderShipManagerList() {
             return sortType === "asc" ? d1 - d2 : d2 - d1;
         });
         currentFiltered = filteredArray;
-        currentPage = 1;
 
         renderTableUI(filteredArray);
     }
 
     function renderTableUI(dataArray) {
-        const LIMIT = 100;
-        const displayData = dataArray.slice(0, LIMIT);
         let html = `<table>
             <tr>
                 <th class="stt-col">STT</th>
@@ -636,7 +633,7 @@ function renderShipManagerList() {
             </tr>`;
 
         let totalWorkers = 0;
-        displayData.forEach(([id, x], index) => {
+        dataArray.forEach(([id, x], index) => {
             totalWorkers += Number(x.workers || 0);
             html += `<tr>
                 <td class="stt-col">${index + 1}</td>
@@ -657,15 +654,7 @@ function renderShipManagerList() {
             <td colspan="3" style="text-align:right">TỔNG CỘNG:</td>
             <td class="worker-col">${totalWorkers}</td>
             <td colspan="${isAdmin ? 2 : 1}">${isAdmin ? 'người' : 'người'}</td>
-        </tr>
-        if(dataArray.length > LIMIT){
-    html += `<tr>
-        <td colspan="6" style="text-align:center; color:gray;">
-            Hiển thị ${LIMIT}/${dataArray.length} dòng
-        </td>
-    </tr>`;
-}
-        </table>`;
+        </tr></table>`;
         
         document.getElementById("tableContainer").innerHTML = html;
     }
@@ -802,12 +791,7 @@ function renderShipManagerList() {
     // Listeners
     document.getElementById("sortType").addEventListener("change", applyFilter);
     document.getElementById("shipFilter").addEventListener("change", applyFilter);
-    let debounceTimer;
-
-document.getElementById("jobFilter").addEventListener("input", () => {
-    clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(applyFilter, 300);
-});
+    document.getElementById("jobFilter").addEventListener("input", applyFilter);
     document.getElementById("fromDate").addEventListener("input", applyFilter);
     document.getElementById("toDate").addEventListener("input", applyFilter);
 

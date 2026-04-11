@@ -396,9 +396,9 @@ h2 {
         <button onclick="addShip()" style="background: #28a745; margin: 0; width: 100px;">➕ Thêm</button>
     </div>
 
-    <div id="shipListContent" style="margin-top:15px; max-height: 300px; overflow-y: auto;">
+    <div id="shipListContent" style="margin-top:15px; max-height: 300px; overflow-y: auto;"></div>
         <div id="checkManagerBox" style="margin-top:15px;"></div>
-        </div>
+       
 </div>
     </div>
 
@@ -605,9 +605,7 @@ function renderShipManagerList() {
     shipChecks = snap.val() || {};
     const box = document.getElementById("shipManagerBox");
     
-    if (box.style.display === "block") {
-        renderShipManagerList();
-    }
+   
 });
 onValue(ref(db, "checkStatus"), snap => {
     checkStatus = snap.val() || {};

@@ -396,9 +396,8 @@ h2 {
         <button onclick="addShip()" style="background: #28a745; margin: 0; width: 100px;">➕ Thêm</button>
     </div>
 
-    <div id="shipListContent" style="margin-top:15px; max-height: 300px; overflow-y: auto;"></div>
-        <div id="checkManagerBox" style="margin-top:15px;"></div>
-       
+    <div id="shipListContent" style="margin-top:15px; max-height: 300px; overflow-y: auto;">
+        </div>
 </div>
     </div>
 
@@ -424,9 +423,7 @@ h2 {
     let isAdmin = false;
     let currentFiltered = [];
     let shipsData = {}; // Biến lưu danh sách tàu từ Firebase
-    let shipChecks = {};
-    let checkStatus = {};
-    let currentShipCheck = null;
+    let checkData = {};
 
 // 1. Lắng nghe danh sách tàu từ Firebase
 onValue(ref(db, "ships"), snapshot => {
@@ -436,6 +433,11 @@ onValue(ref(db, "ships"), snapshot => {
     if(document.getElementById("shipManagerBox").style.display === "block") {
         renderShipManagerList();
     }
+});
+
+    onValue(ref(db, "checks"), snapshot => {
+    checkData = snapshot.val() || {};
+    if(document.getElementById("summary").style.display === "block") showSummary();
 });
 
 // 2. Hàm tự động điền tên tàu vào các ô Select
@@ -513,21 +515,24 @@ window.deleteShip = function(shipId) {
 function renderShipManagerList() {
     let html = `<table>
         <thead>
-            <tr>
-                <th>Tên Tàu</th>
-                <th>Xóa</th>
-            </tr>
-        </thead>
+    <tr>
+        <th>Tên Tàu</th>
+        <th>Xóa</th>
+        <th>Kiểm tra</th>
+    </tr>
+</thead>
         <tbody>`;
     
     Object.keys(shipsData).sort().forEach(shipId => {
-      html += `<tr>
-    <td>
-        <b>${shipId}</b><br>
-        <button onclick="showCheckManager('${shipId}')">⚙️ Hạng mục</button>
-    </td>
+       html += `<tr>
+    <td style="font-weight: bold;">${shipId}</td>
+
     <td>
         <button class="btn-delete" onclick="deleteShip('${shipId}')">🗑️</button>
+    </td>
+
+    <td>
+        <button onclick="saveCheck('${shipId}')">📝</button>
     </td>
 </tr>`;
     });
@@ -601,31 +606,6 @@ function renderShipManagerList() {
         ppData = snapshot.val() || {};
         if(document.getElementById("summary").style.display === "block") showSummary();
     });
-
-   onValue(ref(db, "shipChecks"), snap => {
-    shipChecks = snap.val() || {};
-
-    // Nếu đang mở quản lý tàu → reload lại
-    const checkBox = document.getElementById("checkManagerBox");
-    if (checkBox && checkBox.innerHTML !== "") {
-        // Lấy tên tàu đang mở từ tiêu đề
-        const title = checkBox.querySelector("h4");
-        if (title) {
-            const ship = title.innerText.replace("⚙️ Hạng mục - ", "");
-            showCheckManager(ship);
-        }
-    }
-
-    // Nếu đang mở báo cáo → cập nhật checklist luôn
-    const reportShip = document.getElementById("reportShip");
-    if (reportShip && reportShip.value !== "all") {
-        renderChecklist(reportShip.value);
-    }
-});
-    
-onValue(ref(db, "checkStatus"), snap => {
-    checkStatus = snap.val() || {};
-}); 
 
     window.applyFilter = function(){
         const from = document.getElementById("fromDate").value;
@@ -709,12 +689,13 @@ onValue(ref(db, "checkStatus"), snap => {
         }
     }
 
- window.showSummary = function(){
+  window.showSummary = function(){
     const box = document.getElementById("summary");
     const btn = document.getElementById("btnSummary");
 
     const isOpen = box.style.display === "block";
 
+    // reset tất cả nút
     resetActiveButtons();
 
     if(isOpen){
@@ -729,66 +710,37 @@ onValue(ref(db, "checkStatus"), snap => {
     document.getElementById("workHoursBox").style.display = "none";
     document.getElementById("shipManagerBox").style.display = "none";
 
-    // 🔥 UI chọn tàu
-    let shipOptions = `<option value="all">-- Chọn tàu --</option>`;
-    Object.keys(shipsData).sort().forEach(s => {
-        shipOptions += `<option value="${s}">${s}</option>`;
+    let result = {};
+    Object.values(rawData).forEach(x => {
+        if(!result[x.ship_id]) result[x.ship_id] = { totalWorkers:0 };
+        result[x.ship_id].totalWorkers += Number(x.workers);
     });
 
-    box.innerHTML = `
-        <h4>📊 Báo cáo tổng hợp</h4>
-        <select id="reportShip" onchange="renderSummaryByShip()">
-            ${shipOptions}
-        </select>
-        <div id="reportContent"></div>
-    `;
-}
+    let html = "<h4>📊 Báo cáo tổng hợp</h4>";
+    for(let s in result){
+        let key = s.replace(/\s/g,'_');
+        let savedPP = ppData[key]?.hours || 0;
+        let realHours = result[s].totalWorkers * 8;
 
-window.renderSummaryByShip = function(){
-    const ship = document.getElementById("reportShip").value;
-    const box = document.getElementById("reportContent");
+        let efficiency = realHours > 0 ? (savedPP / realHours) * 100 : 0;
 
-    if(ship === "all"){
-        box.innerHTML = "<i>Vui lòng chọn tàu</i>";
-        return;
+        let color = "red";
+        if(efficiency >= 100) color = "green";
+        else if(efficiency >= 70) color = "orange";
+
+        let checkKey = s.replace(/\s/g,'_');
+let checkText = checkData[checkKey]?.text || "Chưa có kiểm tra";
+            <b>🚢 Tàu: ${s}</b><br>
+    - Tổng nhân công: ${result[s].totalWorkers} lượt người<br>
+    - Tổng giờ thực tế: ${realHours.toLocaleString()} giờ<br>
+    - Giờ định mức PP: <b>${savedPP.toLocaleString()}</b> giờ<br>
+    - Hiệu quả tàu: <b style="color:${color}">${efficiency.toFixed(1)}%</b><br>
+    - 📝 Mục kiểm tra: <i>${checkText}</i>
+</div>`;
     }
 
-    let totalWorkers = 0;
-
-    Object.values(rawData).forEach(x => {
-        if(x.ship_id === ship){
-            totalWorkers += Number(x.workers);
-        }
-    });
-
-    let key = ship.replace(/\s/g,'_');
-    let savedPP = ppData[key]?.hours || 0;
-    let realHours = totalWorkers * 8;
-
-    let efficiency = realHours > 0 ? (savedPP / realHours) * 100 : 0;
-
-    let color = "red";
-    if(efficiency >= 100) color = "green";
-    else if(efficiency >= 70) color = "orange";
-
-    // 🔥 gọi thêm phần checklist
-    
-    box.innerHTML = `
-        <div class="summary-item">
-            <b>🚢 Tàu: ${ship}</b><br>
-            - Tổng nhân công: ${totalWorkers}<br>
-            - Tổng giờ thực tế: ${realHours}<br>
-            - Giờ định mức PP: ${savedPP}<br>
-            - Hiệu quả: <b style="color:${color}">${efficiency.toFixed(1)}%</b>
-        </div>
-
-        <div id="checklistBox"></div>
-    `;
-    renderChecklist(ship);
+    box.innerHTML = html;
 }
-
-
-    
 
   window.toggleWorkHours = function(){
     const box = document.getElementById("workHoursBox");
@@ -813,32 +765,6 @@ window.renderSummaryByShip = function(){
     document.getElementById("shipManagerBox").style.display = "none";
 }
 
-    function renderChecklist(ship){
-  const list = shipChecks[shipKey(ship)] || {};
-    const today = new Date().toISOString().slice(0,10); // ✅ THÊM DÒNG NÀY
-
-    let html = "<h4>🧾 Hạng mục kiểm tra</h4>";
-
-    Object.keys(list).forEach(id => {
-        let checked = checkStatus?.[ship]?.[today]?.[id] || false;
-
-        html += `
-            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding:6px 0;">
-                <span>${list[id]}</span>
-                ${isAdmin ? `
-                <input type="checkbox" ${checked ? "checked" : ""}
-                    onchange="toggleCheck('${ship}','${id}',this.checked)">
-                ` : (checked ? "✅" : "❌")}
-            </div>
-        `;
-    });
-
-    document.getElementById("checklistBox").innerHTML = html;
-}
-
-
-
-    
    function renderWorkHoursInputs(){
     // Lấy danh sách tàu thực tế từ shipsData thay vì ghi tay
     let ships = Object.keys(shipsData).sort(); 
@@ -864,12 +790,6 @@ window.renderSummaryByShip = function(){
         .then(() => alert("Đã cập nhật cho " + shipName));
     }
 
-       window.toggleCheck = function(ship, itemId, val){
-    const today = new Date().toISOString().slice(0,10);
-    set(ref(db, `checkStatus/${ship}/${today}/${itemId}`), val);
-}
-
-    
     window.formatInput = function(input){
         let val = input.value.replace(/,/g,'');
         if(!isNaN(val) && val !== "") input.value = Number(val).toLocaleString('en-US');
@@ -955,69 +875,17 @@ window.onclick = function(event) {
     }
 }
 
-window.showCheckManager = function(ship){
-    currentShipCheck = ship; // ⭐ lưu lại tàu đang mở
+window.saveCheck = function(shipName){
+    let key = shipName.replace(/\s/g,'_');
+    let text = prompt("Nhập nội dung kiểm tra cho " + shipName);
+    if(!text) return;
 
-    const key = shipKey(ship);
-    let list = shipChecks[key] || {};
-
-    let html = `
-        <h4>⚙️ Hạng mục - ${ship}</h4>
-
-        <div style="display:flex; gap:5px; margin-bottom:10px;">
-            <input id="newCheckItem_${key}" placeholder="Tên hạng mục">
-            <button onclick="addCheckItem()">➕</button>
-        </div>
-    `;
-
-    Object.keys(list).forEach(id => {
-        html += `
-            <div style="display:flex; justify-content:space-between;">
-                <span>${list[id]}</span>
-                <button onclick="deleteCheckItem('${ship}','${id}')">🗑️</button>
-            </div>
-        `;
-    });
-
-    document.getElementById("checkManagerBox").innerHTML = html;
+    set(ref(db, "checks/" + key), {
+        ship: shipName,
+        text: text
+    }).then(() => alert("Đã lưu kiểm tra!"));
 }
 
-window.addCheckItem = function(){
-    const ship = currentShipCheck;
-    const key = shipKey(ship);
-
-    const input = document.getElementById(`newCheckItem_${key}`);
-    if(!input){
-        alert("Không tìm thấy ô nhập!");
-        return;
-    }
-
-    const val = input.value.trim();
-    if(!val) return;
-
-    const id = "item" + Date.now();
-
-    set(ref(db, `shipChecks/${key}/${id}`), val)
-    .then(() => {
-        input.value = "";
-        showCheckManager(ship);
-    });
-}
-
-  window.deleteCheckItem = function(ship, id){
-    const key = shipKey(ship);
-
-    remove(ref(db, `shipChecks/${key}/${id}`))
-    .then(() => showCheckManager(ship));
-}
-
-function shipKey(ship){
-    return (ship || "")
-        .trim()
-        .toUpperCase()
-        .replace(/\s+/g,'_')
-        .replace(/[^A-Z0-9_]/g,'');
-}
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

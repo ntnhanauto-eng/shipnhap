@@ -956,7 +956,7 @@ window.onclick = function(event) {
 
 window.showCheckManager = function(ship){
     const key = shipKey(ship);
-    let list = shipChecks[ship] || {};
+    let list = shipChecks[key] || {};
 
     let html = `
         <h4>⚙️ Hạng mục - ${ship}</h4>
@@ -969,14 +969,13 @@ window.showCheckManager = function(ship){
 
     Object.keys(list).forEach(id => {
         html += `
-            <div style="display:flex; justify-content:space-between; margin-top:5px;">
+            <div style="display:flex; justify-content:space-between;">
                 <span>${list[id]}</span>
                 <button onclick="deleteCheckItem('${ship}','${id}')">🗑️</button>
             </div>
         `;
     });
 
-    // 👉 CHỈ render vào vùng riêng
     document.getElementById("checkManagerBox").innerHTML = html;
 }
 
@@ -984,8 +983,8 @@ window.addCheckItem = function(ship){
     const key = shipKey(ship);
     let input = document.getElementById(`newCheckItem_${key}`);
 
-    if(!input){
-        alert("Không tìm thấy ô nhập dữ liệu!");
+    if(!input) {
+        alert("Không tìm thấy input!");
         return;
     }
 
@@ -994,7 +993,7 @@ window.addCheckItem = function(ship){
 
     let id = "item" + Date.now();
 
-    set(ref(db, `shipChecks/${ship}/${id}`), val)
+    set(ref(db, `shipChecks/${key}/${id}`), val)
     .then(() => {
         input.value = "";
         showCheckManager(ship);
@@ -1006,7 +1005,9 @@ window.addCheckItem = function(ship){
     .then(() => showCheckManager(ship));
 }
 
-
+function shipKey(ship){
+    return (ship || "").trim().toUpperCase();
+}
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

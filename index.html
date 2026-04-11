@@ -717,29 +717,30 @@ function renderShipManagerList() {
     });
 
     let html = "<h4>📊 Báo cáo tổng hợp</h4>";
-    for(let s in result){
-        let key = s.replace(/\s/g,'_');
-        let savedPP = ppData[key]?.hours || 0;
-        let realHours = result[s].totalWorkers * 8;
+   for(let s in result){
+    let key = s.replace(/\s/g,'_');
+    let savedPP = ppData[key]?.hours || 0;
+    let realHours = result[s].totalWorkers * 8;
 
-        let efficiency = realHours > 0 ? (savedPP / realHours) * 100 : 0;
+    let efficiency = realHours > 0 ? (savedPP / realHours) * 100 : 0;
 
-        let color = "red";
-        if(efficiency >= 100) color = "green";
-        else if(efficiency >= 70) color = "orange";
+    let color = "red";
+    if(efficiency >= 100) color = "green";
+    else if(efficiency >= 70) color = "orange";
 
-        let checkKey = s.replace(/\s/g,'_');
-let checkText = checkData[checkKey]?.text || "Chưa có kiểm tra";
-            <b>🚢 Tàu: ${s}</b><br>
-    - Tổng nhân công: ${result[s].totalWorkers} lượt người<br>
-    - Tổng giờ thực tế: ${realHours.toLocaleString()} giờ<br>
-    - Giờ định mức PP: <b>${savedPP.toLocaleString()}</b> giờ<br>
-    - Hiệu quả tàu: <b style="color:${color}">${efficiency.toFixed(1)}%</b><br>
-    - 📝 Mục kiểm tra: <i>${checkText}</i>
-</div>`;
-    }
+    let checkKey = s.replace(/\s/g,'_');
+    let checkText = checkData[checkKey]?.text || "Chưa có kiểm tra";
 
-    box.innerHTML = html;
+    html += `
+    <div class="summary-item">
+        <b>🚢 Tàu: ${s}</b><br>
+        - Tổng nhân công: ${result[s].totalWorkers} lượt người<br>
+        - Tổng giờ thực tế: ${realHours.toLocaleString()} giờ<br>
+        - Giờ định mức PP: <b>${savedPP.toLocaleString()}</b> giờ<br>
+        - Hiệu quả tàu: <b style="color:${color}">${efficiency.toFixed(1)}%</b><br>
+        - 📝 Mục kiểm tra: <i>${checkText}</i>
+    </div>
+    `;
 }
 
   window.toggleWorkHours = function(){

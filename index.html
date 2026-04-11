@@ -423,6 +423,8 @@ h2 {
     let isAdmin = false;
     let currentFiltered = [];
     let shipsData = {}; // Biến lưu danh sách tàu từ Firebase
+    let shipChecks = {};
+    let checkStatus = {};
 
 // 1. Lắng nghe danh sách tàu từ Firebase
 onValue(ref(db, "ships"), snapshot => {
@@ -517,12 +519,15 @@ function renderShipManagerList() {
         <tbody>`;
     
     Object.keys(shipsData).sort().forEach(shipId => {
-        html += `<tr>
-            <td style="font-weight: bold;">${shipId}</td>
-            <td>
-                <button class="btn-delete" onclick="deleteShip('${shipId}')">🗑️</button>
-            </td>
-        </tr>`;
+      html += `<tr>
+    <td>
+        <b>${shipId}</b><br>
+        <button onclick="showCheckManager('${shipId}')">⚙️ Hạng mục</button>
+    </td>
+    <td>
+        <button class="btn-delete" onclick="deleteShip('${shipId}')">🗑️</button>
+    </td>
+</tr>`;
     });
     
     html += "</tbody></table>";
@@ -594,6 +599,14 @@ function renderShipManagerList() {
         ppData = snapshot.val() || {};
         if(document.getElementById("summary").style.display === "block") showSummary();
     });
+
+    onValue(ref(db, "shipChecks"), snap => {
+    shipChecks = snap.val() || {};
+});
+
+onValue(ref(db, "checkStatus"), snap => {
+    checkStatus = snap.val() || {};
+});
 
     window.applyFilter = function(){
         const from = document.getElementById("fromDate").value;
@@ -677,13 +690,12 @@ function renderShipManagerList() {
         }
     }
 
-  window.showSummary = function(){
+ window.showSummary = function(){
     const box = document.getElementById("summary");
     const btn = document.getElementById("btnSummary");
 
     const isOpen = box.style.display === "block";
 
-    // reset tất cả nút
     resetActiveButtons();
 
     if(isOpen){
@@ -698,35 +710,66 @@ function renderShipManagerList() {
     document.getElementById("workHoursBox").style.display = "none";
     document.getElementById("shipManagerBox").style.display = "none";
 
-    let result = {};
-    Object.values(rawData).forEach(x => {
-        if(!result[x.ship_id]) result[x.ship_id] = { totalWorkers:0 };
-        result[x.ship_id].totalWorkers += Number(x.workers);
+    // 🔥 UI chọn tàu
+    let shipOptions = `<option value="all">-- Chọn tàu --</option>`;
+    Object.keys(shipsData).sort().forEach(s => {
+        shipOptions += `<option value="${s}">${s}</option>`;
     });
 
-    let html = "<h4>📊 Báo cáo tổng hợp</h4>";
-    for(let s in result){
-        let key = s.replace(/\s/g,'_');
-        let savedPP = ppData[key]?.hours || 0;
-        let realHours = result[s].totalWorkers * 8;
+    box.innerHTML = `
+        <h4>📊 Báo cáo tổng hợp</h4>
+        <select id="reportShip" onchange="renderSummaryByShip()">
+            ${shipOptions}
+        </select>
+        <div id="reportContent"></div>
+    `;
+}
 
-        let efficiency = realHours > 0 ? (savedPP / realHours) * 100 : 0;
+window.renderSummaryByShip = function(){
+    const ship = document.getElementById("reportShip").value;
+    const box = document.getElementById("reportContent");
 
-        let color = "red";
-        if(efficiency >= 100) color = "green";
-        else if(efficiency >= 70) color = "orange";
-
-        html += `<div class="summary-item">
-            <b>🚢 Tàu: ${s}</b><br>
-            - Tổng nhân công: ${result[s].totalWorkers} lượt người<br>
-            - Tổng giờ thực tế: ${realHours.toLocaleString()} giờ<br>
-            - Giờ định mức PP: <b>${savedPP.toLocaleString()}</b> giờ<br>
-            - Hiệu quả tàu: <b style="color:${color}">${efficiency.toFixed(1)}%</b>
-        </div>`;
+    if(ship === "all"){
+        box.innerHTML = "<i>Vui lòng chọn tàu</i>";
+        return;
     }
 
-    box.innerHTML = html;
+    let totalWorkers = 0;
+
+    Object.values(rawData).forEach(x => {
+        if(x.ship_id === ship){
+            totalWorkers += Number(x.workers);
+        }
+    });
+
+    let key = ship.replace(/\s/g,'_');
+    let savedPP = ppData[key]?.hours || 0;
+    let realHours = totalWorkers * 8;
+
+    let efficiency = realHours > 0 ? (savedPP / realHours) * 100 : 0;
+
+    let color = "red";
+    if(efficiency >= 100) color = "green";
+    else if(efficiency >= 70) color = "orange";
+
+    // 🔥 gọi thêm phần checklist
+    renderChecklist(ship);
+
+    box.innerHTML = `
+        <div class="summary-item">
+            <b>🚢 Tàu: ${ship}</b><br>
+            - Tổng nhân công: ${totalWorkers}<br>
+            - Tổng giờ thực tế: ${realHours}<br>
+            - Giờ định mức PP: ${savedPP}<br>
+            - Hiệu quả: <b style="color:${color}">${efficiency.toFixed(1)}%</b>
+        </div>
+
+        <div id="checklistBox"></div>
+    `;
 }
+
+
+    
 
   window.toggleWorkHours = function(){
     const box = document.getElementById("workHoursBox");
@@ -751,6 +794,32 @@ function renderShipManagerList() {
     document.getElementById("shipManagerBox").style.display = "none";
 }
 
+    function renderChecklist(ship){
+    const list = shipChecks[ship] || {};
+    const today = new Date().toISOString().slice(0,10);
+
+    let html = "<h4>🧾 Hạng mục kiểm tra</h4>";
+
+    Object.keys(list).forEach(id => {
+        let checked = checkStatus?.[ship]?.[today]?.[id] || false;
+
+        html += `
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding:6px 0;">
+                <span>${list[id]}</span>
+                ${isAdmin ? `
+                <input type="checkbox" ${checked ? "checked" : ""}
+                    onchange="toggleCheck('${ship}','${id}',this.checked)">
+                ` : (checked ? "✅" : "❌")}
+            </div>
+        `;
+    });
+
+    document.getElementById("checklistBox").innerHTML = html;
+}
+
+
+
+    
    function renderWorkHoursInputs(){
     // Lấy danh sách tàu thực tế từ shipsData thay vì ghi tay
     let ships = Object.keys(shipsData).sort(); 
@@ -776,6 +845,12 @@ function renderShipManagerList() {
         .then(() => alert("Đã cập nhật cho " + shipName));
     }
 
+       window.toggleCheck = function(ship, itemId, val){
+    const today = new Date().toISOString().slice(0,10);
+    set(ref(db, `checkStatus/${ship}/${today}/${itemId}`), val);
+}
+
+    
     window.formatInput = function(input){
         let val = input.value.replace(/,/g,'');
         if(!isNaN(val) && val !== "") input.value = Number(val).toLocaleString('en-US');
@@ -860,6 +935,45 @@ window.onclick = function(event) {
         modal.style.display = "none";
     }
 }
+
+window.showCheckManager = function(ship){
+    let list = shipChecks[ship] || {};
+
+    let html = `
+        <h4>⚙️ Hạng mục - ${ship}</h4>
+
+        <div style="display:flex; gap:5px;">
+            <input id="newCheckItem" placeholder="Tên hạng mục">
+            <button onclick="addCheckItem('${ship}')">➕</button>
+        </div>
+    `;
+
+    Object.keys(list).forEach(id => {
+        html += `
+            <div style="display:flex; justify-content:space-between; margin-top:5px;">
+                <span>${list[id]}</span>
+                <button onclick="deleteCheckItem('${ship}','${id}')">🗑️</button>
+            </div>
+        `;
+    });
+
+    document.getElementById("shipListContent").innerHTML = html;
+}
+
+   window.addCheckItem = function(ship){
+    let val = document.getElementById("newCheckItem").value.trim();
+    if(!val) return;
+
+    let id = "item" + Date.now();
+
+    set(ref(db, `shipChecks/${ship}/${id}`), val);
+}
+
+    window.deleteCheckItem = function(ship, id){
+    remove(ref(db, `shipChecks/${ship}/${id}`));
+}
+
+
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

@@ -382,7 +382,12 @@ h2 {
           
         </div>
         
-        <div id="summary" style="display:none; margin-top:15px;"></div>
+        <div id="summary" style="display:none; margin-top:15px;">
+    <select id="summaryShipFilter" style="margin-bottom:10px;">
+        <option value="all">Tất cả tàu</option>
+    </select>
+    <div id="summaryContent"></div>
+</div>
         
         <div id="workHoursBox" style="display:none; margin-top:15px;">
             <h4>Nhập Giờ Công Theo Định Mức</h4>
@@ -677,13 +682,12 @@ function renderShipManagerList() {
         }
     }
 
-  window.showSummary = function(){
+ window.showSummary = function(){
     const box = document.getElementById("summary");
     const btn = document.getElementById("btnSummary");
 
     const isOpen = box.style.display === "block";
 
-    // reset tất cả nút
     resetActiveButtons();
 
     if(isOpen){
@@ -697,6 +701,64 @@ function renderShipManagerList() {
 
     document.getElementById("workHoursBox").style.display = "none";
     document.getElementById("shipManagerBox").style.display = "none";
+
+    renderSummaryFilter(); // 👈 thêm dòng này
+    renderSummaryContent(); // 👈 vẽ dữ liệu
+}
+
+  function renderSummaryFilter(){
+    const select = document.getElementById("summaryShipFilter");
+
+    let html = `<option value="all">Tất cả tàu</option>`;
+    Object.keys(shipsData).sort().forEach(s => {
+        html += `<option value="${s}">${s}</option>`;
+    });
+
+    select.innerHTML = html;
+
+    select.onchange = renderSummaryContent;
+}
+
+function renderSummaryContent(){
+    const selectedShip = document.getElementById("summaryShipFilter").value;
+
+    let result = {};
+
+    Object.values(rawData).forEach(x => {
+        if(selectedShip !== "all" && x.ship_id !== selectedShip) return;
+
+        if(!result[x.ship_id]) result[x.ship_id] = { totalWorkers:0 };
+        result[x.ship_id].totalWorkers += Number(x.workers);
+    });
+
+    let html = "<h4>📊 Báo cáo tổng hợp</h4>";
+
+    for(let s in result){
+        let key = s.replace(/\s/g,'_');
+        let savedPP = ppData[key]?.hours || 0;
+        let realHours = result[s].totalWorkers * 8;
+
+        let efficiency = realHours > 0 ? (savedPP / realHours) * 100 : 0;
+
+        let color = "red";
+        if(efficiency >= 100) color = "green";
+        else if(efficiency >= 70) color = "orange";
+
+        html += `<div class="summary-item">
+            <b>🚢 Tàu: ${s}</b><br>
+            - Tổng nhân công: ${result[s].totalWorkers} lượt người<br>
+            - Tổng giờ thực tế: ${realHours.toLocaleString()} giờ<br>
+            - Giờ định mức PP: <b>${savedPP.toLocaleString()}</b> giờ<br>
+            - Hiệu quả tàu: <b style="color:${color}">${efficiency.toFixed(1)}%</b><br>
+            - Các hạng mục kiểm tra: <i>(chưa cập nhật)</i>
+        </div>`;
+    }
+
+    document.getElementById("summaryContent").innerHTML = html;
+}
+
+
+    
 
     let result = {};
     Object.values(rawData).forEach(x => {

@@ -590,10 +590,18 @@ function renderShipManagerList() {
         }
     }
 
-    onValue(ref(db, "logs"), snapshot => {
-        rawData = snapshot.val() || {};
-        applyFilter();
-    });
+ import { query, limitToLast, orderByChild } from "firebase/database";
+
+const logsRef = query(
+    ref(db, "logs"),
+    orderByChild("date"),
+    limitToLast(500) // chỉ lấy 500 dòng gần nhất
+);
+
+onValue(logsRef, snapshot => {
+    rawData = snapshot.val() || {};
+    applyFilter();
+});
 
     onValue(ref(db, "workHours"), snapshot => {
         ppData = snapshot.val() || {};
@@ -623,7 +631,7 @@ function renderShipManagerList() {
         });
         currentFiltered = filteredArray;
 
-        renderTableUI(filteredArray);
+        renderVirtualTable(filteredArray);
     }
 
     function renderTableUI(dataArray) {
@@ -823,7 +831,12 @@ function renderSummaryContent(){
     // Listeners
     document.getElementById("sortType").addEventListener("change", applyFilter);
     document.getElementById("shipFilter").addEventListener("change", applyFilter);
-    document.getElementById("jobFilter").addEventListener("input", applyFilter);
+    let debounceTimer;
+
+document.getElementById("jobFilter").addEventListener("input", () => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(applyFilter, 300);
+});
     document.getElementById("fromDate").addEventListener("input", applyFilter);
     document.getElementById("toDate").addEventListener("input", applyFilter);
 
@@ -892,6 +905,61 @@ window.onclick = function(event) {
         modal.style.display = "none";
     }
 }
+
+const rowHeight = 45;
+const visibleCount = 20;
+
+function renderVirtualTable(dataArray) {
+    const container = document.getElementById("tableContainer");
+
+    container.innerHTML = `
+        <div id="scrollBox" style="height:500px; overflow:auto; position:relative;">
+            <div style="height:${dataArray.length * rowHeight}px;"></div>
+            <div id="visibleRows" style="position:absolute; top:0; left:0; right:0;"></div>
+        </div>
+    `;
+
+    const scrollBox = document.getElementById("scrollBox");
+    const visibleRows = document.getElementById("visibleRows");
+
+    function renderRows() {
+        const scrollTop = scrollBox.scrollTop;
+        const start = Math.floor(scrollTop / rowHeight);
+        const end = start + visibleCount;
+
+        let html = `
+        <div style="display:flex; font-weight:bold; background:#f8f9fa; position:sticky; top:0;">
+            <div style="width:50px">STT</div>
+            <div style="width:80px">Tàu</div>
+            <div style="width:100px">Ngày</div>
+            <div style="width:60px">Người</div>
+            <div style="flex:1">Công việc</div>
+        </div>`;
+
+        for (let i = start; i < end && i < dataArray.length; i++) {
+            const [id, x] = dataArray[i];
+
+            html += `
+            <div style="height:${rowHeight}px; display:flex; border-bottom:1px solid #eee; align-items:center;">
+                <div style="width:50px">${i+1}</div>
+                <div style="width:80px">${x.ship_id}</div>
+                <div style="width:100px">${x.date}</div>
+                <div style="width:60px">${x.workers}</div>
+                <div style="flex:1">${x.job || ""}</div>
+            </div>`;
+        }
+
+        visibleRows.style.transform = `translateY(${start * rowHeight}px)`;
+        visibleRows.innerHTML = html;
+    }
+
+    scrollBox.addEventListener("scroll", renderRows);
+
+    renderRows();
+}
+
+
+
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

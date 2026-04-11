@@ -423,7 +423,6 @@ h2 {
     let isAdmin = false;
     let currentFiltered = [];
     let shipsData = {}; // Biến lưu danh sách tàu từ Firebase
-    let checkData = {};
 
 // 1. Lắng nghe danh sách tàu từ Firebase
 onValue(ref(db, "ships"), snapshot => {
@@ -435,12 +434,6 @@ onValue(ref(db, "ships"), snapshot => {
     }
 });
 
-onValue(ref(db, "checks"), snapshot => {
-    checkData = snapshot.val() || {};
-    if(document.getElementById("summary").style.display === "block") showSummary();
-});
-
-    
 // 2. Hàm tự động điền tên tàu vào các ô Select
 function renderShipSelects() {
     const shipSelect = document.getElementById("ship");
@@ -729,18 +722,6 @@ function renderShipManagerList() {
             - Tổng giờ thực tế: ${realHours.toLocaleString()} giờ<br>
             - Giờ định mức PP: <b>${savedPP.toLocaleString()}</b> giờ<br>
             - Hiệu quả tàu: <b style="color:${color}">${efficiency.toFixed(1)}%</b>
-            let checkKey = s.replace(/\s/g,'_');
-let checkVal = checkData[checkKey]?.text || "";
-
-html += `
-    - Hiệu quả tàu: <b style="color:${color}">${efficiency.toFixed(1)}%</b><br>
-    - Mục kiểm tra: 
-    ${isAdmin 
-        ? `<input id="check_${checkKey}" value="${checkVal}" style="padding:5px; width:60%">
-           <button onclick="saveCheck('${s}')" style="width:60px">💾</button>`
-        : `<b>${checkVal || "Chưa có"}</b>`
-    }
-`;
         </div>`;
     }
 
@@ -879,18 +860,6 @@ window.onclick = function(event) {
         modal.style.display = "none";
     }
 }
-
-    window.saveCheck = function(shipName){
-    let key = shipName.replace(/\s/g,'_');
-    let val = document.getElementById("check_" + key).value;
-
-    set(ref(db, "checks/" + key), {
-        ship: shipName,
-        text: val
-    }).then(() => alert("Đã lưu mục kiểm tra cho " + shipName));
-}
-
-    
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

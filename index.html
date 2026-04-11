@@ -428,6 +428,7 @@ h2 {
     let isAdmin = false;
     let currentFiltered = [];
     let shipsData = {}; // Biến lưu danh sách tàu từ Firebase
+    let checklistData = {};
 
 // 1. Lắng nghe danh sách tàu từ Firebase
 onValue(ref(db, "ships"), snapshot => {
@@ -437,6 +438,9 @@ onValue(ref(db, "ships"), snapshot => {
     if(document.getElementById("shipManagerBox").style.display === "block") {
         renderShipManagerList();
     }
+});
+    onValue(ref(db, "checklists"), snapshot => {
+    checklistData = snapshot.val() || {};
 });
 
 // 2. Hàm tự động điền tên tàu vào các ô Select
@@ -744,14 +748,34 @@ function renderSummaryContent(){
         if(efficiency >= 100) color = "green";
         else if(efficiency >= 70) color = "orange";
 
-        html += `<div class="summary-item">
-            <b>🚢 Tàu: ${s}</b><br>
-            - Tổng nhân công: ${result[s].totalWorkers} lượt người<br>
-            - Tổng giờ thực tế: ${realHours.toLocaleString()} giờ<br>
-            - Giờ định mức PP: <b>${savedPP.toLocaleString()}</b> giờ<br>
-            - Hiệu quả tàu: <b style="color:${color}">${efficiency.toFixed(1)}%</b><br>
-            - Các hạng mục kiểm tra: <i>(chưa cập nhật)</i>
-        </div>`;
+
+        let checkData = checklistData[s] || {};
+let checkedItems = Object.keys(checkData).filter(k => checkData[k]);
+        let totalItems = CHECK_ITEMS.length;
+let doneItems = checkedItems.length;
+
+let checklistPercent = totalItems > 0 ? (doneItems / totalItems) * 100 : 0;
+
+let checklistHTML = CHECK_ITEMS.map(item => {
+    let checked = checkData[item] ? "checked" : "";
+    return `
+    <label style="display:block">
+        <input type="checkbox" onchange="toggleCheck('${s}','${item}')" ${checked}>
+        ${item}
+    </label>`;
+}).join("");
+       html += `<div class="summary-item">
+    <b>🚢 Tàu: ${s}</b><br>
+    - Tổng nhân công: ${result[s].totalWorkers} lượt người<br>
+    - Tổng giờ thực tế: ${realHours.toLocaleString()} giờ<br>
+    - Giờ định mức PP: <b>${savedPP.toLocaleString()}</b> giờ<br>
+    - Hiệu quả tàu: <b style="color:${color}">${efficiency.toFixed(1)}%</b><br>
+
+    <div style="margin-top:8px;">
+        <b>📋 Hạng mục kiểm tra:</b>
+        ${checklistHTML}
+    </div>
+</div>`;
     }
 
     document.getElementById("summaryContent").innerHTML = html;
@@ -892,6 +916,24 @@ window.onclick = function(event) {
         modal.style.display = "none";
     }
 }
+
+const CHECK_ITEMS = [
+    "Vệ sinh casing",
+    "Kiểm tra rò rỉ",
+    "Kiểm tra bulong",
+    "Kiểm tra sơn",
+    "Kiểm tra an toàn",
+    "Kiểm tra hệ thống điện"
+];
+
+window.toggleCheck = function(ship, item){
+    let key = ship.replace(/\s/g,'_');
+
+    let current = checklistData[ship]?.[item] || false;
+
+    set(ref(db, `checklists/${ship}/${item}`), !current);
+}
+
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

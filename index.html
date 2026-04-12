@@ -204,11 +204,11 @@ h2 {
 /* Định dạng riêng cho bảng quản lý tàu */
 #shipListContent table {
     width: 100%;
-    margin-top: 10px;
     border-collapse: collapse;
-    background: #fff;
-    table-layout: fixed; /* QUAN TRỌNG */
+    table-layout: fixed; /* QUAN TRỌNG NHẤT */
 }
+
+        
 
  #shipListContent th:nth-child(1),
 #shipListContent td:nth-child(1) {
@@ -226,7 +226,7 @@ h2 {
         
 #shipListContent th, 
 #shipListContent td {
-    padding: 8px 5px;
+    padding: 6px 4px;
     font-size: 13px;
 }
 /* Thu nhỏ cột nút xóa */
@@ -237,15 +237,10 @@ h2 {
 
 /* Làm nút xóa nhỏ gọn và canh giữa */
 #shipListContent .btn-delete {
-    width: 28px;
-    height: 28px;
+    width: 26px;
+    height: 26px;
     padding: 0;
-    margin: 0 auto;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 13px;
-    border-radius: 6px;
+    font-size: 12px;
 }
 
 /* Khung quản lý tàu chuyên dụng */
@@ -335,6 +330,26 @@ h2 {
     background: #e8f0fe;
     transition: 0.2s;
 }      
+
+/* Cột tên tàu */
+#shipListContent td:first-child {
+    width: calc(100% - 50px); /* trừ phần nút */
+    max-width: calc(100% - 50px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Cột nút xóa */
+#shipListContent td:last-child {
+    width: 50px;
+    min-width: 50px;
+    max-width: 50px;
+    text-align: center;
+}
+#shipListContent {
+    overflow-x: hidden;
+}
         
     </style>
 </head>
@@ -546,7 +561,9 @@ function renderShipManagerList() {
     
     Object.keys(shipsData).sort().forEach(shipId => {
         html += `<tr>
-            <td style="font-weight: bold;">${shipId}</td>
+            <td style="font-weight: bold; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+    ${shipId}
+</td>
             <td>
                 <button class="btn-delete" onclick="deleteShip('${shipId}')">🗑️</button>
             </td>

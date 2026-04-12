@@ -215,22 +215,31 @@ h2 {
     min-width: 0;
 }      
 
-/* Hiệu ứng khi focus */
+input, select {
+    width: 100%;
+    margin: 8px 0;
+    padding: 12px;
+    font-size: 14px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+
+    transition: all 0.25s ease; /* mượt */
+}
+
+/* 🟢 Khi bấm vào */
 input:focus, select:focus {
-    border-color: #1a73e8;
-    background: #e8f0fe;
-    outline: none;
-    box-shadow: 0 0 5px rgba(26,115,232,0.3);
-    transition: all 0.2s ease;
-}
-
-/* Khi đã nhập dữ liệu */
-input.filled, select.filled {
-    background: #e6f4ea;
     border-color: #34a853;
+    background: #f0fff4;
+    box-shadow: 0 0 6px rgba(52,168,83,0.4);
+    outline: none;
 }
 
-/* Khi lỗi (trống mà blur) */
+/* ⚪ Khi rời ra → về lại bình thường */
+input:not(:focus), select:not(:focus) {
+    background: #fff;
+}
+
+/* 🔴 Khi lỗi */
 input.error, select.error {
     border-color: #dc3545;
     background: #fdecea;

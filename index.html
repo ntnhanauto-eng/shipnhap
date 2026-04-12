@@ -798,32 +798,60 @@ html += `
 
 // xuất Excel
 window.exportExcel = function() {
-    let rows = [];
-
-    rows.push(["Tàu","Ngày","Số người","Công việc"]);
+    let data = [];
 
     currentFiltered.forEach(([id, x]) => {
-        rows.push([
-            x.ship_id,
-            x.date,
-            x.workers,
-            x.job || ""
-        ]);
+        data.push({
+            "Tàu": x.ship_id,
+            "Ngày": x.date,
+            "Số người": x.workers,
+            "Công việc": x.job || ""
+        });
     });
 
-    let total = currentFiltered.reduce((sum, [id,x]) => sum + Number(x.workers), 0);
-    rows.push(["TỔNG","", total,""]);
+    data.push({
+        "Tàu": "TỔNG",
+        "Ngày": "",
+        "Số người": data.reduce((sum, r) => sum + r["Số người"], 0),
+        "Công việc": ""
+    });
 
-    let csvContent = rows.map(e => e.join(",")).join("\n");
+    if(data.length === 0){
+        alert("Không có dữ liệu để xuất!");
+        return;
+    }
 
-    let blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    let ws = XLSX.utils.json_to_sheet(data);
+    let wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "BaoCao");
+
+    let wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+
+    let blob = new Blob([wbout], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    });
 
     let url = URL.createObjectURL(blob);
 
+    // 🔥 TẠO LINK MỚI MỖI LẦN
     let a = document.createElement("a");
     a.href = url;
-    a.download = "BaoCao.csv";
-    a.click();
+    a.download = "BaoCaoCasing_" + Date.now() + ".xlsx"; // tránh trùng tên
+    a.style.display = "none";
+
+    document.body.appendChild(a);
+
+    // 🔥 BẮT BUỘC dùng setTimeout cho mobile
+    setTimeout(() => {
+        a.click();
+
+        // cleanup sau khi click
+        setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }, 1000);
+
+    }, 100);
 }
 
 

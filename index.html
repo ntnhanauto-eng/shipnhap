@@ -226,7 +226,7 @@ input, select {
     transition: all 0.25s ease; /* mượt */
 }
 
-/* 🟢 Khi bấm vào */
+/* 🟢 Khi focus */
 input:focus, select:focus {
     border-color: #34a853;
     background: #f0fff4;
@@ -234,15 +234,15 @@ input:focus, select:focus {
     outline: none;
 }
 
-/* ⚪ Khi rời ra → về lại bình thường */
-input:not(:focus), select:not(:focus) {
-    background: #fff;
-}
-
 /* 🔴 Khi lỗi */
 input.error, select.error {
     border-color: #dc3545;
     background: #fdecea;
+}
+
+/* ⚪ Bình thường */
+input, select {
+    background: #fff;
 }
 .btn-save {
     width: auto;

@@ -90,11 +90,6 @@ input[type="date"] {
     display: flex;
     gap: 10px;
 }
-
-.date-row .date-field {
-    flex: 1; /* mỗi ô chiếm 50% */
-}
-
 .date-row input {
     flex: 1; /* Chia đều 50-50 */
     min-width: 0; /* Ngăn chặn input phá vỡ layout flex */
@@ -206,216 +201,8 @@ h2 {
     to { transform: translateY(0); opacity: 1; }
 }
 
-/* Định dạng riêng cho bảng quản lý tàu */
-#shipListContent table {
-    width: 80%;
-    margin-top: 10px;
-    border-collapse: collapse;
-    background: #fff;
-}
-
-#shipListContent th, #shipListContent td {
-    padding: 12px 8px;
-    border: 1px solid #eee;
-    text-align: left;
-}
-
-/* Thu nhỏ cột nút xóa */
-#shipListContent td:last-child {
-    width: 35px;
-    text-align: center;
-}
-
-/* Làm nút xóa nhỏ gọn và canh giữa */
-#shipListContent .btn-delete {
-    width: 30px;
-    height: 30px;
-    line-height: 35px;
-    padding: 0;
-    margin: 0 auto;
-    display: block;
-    font-size: 14px;
-}        
-
-/* Khung quản lý tàu chuyên dụng */
-#shipManagerBox {
-    border: 1px solid #28a745;
-    background: #ffffff;
-}
-
-.ship-input-group {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 15px;
-}
-
-.ship-input-group input {
-    flex: 2; /* Ô nhập chiếm 2 phần */
-    margin: 0;
-}
-
-.ship-input-group button {
-    flex: 1; /* Nút bấm chiếm 1 phần */
-    margin: 0;
-    background: #28a745;
-    white-space: nowrap;
-}
-
-/* Bảng danh sách tàu */
-.ship-table {
-    width: 100%;
-    border-collapse: collapse;
-}
-
-.ship-table th {
-    background: #f8f9fa;
-    color: #333;
-    font-size: 13px;
-    padding: 10px;
-    border-bottom: 2px solid #28a745;
-}
-
-.ship-table td {
-    padding: 10px;
-    border-bottom: 1px solid #eee;
-    vertical-align: middle;
-}
-
-.ship-table .ship-name {
-    font-weight: bold;
-    color: #1a73e8;
-}
-
-.btn-delete-small {
-    background: #dc3545 !important;
-    width: 35px !important;
-    height: 35px !important;
-    padding: 0 !important;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 6px;
-    margin: 0 auto !important;
-}
-
-/* Nút active khi đang mở */
-.btn-active {
-    background: #28a745 !important; /* xanh lá */
-    color: #fff !important;
-}
-
-/* Màu riêng từng nút (optional đẹp hơn) */
-#btnSummary.btn-active {
-    background: #17a2b8 !important; /* xanh dương nhạt */
-}
-
-#btnWorkHours.btn-active {
-    background: #ffc107 !important; /* vàng */
-    color: #000 !important;
-}
-
-#btnManageShips.btn-active {
-    background: #28a745 !important; /* xanh lá */
-}
-
-  input:focus, select:focus {
-    outline: none;
-    border: 2px solid #1a73e8;
-    background: #e8f0fe;
-    transition: 0.2s;
-}      
-
-/* Grid riêng cho nhóm nút chức năng */
-.button-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr; /* 2 nút mỗi hàng */
-    gap: 10px;
-}
-
-/* Tablet trở lên: có thể 3 nút/hàng */
-@media (min-width: 600px) {
-    .button-grid {
-        grid-template-columns: repeat(3, 1fr);
-    }
-}
-
-/* Desktop lớn: 4 nút/hàng */
-@media (min-width: 900px) {
-    .button-grid {
-        grid-template-columns: repeat(4, 1fr);
-    }
-}
-
- /* Nút phân trang */
-.pagination button {
-    width: 40px;        /* nhỏ lại */
-    height: 40px;
-    padding: 0;
-    font-size: 16px;
-    border-radius: 50%; /* tròn đẹp */
-    background: #e0e0e0;
-    color: #333;
-    transition: all 0.2s ease;
-}
-
-/* Hover */
-.pagination button:hover:not(:disabled) {
-    background: #1a73e8;
-    color: #fff;
-    transform: scale(1.1);
-}
-
-/* Disabled */
-.pagination button:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-}
-
-/* Text giữa */
-.pagination span {
-    font-size: 14px;
-    font-weight: bold;
-    display: flex;
-    align-items: center;
-}
-
-   /* Hàng filter riêng */
-.filter-row {
-    display: flex;
-    gap: 10px;
-    margin-top: 10px;
-}
-
-.filter-row select {
-    flex: 1; /* mỗi cái chiếm 1/2 */
-}
-
-.save-btn {
-    width: 25%;
-    min-width: 140px;   /* không bị quá nhỏ trên mobile */
-    margin: 10px auto;
-    display: block;
-}
-
-    .date-row {
-    display: flex;
-    gap: 10px;
-}
-
-.half-left {
-    flex: 1;
-}
-
-.half-right {
-    flex: 1;
-}
-
-/* Đảm bảo input không phá layout */
-.date-field input,
-.date-field select {
-    width: 100%;
-    min-width: 0;
-}    
+        
+        
         
     </style>
 </head>
@@ -429,24 +216,20 @@ h2 {
     <div class="card admin-only">
         <h3>Nhập Dữ Liệu</h3>
         <div class="flex">
-  <div class="date-row">
-    <div class="date-field half-left">
+    <select id="ship">
+        <option value="all">-- Chọn Tàu --</option>
+     </select>
+
+    <div class="date-field">
         <label for="date">Chọn ngày</label>
         <input type="date" id="date">
     </div>
-
-    <div class="date-field half-right">
-        <label for="ship">Chọn tàu</label>
-        <select id="ship">
-            <option value="all">-- Chọn Tàu --</option>
-        </select>
-    </div>
 </div>
         <div class="flex">
-           <input type="number" id="workers" placeholder="Số người thực hiện" min="0" max="999" step="1">
+            <input type="number" id="workers" placeholder="Số người thực hiện">
             <input type="text" id="job" placeholder="Nội dung công việc">
         </div>
-        <button class="save-btn" onclick="saveLog()">💾 Lưu Thông Tin</button>
+        <button onclick="saveLog()">💾 Lưu Thông Tin</button>
     </div>
 
    <div class="card">
@@ -462,18 +245,16 @@ h2 {
     </div>
 </div>
     
-   <div class="filter-row">
+    <div class="flex" style="margin-top: 10px;">
+        <select id="shipFilter">
+            <option value="all">Tất cả tàu</option>
+        </select>
+        <input type="text" id="jobFilter" placeholder="Tìm tên công việc...">
+    </div>
     <select id="sortType">
         <option value="desc">📅 Mới nhất trước</option>
         <option value="asc">📅 Cũ nhất trước</option>
     </select>
-
-    <select id="shipFilter">
-        <option value="all">Tất cả tàu</option>
-    </select>
-</div>
-
-<input type="text" id="jobFilter" placeholder="Tìm tên công việc...">
 </div>
 
     <div class="card">
@@ -481,34 +262,28 @@ h2 {
     </div>
 
     <div class="card">
-        <div class="button-grid">
-    <button onclick="exportExcel()">📥 Xuất Excel</button>
-    <button id="btnManageShips" class="admin-only" onclick="toggleShipManager()">🚢 Danh Sách Tàu</button>
-    <button id="btnWorkHours" class="admin-only" onclick="toggleWorkHours()">⏱️ Giờ Công Tàu</button>
-    <button id="btnSummary" onclick="showSummary()">📊 Xem BÁO CÁO</button>
-</div>
+        <div class="flex">
+            <button onclick="exportExcel()">📥 Xuất Excel</button>
+            <button id="btnWorkHours" class="admin-only" onclick="toggleWorkHours()">⏱️ Giờ Công Tàu</button>
+            <button id="btnManageShips" class="admin-only" onclick="toggleShipManager()">🚢 Quản Lý Danh Sách Tàu</button>
+            <button id="btnSummary" onclick="showSummary()">📊 Xem BÁO CÁO</button>
+            
+          
+        </div>
         
-        <div id="summary" style="display:none; margin-top:15px;">
-    <select id="summaryShipFilter" style="margin-bottom:10px;">
-        <option value="all">Tất cả tàu</option>
-    </select>
-    <div id="summaryContent"></div>
-</div>
+        <div id="summary" style="display:none; margin-top:15px;"></div>
         
         <div id="workHoursBox" style="display:none; margin-top:15px;">
             <h4>Nhập Giờ Công Theo Định Mức</h4>
             <div id="workHoursContent"></div>
             </div>
-       <div id="shipManagerBox" class="card admin-only" style="display:none; margin-top:15px; border: 2px solid #28a745;">
-    <h4 style="color: #28a745; margin-top: 0;">🚢 Quản Lý Danh Sách Tàu</h4>
-    
-    <div style="display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center;">
-        <input type="text" id="newShipName" placeholder="Tên tàu (VD: S580)" style="margin: 0;">
-        <button onclick="addShip()" style="background: #28a745; margin: 0; width: 100px;">➕ Thêm</button>
+        <div id="shipManagerBox" class="card admin-only" style="display:none; margin-top:15px;">
+    <h4>Quản Lý Danh Sách Tàu</h4>
+    <div class="flex">
+        <input type="text" id="newShipName" placeholder="Nhập tên tàu mới (VD: S580)">
+        <button onclick="addShip()">➕ Thêm Tàu</button>
     </div>
-
-    <div id="shipListContent" style="margin-top:15px; max-height: 300px; overflow-y: auto;">
-        </div>
+    <div id="shipListContent" style="margin-top:10px;"></div>
 </div>
     </div>
 
@@ -534,8 +309,6 @@ h2 {
     let isAdmin = false;
     let currentFiltered = [];
     let shipsData = {}; // Biến lưu danh sách tàu từ Firebase
-    let currentPage = 1;
-    const rowsPerPage = 50;
 
 // 1. Lắng nghe danh sách tàu từ Firebase
 onValue(ref(db, "ships"), snapshot => {
@@ -565,37 +338,15 @@ function renderShipSelects() {
     filterSelect.innerHTML = filterOptions;
 }
 
-function resetActiveButtons() {
-    document.getElementById("btnSummary").classList.remove("btn-active");
-    document.getElementById("btnWorkHours").classList.remove("btn-active");
-    document.getElementById("btnManageShips").classList.remove("btn-active");
-}
-
-
-
-    
 // 3. Hàm Đóng/Mở khung quản lý tàu
 window.toggleShipManager = function() {
     const box = document.getElementById("shipManagerBox");
-    const btn = document.getElementById("btnManageShips");
-
-    const isOpen = box.style.display === "block";
-
-    resetActiveButtons();
-
-    if(isOpen){
-        box.style.display = "none";
-        btn.classList.remove("btn-active");
-        return;
+    box.style.display = (box.style.display === "none") ? "block" : "none";
+    if(box.style.display === "block") {
+        renderShipManagerList();
+        document.getElementById("summary").style.display = "none";
+        document.getElementById("workHoursBox").style.display = "none";
     }
-
-    box.style.display = "block";
-    btn.classList.add("btn-active");
-
-    renderShipManagerList();
-
-    document.getElementById("summary").style.display = "none";
-    document.getElementById("workHoursBox").style.display = "none";
 }
 
 // 4. Hàm Thêm tàu mới lên Firebase
@@ -620,25 +371,14 @@ window.deleteShip = function(shipId) {
 
 // 6. Hàm hiển thị danh sách tàu kèm nút Xóa
 function renderShipManagerList() {
-    let html = `<table>
-        <thead>
-            <tr>
-                <th>Tên Tàu</th>
-                <th>Xóa</th>
-            </tr>
-        </thead>
-        <tbody>`;
-    
+    let html = `<table><tr><th>Tên Tàu</th><th style="width:60px">Xóa</th></tr>`;
     Object.keys(shipsData).sort().forEach(shipId => {
         html += `<tr>
-            <td style="font-weight: bold;">${shipId}</td>
-            <td>
-                <button class="btn-delete" onclick="deleteShip('${shipId}')">🗑️</button>
-            </td>
+            <td><b>${shipId}</b></td>
+            <td><button class="btn-delete" onclick="deleteShip('${shipId}')" style="margin:0; padding:5px;">🗑️</button></td>
         </tr>`;
     });
-    
-    html += "</tbody></table>";
+    html += "</table>";
     document.getElementById("shipListContent").innerHTML = html;
 }
 
@@ -674,16 +414,10 @@ function renderShipManagerList() {
     window.saveLog = function(){
         const shipVal = document.getElementById("ship").value;
         const dateVal = document.getElementById("date").value;
-       const workerVal = Number(document.getElementById("workers").value);
-
-// Kiểm tra hợp lệ
-if (isNaN(workerVal) || workerVal < 0 || workerVal > 999) {
-    alert("Số người chỉ được từ 0 đến 999!");
-    return;
-}
+        const workerVal = document.getElementById("workers").value;
         const jobVal = document.getElementById("job").value;
 
-        if(shipVal === 'all' || !dateVal || workerVal === "") {
+        if(shipVal === 'all' || !dateVal || !workerVal) {
             alert("Vui lòng nhập đầy đủ Tàu, Ngày và Số người!");
             return;
         }
@@ -736,7 +470,6 @@ if (isNaN(workerVal) || workerVal < 0 || workerVal > 999) {
             return sortType === "asc" ? d1 - d2 : d2 - d1;
         });
         currentFiltered = filteredArray;
-        currentPage = 1; // reset về trang đầu
 
         renderTableUI(filteredArray);
     }
@@ -753,15 +486,10 @@ if (isNaN(workerVal) || workerVal < 0 || workerVal > 999) {
             </tr>`;
 
         let totalWorkers = 0;
-       // Tính toán phân trang
-const start = (currentPage - 1) * rowsPerPage;
-const end = start + rowsPerPage;
-const pageData = dataArray.slice(start, end);
-
-pageData.forEach(([id, x], index) => {
+        dataArray.forEach(([id, x], index) => {
             totalWorkers += Number(x.workers || 0);
             html += `<tr>
-                <td class="stt-col">${start + index + 1}</td>
+                <td class="stt-col">${index + 1}</td>
                 <td class="ship-col">${x.ship_id}</td>
                 <td class="date-col">${x.date}</td>
                 <td class="worker-col">${x.workers}</td>
@@ -781,19 +509,7 @@ pageData.forEach(([id, x], index) => {
             <td colspan="${isAdmin ? 2 : 1}">${isAdmin ? 'người' : 'người'}</td>
         </tr></table>`;
         
-        // Tổng số trang
-const totalPages = Math.ceil(dataArray.length / rowsPerPage);
-
-// UI phân trang
-let pagination = `
-<div class="pagination" style="display:flex; justify-content:center; align-items:center; gap:12px; margin-top:10px;">
-    <button onclick="changePage(-1)" ${currentPage === 1 ? "disabled" : ""}>❮</button>
-    <span>Trang ${currentPage} / ${totalPages || 1}</span>
-    <button onclick="changePage(1)" ${currentPage === totalPages ? "disabled" : ""}>❯</button>
-</div>
-`;
-
-document.getElementById("tableContainer").innerHTML = html + pagination;
+        document.getElementById("tableContainer").innerHTML = html;
     }
 
     window.editItem = function(id){
@@ -814,106 +530,52 @@ document.getElementById("tableContainer").innerHTML = html + pagination;
         }
     }
 
- window.showSummary = function(){
-    const box = document.getElementById("summary");
-    const btn = document.getElementById("btnSummary");
+    window.showSummary = function(){
+        const box = document.getElementById("summary");
+        box.style.display = (box.style.display === "none") ? "block" : "none";
+        if(box.style.display === "none") return;
 
-    const isOpen = box.style.display === "block";
+        let result = {};
+        Object.values(rawData).forEach(x => {
+            if(!result[x.ship_id]) result[x.ship_id] = { totalWorkers:0 };
+            result[x.ship_id].totalWorkers += Number(x.workers);
+        });
 
-    resetActiveButtons();
+        let html = "<h4>📊 Báo cáo tổng hợp</h4>";
+        for(let s in result){
+            let key = s.replace(/\s/g,'_');
+            let savedPP = ppData[key]?.hours || 0;
+            let realHours = result[s].totalWorkers * 8;
+            let efficiency = 0;
+if(realHours > 0){
+    efficiency = (savedPP / realHours) * 100;
+}
 
-    if(isOpen){
-        box.style.display = "none";
-        btn.classList.remove("btn-active");
-        return;
+      let color = "red";
+if(efficiency >= 100) color = "green";
+else if(efficiency >= 70) color = "orange";
+
+            
+           html += `<div class="summary-item">
+    <b>🚢 Tàu: ${s}</b><br>
+    - Tổng nhân công: ${result[s].totalWorkers} lượt người<br>
+    - Tổng giờ thực tế: ${realHours.toLocaleString()} giờ<br>
+    - Giờ định mức PP: <b>${savedPP.toLocaleString()}</b> giờ<br>
+    - Hiệu quả tàu: <b style="color:${color}">${efficiency.toFixed(1)}%</b>
+</div>`;
+        }
+        box.innerHTML = html;
+        document.getElementById("workHoursBox").style.display = "none";
     }
 
-    box.style.display = "block";
-    btn.classList.add("btn-active");
-
-    document.getElementById("workHoursBox").style.display = "none";
-    document.getElementById("shipManagerBox").style.display = "none";
-
-    renderSummaryFilter(); // 👈 thêm dòng này
-    renderSummaryContent(); // 👈 vẽ dữ liệu
-}
-
-  function renderSummaryFilter(){
-    const select = document.getElementById("summaryShipFilter");
-
-    let html = `<option value="all">Tất cả tàu</option>`;
-    Object.keys(shipsData).sort().forEach(s => {
-        html += `<option value="${s}">${s}</option>`;
-    });
-
-    select.innerHTML = html;
-
-    select.onchange = renderSummaryContent;
-}
-
-function renderSummaryContent(){
-    const selectedShip = document.getElementById("summaryShipFilter").value;
-
-    let result = {};
-
-    Object.values(rawData).forEach(x => {
-        if(selectedShip !== "all" && x.ship_id !== selectedShip) return;
-
-        if(!result[x.ship_id]) result[x.ship_id] = { totalWorkers:0 };
-        result[x.ship_id].totalWorkers += Number(x.workers);
-    });
-
-    let html = "<h4>📊 Báo cáo tổng hợp</h4>";
-
-    for(let s in result){
-        let key = s.replace(/\s/g,'_');
-        let savedPP = ppData[key]?.hours || 0;
-        let realHours = result[s].totalWorkers * 8;
-
-        let efficiency = realHours > 0 ? (savedPP / realHours) * 100 : 0;
-
-        let color = "red";
-        if(efficiency >= 100) color = "green";
-        else if(efficiency >= 70) color = "orange";
-
-        html += `<div class="summary-item">
-            <b>🚢 Tàu: ${s}</b><br>
-            - Tổng nhân công: ${result[s].totalWorkers} lượt người<br>
-            - Tổng giờ thực tế: ${realHours.toLocaleString()} giờ<br>
-            - Giờ định mức PP: <b>${savedPP.toLocaleString()}</b> giờ<br>
-            - Hiệu quả tàu: <b style="color:${color}">${efficiency.toFixed(1)}%</b><br>
-            - Các hạng mục kiểm tra: <i>(chưa cập nhật)</i>
-        </div>`;
+    window.toggleWorkHours = function(){
+        const box = document.getElementById("workHoursBox");
+        box.style.display = (box.style.display === "none") ? "block" : "none";
+        if(box.style.display === "block") {
+            renderWorkHoursInputs();
+            document.getElementById("summary").style.display = "none";
+        }
     }
-
-    document.getElementById("summaryContent").innerHTML = html;
-}
-
-
-    
-
-  window.toggleWorkHours = function(){
-    const box = document.getElementById("workHoursBox");
-    const btn = document.getElementById("btnWorkHours");
-
-    const isOpen = box.style.display === "block";
-
-    resetActiveButtons();
-
-    if(isOpen){
-        box.style.display = "none";
-        btn.classList.remove("btn-active");
-        return;
-    }
-
-    box.style.display = "block";
-    btn.classList.add("btn-active");
-
-    renderWorkHoursInputs();
-
-    document.getElementById("summary").style.display = "none";
-    document.getElementById("shipManagerBox").style.display = "none";
-}
 
    function renderWorkHoursInputs(){
     // Lấy danh sách tàu thực tế từ shipsData thay vì ghi tay
@@ -1024,51 +686,6 @@ window.onclick = function(event) {
         modal.style.display = "none";
     }
 }
-
-
-
-window.changePage = function(step){
-    const totalPages = Math.ceil(currentFiltered.length / rowsPerPage);
-
-    currentPage += step;
-
-    if(currentPage < 1) currentPage = 1;
-    if(currentPage > totalPages) currentPage = totalPages;
-
-    renderTableUI(currentFiltered);
-}
-
-document.addEventListener("DOMContentLoaded", () => {
-
-    // Set ngày mặc định
-    document.getElementById("date").valueAsDate = new Date();
-
-    // Lấy input sau khi DOM đã load
-    const workersInput = document.getElementById("workers");
-
-    if (workersInput) {
-        workersInput.addEventListener("input", function () {
-            // Chỉ cho nhập số
-            this.value = this.value.replace(/\D/g, '');
-
-            // Giới hạn 3 ký tự
-            if (this.value.length > 3) {
-                this.value = this.value.slice(0, 3);
-            }
-
-            // Giới hạn max 999
-            if (Number(this.value) > 999) {
-                this.value = "999";
-            }
-        });
-    }
-
-});
-
-
-
-    
-    
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

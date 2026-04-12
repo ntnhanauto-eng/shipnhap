@@ -732,9 +732,9 @@ const totalPages = Math.ceil(dataArray.length / rowsPerPage);
 // UI phân trang
 let pagination = `
 <div class="pagination" style="display:flex; justify-content:center; align-items:center; gap:12px; margin-top:10px;">
-    <button onclick="changePage(-1)" ${currentPage === 1 ? "disabled" : ""}>⬅</button>
+    <button onclick="changePage(-1)" ${currentPage === 1 ? "disabled" : ""}>❮</button>
     <span>Trang ${currentPage} / ${totalPages || 1}</span>
-    <button onclick="changePage(1)" ${currentPage === totalPages ? "disabled" : ""}>➡</button>
+    <button onclick="changePage(1)" ${currentPage === totalPages ? "disabled" : ""}>❯</button>
 </div>
 `;
 

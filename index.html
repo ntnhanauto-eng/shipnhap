@@ -256,12 +256,12 @@ input.error, select.error {
 .btn-active {
     background: #28a745 !important;
 }
- .pagination {
+.pagination {
     display: flex;
     justify-content: center;
     flex-wrap: wrap;
-    gap: 5px;
-    padding: 10px;
+    gap: 3px;              /* giảm khoảng cách */
+    padding: 5px;          /* nhỏ lại */
     border-top: 1px solid #eee;
     background: #fff;
     position: sticky;
@@ -270,9 +270,10 @@ input.error, select.error {
 
 .pagination button {
     width: auto;
-    padding: 6px 10px;
-    font-size: 13px;
-    border-radius: 6px;
+    padding: 3px 6px;     /* nhỏ lại */
+    font-size: 11px;      /* chữ nhỏ hơn */
+    border-radius: 4px;   /* bo ít lại */
+    min-width: 28px;      /* giữ form đẹp */
 }
 
 .pagination button.active {

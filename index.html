@@ -389,6 +389,13 @@ h2 {
 .filter-row select {
     flex: 1; /* mỗi cái chiếm 1/2 */
 }
+
+.save-btn {
+    width: 25%;          /* giảm còn 1/4 */
+    margin: 10px auto;   /* canh giữa */
+    display: block;      /* để margin auto hoạt động */
+}
+
         
         
     </style>
@@ -420,7 +427,7 @@ h2 {
            <input type="number" id="workers" placeholder="Số người thực hiện" min="0" max="999" step="1">
             <input type="text" id="job" placeholder="Nội dung công việc">
         </div>
-        <button onclick="saveLog()">💾 Lưu Thông Tin</button>
+        <button class="save-btn" onclick="saveLog()">💾 Lưu Thông Tin</button>
     </div>
 
    <div class="card">

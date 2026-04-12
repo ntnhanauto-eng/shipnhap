@@ -731,7 +731,7 @@ if (isNaN(workerVal) || workerVal < 0 || workerVal > 999) {
                 <th class="date-col">Ngày</th>
                 <th class="worker-col">Người</th>
                 <th>Công việc</th>
-                <th class="action-col admin-inline">Sửa/Xóa</th>
+                ${isAdmin ? `<th class="action-col">Sửa/Xóa</th>` : ``}
             </tr>`;
 
         let totalWorkers = 0;
@@ -748,7 +748,9 @@ pageData.forEach(([id, x], index) => {
                 <td class="date-col">${x.date}</td>
                 <td class="worker-col">${x.workers}</td>
                 <td>${x.job}</td>
-                <td class="action-col admin-inline">
+                    
+                    ${isAdmin ? `
+                    <td class="action-col">
                     <div class="action-buttons">
                         <button class="btn-edit" onclick="editItem('${id}')">✏️</button>
                         <button class="btn-delete" onclick="deleteItem('${id}')">🗑️</button>

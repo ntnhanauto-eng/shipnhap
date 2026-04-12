@@ -94,7 +94,7 @@ input[type="date"] {
 .date-row .date-field {
     flex: 1; /* mỗi ô chiếm 50% */
 }
-}
+
 .date-row input {
     flex: 1; /* Chia đều 50-50 */
     min-width: 0; /* Ngăn chặn input phá vỡ layout flex */
@@ -749,14 +749,15 @@ pageData.forEach(([id, x], index) => {
                 <td class="worker-col">${x.workers}</td>
                 <td>${x.job}</td>
                     
-                    ${isAdmin ? `
-                    <td class="action-col">
-                    <div class="action-buttons">
-                        <button class="btn-edit" onclick="editItem('${id}')">✏️</button>
-                        <button class="btn-delete" onclick="deleteItem('${id}')">🗑️</button>
-                    </div>
-                </td>
-            </tr>`;
+                  ${isAdmin ? `
+    <td class="action-col">
+        <div class="action-buttons">
+            <button class="btn-edit" onclick="editItem('${id}')">✏️</button>
+            <button class="btn-delete" onclick="deleteItem('${id}')">🗑️</button>
+        </div>
+    </td>
+` : ""}
+</tr>`;
         });
 
         html += `<tr class="total-row">

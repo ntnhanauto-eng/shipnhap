@@ -203,18 +203,32 @@ h2 {
 
 /* Định dạng riêng cho bảng quản lý tàu */
 #shipListContent table {
-    width: 80%;
+    width: 100%;
     margin-top: 10px;
     border-collapse: collapse;
     background: #fff;
+    table-layout: fixed; /* QUAN TRỌNG */
 }
 
-#shipListContent th, #shipListContent td {
-    padding: 12px 8px;
-    border: 1px solid #eee;
-    text-align: left;
+ #shipListContent th:nth-child(1),
+#shipListContent td:nth-child(1) {
+    width: 75%; /* Tên tàu */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
+#shipListContent th:nth-child(2),
+#shipListContent td:nth-child(2) {
+    width: 25%; /* Nút xóa */
+    text-align: center;
+}       
+        
+#shipListContent th, 
+#shipListContent td {
+    padding: 8px 5px;
+    font-size: 13px;
+}
 /* Thu nhỏ cột nút xóa */
 #shipListContent td:last-child {
     width: 35px;
@@ -223,14 +237,16 @@ h2 {
 
 /* Làm nút xóa nhỏ gọn và canh giữa */
 #shipListContent .btn-delete {
-    width: 30px;
-    height: 30px;
-    line-height: 35px;
+    width: 28px;
+    height: 28px;
     padding: 0;
     margin: 0 auto;
-    display: block;
-    font-size: 14px;
-}        
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    border-radius: 6px;
+}
 
 /* Khung quản lý tàu chuyên dụng */
 #shipManagerBox {
@@ -406,7 +422,7 @@ h2 {
         <button onclick="addShip()" style="background: #28a745; margin: 0; width: 100px;">➕ Thêm</button>
     </div>
 
-    <div id="shipListContent" style="margin-top:15px; max-height: 300px; overflow-y: auto;">
+    <div id="shipListContent" style="margin-top:15px; max-height:250px; overflow-y:auto;">
         </div>
 </div>
     </div>

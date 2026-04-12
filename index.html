@@ -341,6 +341,38 @@ h2 {
     }
 }
 
+ /* Nút phân trang */
+.pagination button {
+    width: 40px;        /* nhỏ lại */
+    height: 40px;
+    padding: 0;
+    font-size: 16px;
+    border-radius: 50%; /* tròn đẹp */
+    background: #e0e0e0;
+    color: #333;
+    transition: all 0.2s ease;
+}
+
+/* Hover */
+.pagination button:hover:not(:disabled) {
+    background: #1a73e8;
+    color: #fff;
+    transform: scale(1.1);
+}
+
+/* Disabled */
+.pagination button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* Text giữa */
+.pagination span {
+    font-size: 14px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+}
         
     </style>
 </head>
@@ -699,7 +731,7 @@ const totalPages = Math.ceil(dataArray.length / rowsPerPage);
 
 // UI phân trang
 let pagination = `
-<div style="display:flex; justify-content:center; gap:10px; margin-top:10px;">
+<div class="pagination" style="display:flex; justify-content:center; align-items:center; gap:12px; margin-top:10px;">
     <button onclick="changePage(-1)" ${currentPage === 1 ? "disabled" : ""}>⬅</button>
     <span>Trang ${currentPage} / ${totalPages || 1}</span>
     <button onclick="changePage(1)" ${currentPage === totalPages ? "disabled" : ""}>➡</button>

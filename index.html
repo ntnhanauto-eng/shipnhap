@@ -433,6 +433,8 @@ h2 {
     let isAdmin = false;
     let currentFiltered = [];
     let shipsData = {}; // Biến lưu danh sách tàu từ Firebase
+    let currentPage = 1;
+    const rowsPerPage = 50;
 
 // 1. Lắng nghe danh sách tàu từ Firebase
 onValue(ref(db, "ships"), snapshot => {
@@ -627,6 +629,7 @@ function renderShipManagerList() {
             return sortType === "asc" ? d1 - d2 : d2 - d1;
         });
         currentFiltered = filteredArray;
+        currentPage = 1; // reset về trang đầu
 
         renderTableUI(filteredArray);
     }
@@ -643,10 +646,15 @@ function renderShipManagerList() {
             </tr>`;
 
         let totalWorkers = 0;
-        dataArray.forEach(([id, x], index) => {
+       // Tính toán phân trang
+const start = (currentPage - 1) * rowsPerPage;
+const end = start + rowsPerPage;
+const pageData = dataArray.slice(start, end);
+
+pageData.forEach(([id, x], index) => {
             totalWorkers += Number(x.workers || 0);
             html += `<tr>
-                <td class="stt-col">${index + 1}</td>
+                <td class="stt-col">${start + index + 1}</td>
                 <td class="ship-col">${x.ship_id}</td>
                 <td class="date-col">${x.date}</td>
                 <td class="worker-col">${x.workers}</td>
@@ -666,7 +674,19 @@ function renderShipManagerList() {
             <td colspan="${isAdmin ? 2 : 1}">${isAdmin ? 'người' : 'người'}</td>
         </tr></table>`;
         
-        document.getElementById("tableContainer").innerHTML = html;
+        // Tổng số trang
+const totalPages = Math.ceil(dataArray.length / rowsPerPage);
+
+// UI phân trang
+let pagination = `
+<div style="display:flex; justify-content:center; gap:10px; margin-top:10px;">
+    <button onclick="changePage(-1)" ${currentPage === 1 ? "disabled" : ""}>⬅</button>
+    <span>Trang ${currentPage} / ${totalPages || 1}</span>
+    <button onclick="changePage(1)" ${currentPage === totalPages ? "disabled" : ""}>➡</button>
+</div>
+`;
+
+document.getElementById("tableContainer").innerHTML = html + pagination;
     }
 
     window.editItem = function(id){
@@ -897,6 +917,22 @@ window.onclick = function(event) {
         modal.style.display = "none";
     }
 }
+
+
+
+window.changePage = function(step){
+    const totalPages = Math.ceil(currentFiltered.length / rowsPerPage);
+
+    currentPage += step;
+
+    if(currentPage < 1) currentPage = 1;
+    if(currentPage > totalPages) currentPage = totalPages;
+
+    renderTableUI(currentFiltered);
+}
+
+
+    
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

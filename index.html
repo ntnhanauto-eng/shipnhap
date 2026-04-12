@@ -608,8 +608,8 @@ renderPagination();
     // ✅ THÊM DÒNG TỔNG
     html += `
         <tr class="total-row">
-            <td colspan="3"><b>TỔNG:</b></td>
-            <td class="worker-col"><b>${totalWorkers} người</b></td>
+            <td colspan="3" style="text-align:right; font-weight:bold;">TỔNG:</td>
+            <td class="worker-col"><b>${totalWorkers.toLocaleString()} người</b></td>
             <td colspan="2"></td>
         </tr>
     `;

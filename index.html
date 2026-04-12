@@ -623,23 +623,23 @@ renderPagination();
         </tr>`;
     });
 
-    // ✅ THÊM DÒNG TỔNG
- html += `
+html += `
 <tr class="total-row">
     <td></td> <!-- STT -->
     <td></td> <!-- Tàu -->
     <td style="text-align:right;"><b>TỔNG:</b></td> <!-- Ngày -->
+    
+    <td class="worker-col" style="text-align:center;">
+        <b>${totalWorkers.toLocaleString()}</b>
+    </td> <!-- Người (GIỮ ĐÚNG CỘT) -->
 
-    <td class="worker-col" style="white-space:nowrap;">
-        <b>
-            ${totalWorkers.toLocaleString()}
-            <span style="margin-left:20px;">người</span>
-        </b>
-    </td>
-    <td colspan="2"></td>
+    <td style="text-align:left; padding-left:15px;">
+        <b>người</b>
+    </td> <!-- Công việc -->
+
+    <td class="admin-inline"></td> <!-- Sửa/Xóa -->
 </tr>
 `;
-
     html += `</table>`;
 
     document.getElementById("tableContainer").innerHTML = html;

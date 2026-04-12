@@ -594,9 +594,44 @@ function renderShipManagerList() {
         }
     }
 
-    window.showSummary = function(){
-        const box = document.getElementById("summary");
-        box.style.display = (box.style.display === "none") ? "block" : "none";
+   window.showSummary = function(){
+    const box = document.getElementById("summary");
+
+    // LUÔN mở (không toggle nữa)
+    box.style.display = "block";
+
+    let result = {};
+    Object.values(rawData).forEach(x => {
+        if(!result[x.ship_id]) result[x.ship_id] = { totalWorkers:0 };
+        result[x.ship_id].totalWorkers += Number(x.workers);
+    });
+
+    let html = "<h4>📊 Báo cáo tổng hợp</h4>";
+    for(let s in result){
+        let key = s.replace(/\s/g,'_');
+        let savedPP = ppData[key]?.hours || 0;
+        let realHours = result[s].totalWorkers * 8;
+
+        let efficiency = 0;
+        if(realHours > 0){
+            efficiency = (savedPP / realHours) * 100;
+        }
+
+        let color = "red";
+        if(efficiency >= 100) color = "green";
+        else if(efficiency >= 70) color = "orange";
+
+        html += `<div class="summary-item">
+            <b>🚢 Tàu: ${s}</b><br>
+            - Tổng nhân công: ${result[s].totalWorkers} lượt người<br>
+            - Tổng giờ thực tế: ${realHours.toLocaleString()} giờ<br>
+            - Giờ định mức PP: <b>${savedPP.toLocaleString()}</b> giờ<br>
+            - Hiệu quả tàu: <b style="color:${color}">${efficiency.toFixed(1)}%</b>
+        </div>`;
+    }
+
+    box.innerHTML = html;
+}
         if(box.style.display === "none") return;
 
         let result = {};

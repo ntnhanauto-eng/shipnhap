@@ -214,6 +214,27 @@ h2 {
     flex: 1; /* mỗi ô chiếm 50% */
     min-width: 0;
 }      
+
+/* Hiệu ứng khi focus */
+input:focus, select:focus {
+    border-color: #1a73e8;
+    background: #e8f0fe;
+    outline: none;
+    box-shadow: 0 0 5px rgba(26,115,232,0.3);
+    transition: all 0.2s ease;
+}
+
+/* Khi đã nhập dữ liệu */
+input.filled, select.filled {
+    background: #e6f4ea;
+    border-color: #34a853;
+}
+
+/* Khi lỗi (trống mà blur) */
+input.error, select.error {
+    border-color: #dc3545;
+    background: #fdecea;
+}
         
         
     </style>
@@ -714,6 +735,36 @@ window.onclick = function(event) {
 document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("date").valueAsDate = new Date();
 });
+
+
+function handleInputState(el) {
+    if (el.value.trim() !== "") {
+        el.classList.add("filled");
+        el.classList.remove("error");
+    } else {
+        el.classList.remove("filled");
+    }
+}
+
+// Áp dụng cho toàn bộ input + select
+document.querySelectorAll("input, select").forEach(el => {
+    // Khi nhập
+    el.addEventListener("input", () => handleInputState(el));
+
+    // Khi rời khỏi ô (blur)
+    el.addEventListener("blur", () => {
+        if (el.value.trim() === "") {
+            el.classList.add("error");
+        }
+    });
+
+    // Khi focus thì bỏ error
+    el.addEventListener("focus", () => {
+        el.classList.remove("error");
+    });
+});
+
+    
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

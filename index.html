@@ -260,6 +260,19 @@ h2 {
 .ship-table {
     width: 100%;
     border-collapse: collapse;
+    table-layout: fixed; /* QUAN TRỌNG */
+}
+
+    .ship-table td:first-child {
+    width: calc(100% - 50px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ship-table td:last-child {
+    width: 50px;
+    text-align: center;
 }
 
 .ship-table th {

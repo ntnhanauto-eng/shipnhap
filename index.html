@@ -410,10 +410,10 @@ input, select {
         <h2>🚢 E/R CASING</h2>
         <button id="authBtn" onclick="handleAuth()">🔐 Admin Đăng Nhập</button>
     </div>
-
+    
     <div class="card admin-only">
         <h3>Nhập Dữ Liệu</h3>
-       <div class="date-row">
+         <div class="date-row">
     <div class="date-field">
         <label for="date">Chọn ngày</label>
         <input type="date" id="date">
@@ -432,7 +432,24 @@ input, select {
         </div>
         <button class="btn-save" onclick="saveLog()">💾 Lưu Thông Tin</button>
     </div>
-
+   <div class="card" id="upcomingEventsBox">
+        <h3>📅 Công việc 7 ngày tới</h3>
+        <div class="table-wrap">
+            <table id="upcomingEventsTable">
+                <thead>
+                    <tr>
+                        <th style="width: 80px;">Ngày</th>
+                        <th style="width: 60px;">Tàu</th>
+                        <th>Công việc</th>
+                        <th style="width: 50px;">Người</th>
+                    </tr>
+                </thead>
+                <tbody id="upcomingEventsBody">
+                    </tbody>
+            </table>
+        </div>
+    </div>
+    
    <div class="card">
     <h3>Bộ Lọc & Tìm Kiếm</h3>
     <div class="date-row">
@@ -669,6 +686,7 @@ function renderShipManagerList() {
     onValue(ref(db, "logs"), snapshot => {
         rawData = snapshot.val() || {};
         applyFilter();
+        renderUpcomingEvents(); // <--- Dòng này giúp bảng tự cập nhật ngay khi mở web hoặc khi Boss sửa dữ liệu
     });
 
     onValue(ref(db, "workHours"), snapshot => {
@@ -703,6 +721,43 @@ renderTableUI();
 renderPagination();
     }
 
+// --- HÀM RENDER CÔNG VIỆC 7 NGÀY TỚI ---
+function renderUpcomingEvents() {
+    const today = new Date();
+    // Tạo mốc thời gian 7 ngày tới
+    const sevenDaysLater = new Date();
+    sevenDaysLater.setDate(today.getDate() + 7);
+
+    // Chuyển đổi sang định dạng YYYY-MM-DD để so sánh với dữ liệu Firebase
+    const todayStr = today.toISOString().split('T')[0];
+    const sevenDaysStr = sevenDaysLater.toISOString().split('T')[0];
+
+    // Lọc các bản ghi trong khoảng 7 ngày
+    const upcomingEvents = Object.entries(rawData)
+        .filter(([id, item]) => item.date >= todayStr && item.date <= sevenDaysStr)
+        .sort((a, b) => new Date(a[1].date) - new Date(b[1].date));
+
+    const tbody = document.getElementById("upcomingEventsBody");
+    if (!tbody) return; // Thoát nếu không tìm thấy id bảng
+
+    let html = "";
+    if (upcomingEvents.length === 0) {
+        html = "<tr><td colspan='4' style='text-align:center;'>Không có công việc nào trong 7 ngày tới.</td></tr>";
+    } else {
+        upcomingEvents.forEach(([id, item]) => {
+            html += `<tr>
+                <td style="white-space:nowrap;">${item.date}</td>
+                <td><b>${item.ship_id}</b></td>
+                <td>${item.job}</td>
+                <td style="text-align:center;">${item.workers}</td>
+            </tr>`;
+        });
+    }
+    tbody.innerHTML = html;
+}
+
+
+    
     function renderTableUI() {
 
     let start = (currentPage - 1) * rowsPerPage;

@@ -605,7 +605,17 @@ renderPagination();
         </tr>`;
     });
 
+    // ✅ THÊM DÒNG TỔNG
+    html += `
+        <tr class="total-row">
+            <td colspan="3"><b>TỔNG</b></td>
+            <td class="worker-col"><b>${totalWorkers}</b></td>
+            <td colspan="2"></td>
+        </tr>
+    `;
+
     html += `</table>`;
+
     document.getElementById("tableContainer").innerHTML = html;
 }
 

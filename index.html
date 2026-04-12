@@ -203,32 +203,18 @@ h2 {
 
 /* Định dạng riêng cho bảng quản lý tàu */
 #shipListContent table {
-    width: 100%;
+    width: 80%;
+    margin-top: 10px;
     border-collapse: collapse;
-    table-layout: fixed; /* QUAN TRỌNG NHẤT */
+    background: #fff;
 }
 
-        
-
- #shipListContent th:nth-child(1),
-#shipListContent td:nth-child(1) {
-    width: 75%; /* Tên tàu */
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+#shipListContent th, #shipListContent td {
+    padding: 12px 8px;
+    border: 1px solid #eee;
+    text-align: left;
 }
 
-#shipListContent th:nth-child(2),
-#shipListContent td:nth-child(2) {
-    width: 25%; /* Nút xóa */
-    text-align: center;
-}       
-        
-#shipListContent th, 
-#shipListContent td {
-    padding: 6px 4px;
-    font-size: 13px;
-}
 /* Thu nhỏ cột nút xóa */
 #shipListContent td:last-child {
     width: 35px;
@@ -237,11 +223,14 @@ h2 {
 
 /* Làm nút xóa nhỏ gọn và canh giữa */
 #shipListContent .btn-delete {
-    width: 26px;
-    height: 26px;
+    width: 30px;
+    height: 30px;
+    line-height: 35px;
     padding: 0;
-    font-size: 12px;
-}
+    margin: 0 auto;
+    display: block;
+    font-size: 14px;
+}        
 
 /* Khung quản lý tàu chuyên dụng */
 #shipManagerBox {
@@ -330,26 +319,6 @@ h2 {
     background: #e8f0fe;
     transition: 0.2s;
 }      
-
-/* Cột tên tàu */
-#shipListContent td:first-child {
-    width: calc(100% - 50px); /* trừ phần nút */
-    max-width: calc(100% - 50px);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-/* Cột nút xóa */
-#shipListContent td:last-child {
-    width: 50px;
-    min-width: 50px;
-    max-width: 50px;
-    text-align: center;
-}
-#shipListContent {
-    overflow-x: hidden;
-}
         
     </style>
 </head>
@@ -437,7 +406,7 @@ h2 {
         <button onclick="addShip()" style="background: #28a745; margin: 0; width: 100px;">➕ Thêm</button>
     </div>
 
-    <div id="shipListContent" style="margin-top:15px; max-height:250px; overflow-y:auto;">
+    <div id="shipListContent" style="margin-top:15px; max-height: 300px; overflow-y: auto;">
         </div>
 </div>
     </div>
@@ -561,9 +530,7 @@ function renderShipManagerList() {
     
     Object.keys(shipsData).sort().forEach(shipId => {
         html += `<tr>
-            <td style="font-weight: bold; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-    ${shipId}
-</td>
+            <td style="font-weight: bold;">${shipId}</td>
             <td>
                 <button class="btn-delete" onclick="deleteShip('${shipId}')">🗑️</button>
             </td>

@@ -657,7 +657,7 @@ if (isNaN(workerVal) || workerVal < 0 || workerVal > 999) {
 }
         const jobVal = document.getElementById("job").value;
 
-        if(shipVal === 'all' || !dateVal || !workerVal) {
+        if(shipVal === 'all' || !dateVal || workerVal === "") {
             alert("Vui lòng nhập đầy đủ Tàu, Ngày và Số người!");
             return;
         }

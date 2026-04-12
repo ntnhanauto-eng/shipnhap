@@ -447,9 +447,12 @@ function renderShipManagerList() {
 }
 
     // --- XỬ LÝ ĐĂNG NHẬP ---
-   window.handleAuth = function() {
+  window.handleAuth = function() {
     if (isAdmin) {
-        signOut(auth).then(() => alert("Đã đăng xuất!"));
+        signOut(auth).then(() => {
+            alert("Đã đăng xuất!");
+            location.reload(); // 🔥 reload lại trang
+        });
     } else {
         document.getElementById("loginModal").style.display = "block";
     }

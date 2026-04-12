@@ -256,7 +256,28 @@ input.error, select.error {
 .btn-active {
     background: #28a745 !important;
 }
-        
+ .pagination {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 5px;
+    padding: 10px;
+    border-top: 1px solid #eee;
+    background: #fff;
+    position: sticky;
+    bottom: 0;
+}
+
+.pagination button {
+    width: auto;
+    padding: 6px 10px;
+    font-size: 13px;
+    border-radius: 6px;
+}
+
+.pagination button.active {
+    background: #28a745;
+}       
         
         
     </style>
@@ -323,8 +344,10 @@ input.error, select.error {
 </div>
 
     <div class="card">
-        <div class="table-wrap" id="tableContainer"></div>
-        <div id="pagination" style="text-align:center; margin-top:10px;"></div>
+ <div class="table-wrap">
+    <div id="tableContainer"></div>
+    <div id="pagination" class="pagination"></div>
+</div>
     </div>
 
     <div class="card">
@@ -864,19 +887,24 @@ function renderPagination() {
         return;
     }
 
-    // Nút Prev
-    html += `<button onclick="changePage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>⬅️</button>`;
+    // Prev
+    html += `<button onclick="changePage(${currentPage - 1})"
+        ${currentPage === 1 ? 'disabled' : ''}>⬅️</button>`;
 
-    // Hiển thị số trang
-    for (let i = 1; i <= totalPages; i++) {
-        html += `<button onclick="changePage(${i})" 
-            style="${i === currentPage ? 'background:#28a745' : ''}">
+    // Số trang (giới hạn hiển thị cho đẹp)
+    let start = Math.max(1, currentPage - 2);
+    let end = Math.min(totalPages, currentPage + 2);
+
+    for (let i = start; i <= end; i++) {
+        html += `<button onclick="changePage(${i})"
+            class="${i === currentPage ? 'active' : ''}">
             ${i}
         </button>`;
     }
 
-    // Nút Next
-    html += `<button onclick="changePage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>➡️</button>`;
+    // Next
+    html += `<button onclick="changePage(${currentPage + 1})"
+        ${currentPage === totalPages ? 'disabled' : ''}>➡️</button>`;
 
     document.getElementById("pagination").innerHTML = html;
 }

@@ -205,7 +205,15 @@ h2 {
     to { transform: translateY(0); opacity: 1; }
 }
 
-        
+  .filter-row {
+    display: flex;
+    gap: 10px;
+}
+
+.filter-row select {
+    flex: 1; /* mỗi ô chiếm 50% */
+    min-width: 0;
+}      
         
         
     </style>
@@ -252,16 +260,21 @@ h2 {
     </div>
 </div>
     
-    <div class="flex" style="margin-top: 10px;">
-        <select id="shipFilter">
-            <option value="all">Tất cả tàu</option>
-        </select>
-        <input type="text" id="jobFilter" placeholder="Tìm tên công việc...">
-    </div>
+   <div class="flex" style="margin-top: 10px;">
+    <input type="text" id="jobFilter" placeholder="Tìm tên công việc...">
+</div>
+
+<!-- Hàng mới -->
+<div class="filter-row">
     <select id="sortType">
         <option value="desc">📅 Mới nhất trước</option>
         <option value="asc">📅 Cũ nhất trước</option>
     </select>
+
+    <select id="shipFilter">
+        <option value="all">Tất cả tàu</option>
+    </select>
+</div>
 </div>
 
     <div class="card">

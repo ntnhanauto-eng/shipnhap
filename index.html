@@ -449,37 +449,37 @@ input, select {
     </div>
 </div>
     
-   <div class="card">
-    <h3>Bộ Lọc & Tìm Kiếm</h3>
-    <div class="date-row">
-    <div class="date-field">
-        <label for="fromDate">Từ ngày</label>
-        <input type="date" id="fromDate">
-    </div>
-    <div class="date-field">
-        <label for="toDate">Đến ngày</label>
-        <input type="date" id="toDate">
-    </div>
-</div>
-   <div class="flex" style="margin-top: 10px;">
-    <input type="text" id="jobFilter" placeholder="Tìm tên công việc...">
-</div>
-
-<!-- Hàng mới -->
-<div class="filter-row">
-   
-    <select id="sortType">
-        <option value="desc">📅 Mới nhất trước</option>
-        <option value="asc">📅 Cũ nhất trước</option>
-    </select>
-
-    <select id="shipFilter">
-        <option value="all">Tất cả tàu</option>
-    </select>
+  <div class="card">
+    <h3 style="cursor:pointer; color:#1a73e8; margin:0;" onclick="toggleAdvancedSearch()">
+        🔍 Tìm kiếm nâng cao ▾
+    </h3>
     
-</div>
-         
- 
+    <div id="advancedSearch" style="display: none; margin-top: 15px;">
+        <div class="date-row">
+            <div class="date-field">
+                <label for="fromDate">Từ ngày</label>
+                <input type="date" id="fromDate">
+            </div>
+            <div class="date-field">
+                <label for="toDate">Đến ngày</label>
+                <input type="date" id="toDate">
+            </div>
+        </div>
+
+        <div class="flex" style="margin-top: 10px;">
+            <input type="text" id="jobFilter" placeholder="Tìm tên công việc...">
+        </div>
+
+        <div class="filter-row" style="margin-top: 10px;">
+            <select id="sortType">
+                <option value="desc">📅 Mới nhất trước</option>
+                <option value="asc">📅 Cũ nhất trước</option>
+            </select>
+            <select id="shipFilter">
+                <option value="all">Tất cả tàu</option>
+            </select>
+        </div>
+    </div>
 </div>
 
     <div class="card">
@@ -811,6 +811,19 @@ html += `
     document.getElementById("tableContainer").innerHTML = html;
 }
 
+window.toggleAdvancedSearch = function() {
+    const box = document.getElementById("advancedSearch");
+    // Kiểm tra trạng thái hiện tại để ẩn hoặc hiện
+    if (box.style.display === "none") {
+        box.style.display = "block";
+    } else {
+        box.style.display = "none";
+    }
+};
+
+
+
+    
     window.editItem = function(id){
         if(!isAdmin) return;
         let x = rawData[id];

@@ -373,6 +373,18 @@ h2 {
     display: flex;
     align-items: center;
 }
+
+   /* Hàng filter riêng */
+.filter-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.filter-row select {
+    flex: 1; /* mỗi cái chiếm 1/2 */
+}
+        
         
     </style>
 </head>
@@ -415,16 +427,18 @@ h2 {
     </div>
 </div>
     
-    <div class="flex" style="margin-top: 10px;">
-        <select id="shipFilter">
-            <option value="all">Tất cả tàu</option>
-        </select>
-        <input type="text" id="jobFilter" placeholder="Tìm tên công việc...">
-    </div>
+   <div class="filter-row">
     <select id="sortType">
         <option value="desc">📅 Mới nhất trước</option>
         <option value="asc">📅 Cũ nhất trước</option>
     </select>
+
+    <select id="shipFilter">
+        <option value="all">Tất cả tàu</option>
+    </select>
+</div>
+
+<input type="text" id="jobFilter" placeholder="Tìm tên công việc...">
 </div>
 
     <div class="card">

@@ -417,8 +417,7 @@ h2 {
     </div>
 </div>
         <div class="flex">
-         <input type="number" id="workers" placeholder="Số người thực hiện" min="0" max="999">
-         <div id="workersError" style="color:red; font-size:13px; display:none;"></div>
+           <input type="number" id="workers" placeholder="Số người thực hiện" min="0" max="999" step="1">
             <input type="text" id="job" placeholder="Nội dung công việc">
         </div>
         <button onclick="saveLog()">💾 Lưu Thông Tin</button>
@@ -657,11 +656,6 @@ if (isNaN(workerVal) || workerVal < 0 || workerVal > 999) {
     return;
 }
         const jobVal = document.getElementById("job").value;
-         // ✅ THÊM ĐOẠN NÀY (chặn nếu đang có lỗi)
-    if (document.getElementById("workersError").style.display === "block") {
-        alert("Vui lòng sửa lỗi trước khi lưu!");
-        return;
-    }
 
         if(shipVal === 'all' || !dateVal || !workerVal) {
             alert("Vui lòng nhập đầy đủ Tàu, Ngày và Số người!");
@@ -1040,37 +1034,7 @@ workersInput.addEventListener("input", function () {
     }
 });
 
-const workersInput = document.getElementById("workers");
-const workersError = document.getElementById("workersError");
 
-workersInput.addEventListener("input", function () {
-    let val = this.value;
-
-    // Xóa ký tự không phải số
-    val = val.replace(/\D/g, '');
-    this.value = val;
-
-    // Kiểm tra lỗi
-    if (val === "") {
-        showError("Vui lòng nhập số người");
-    } else if (Number(val) < 0 || Number(val) > 999) {
-        showError("Chỉ được nhập từ 0 đến 999");
-    } else {
-        hideError();
-    }
-});
-
-function showError(msg){
-    workersError.innerText = msg;
-    workersError.style.display = "block";
-    workersInput.style.border = "2px solid red";
-}
-
-function hideError(){
-    workersError.innerText = "";
-    workersError.style.display = "none";
-    workersInput.style.border = "1px solid #ccc";
-}
 
     
     

@@ -450,7 +450,14 @@ input, select {
 </div>
     
   <div class="card">
-    <h3 style="cursor:pointer; color:#1a73e8; margin:0;" onclick="toggleAdvancedSearch()">
+    <div style="margin-bottom: 15px;">
+        <label for="shipFilter" style="font-weight:bold; display:block; margin-bottom:5px;">🚢 Chọn tàu:</label>
+        <select id="shipFilter">
+            <option value="all">Tất cả tàu</option>
+        </select>
+    </div>
+
+    <h3 style="cursor:pointer; color:#1a73e8; margin:0; font-size:16px;" onclick="toggleAdvancedSearch()">
         🔍 Tìm kiếm nâng cao ▾
     </h3>
     
@@ -474,9 +481,6 @@ input, select {
             <select id="sortType">
                 <option value="desc">📅 Mới nhất trước</option>
                 <option value="asc">📅 Cũ nhất trước</option>
-            </select>
-            <select id="shipFilter">
-                <option value="all">Tất cả tàu</option>
             </select>
         </div>
     </div>

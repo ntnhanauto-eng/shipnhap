@@ -90,6 +90,11 @@ input[type="date"] {
     display: flex;
     gap: 10px;
 }
+
+.date-row .date-field {
+    flex: 1; /* mỗi ô chiếm 50% */
+}
+}
 .date-row input {
     flex: 1; /* Chia đều 50-50 */
     min-width: 0; /* Ngăn chặn input phá vỡ layout flex */
@@ -398,13 +403,17 @@ h2 {
     <div class="card admin-only">
         <h3>Nhập Dữ Liệu</h3>
         <div class="flex">
-    <select id="ship">
-        <option value="all">-- Chọn Tàu --</option>
-     </select>
-
+   <div class="date-row">
     <div class="date-field">
         <label for="date">Chọn ngày</label>
         <input type="date" id="date">
+    </div>
+
+    <div class="date-field">
+        <label for="ship">Chọn tàu</label>
+        <select id="ship">
+            <option value="all">-- Chọn Tàu --</option>
+        </select>
     </div>
 </div>
         <div class="flex">
@@ -997,7 +1006,9 @@ window.changePage = function(step){
     renderTableUI(currentFiltered);
 }
 
-
+document.addEventListener("DOMContentLoaded", () => {
+    document.getElementById("date").valueAsDate = new Date();
+});
     
     
 </script>

@@ -809,16 +809,13 @@ window.exportExcel = function() {
         });
     });
 
-data.push({
-    "Tàu": "TỔNG",
-    "Ngày": "",
-    "Số người": data.reduce((sum, r) => sum + r["Số người"], 0),
-    "Công việc": ""
-});
+    data.push({
+        "Tàu": "TỔNG",
+        "Ngày": "",
+        "Số người": data.reduce((sum, r) => sum + r["Số người"], 0),
+        "Công việc": ""
+    });
 
-
-
-    
     if(data.length === 0){
         alert("Không có dữ liệu để xuất!");
         return;
@@ -828,7 +825,22 @@ data.push({
     let wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "BaoCao");
 
-    XLSX.writeFile(wb, "BaoCao_Loc.xlsx");
+    // ❗ THAY writeFile bằng Blob
+    let wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+
+    let blob = new Blob([wbout], { type: "application/octet-stream" });
+
+    let url = URL.createObjectURL(blob);
+
+    let a = document.createElement("a");
+    a.href = url;
+    a.download = "BaoCao_Loc.xlsx";
+
+    document.body.appendChild(a);
+    a.click();
+
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
 }
 
 

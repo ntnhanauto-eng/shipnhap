@@ -447,29 +447,11 @@ input.error, select.error {
     let isAdmin = false;
     let currentFiltered = [];
     let shipsData = {}; // Biến lưu danh sách tàu từ Firebase
-    let shipChecksData = {};
-
-onValue(ref(db, "shipChecks"), snapshot => {
-    shipChecksData = snapshot.val() || {};
-
-    renderAllChecks();
-
-    if(document.getElementById("summary").style.display === "block") {
-        showSummary();
-    }
-});
 
 // 1. Lắng nghe danh sách tàu từ Firebase
 onValue(ref(db, "ships"), snapshot => {
     shipsData = snapshot.val() || {};
-
-    renderShipSelects();
-
-    // 🔥 QUAN TRỌNG: nếu đang mở thì render lại
-    if(document.getElementById("shipManagerBox").style.display === "block") {
-        renderShipManagerList();
-    }
-});
+    renderShipSelects(); // Cập nhật các ô chọn tàu
     // Nếu đang mở bảng quản lý tàu thì vẽ lại bảng đó luôn
     if(document.getElementById("shipManagerBox").style.display === "block") {
         renderShipManagerList();
@@ -527,43 +509,26 @@ window.deleteShip = function(shipId) {
 
 // 6. Hàm hiển thị danh sách tàu kèm nút Xóa
 function renderShipManagerList() {
-    let html = `<table>
-        <tr>
-            <th>Tên Tàu</th>
-            <th>Checklist</th>
-            <th style="width:60px">Xóa</th>
-        </tr>`;
-
+    let html = `<table><tr><th>Tên Tàu</th><th style="width:60px">Xóa</th></tr>`;
     Object.keys(shipsData).sort().forEach(shipId => {
-
-        html += `<tr>
-            <td><b>${shipId}</b></td>
-
-            <td>
-                <input type="text" id="check_${shipId}" 
-                    placeholder="Nhập hạng mục...">
-                <button onclick="addCheck('${shipId}')" 
-                    style="width:auto; padding:4px 6px;">➕</button>
-
-                let safeId = shipId.replace(/\s/g, "_");
-
-<div id="list_${safeId}" style="margin-top:5px;"></div>
-            </td>
-
-            <td>
-                <button class="btn-delete"
-                    onclick="deleteShip('${shipId}')"
-                    style="margin:0; padding:4px 6px; width:auto; font-size:12px;">
-                    🗑️
-                </button>
-            </td>
-        </tr>`;
+       html += `<tr>
+    <td><b>${shipId}</b></td>
+    <td>
+        <button class="btn-delete" 
+            onclick="deleteShip('${shipId}')"
+            style="
+                margin:0;
+                padding:4px 6px;
+                width:auto;
+                font-size:12px;
+            ">
+            🗑️
+        </button>
+    </td>
+</tr>`;
     });
-
     html += "</table>";
     document.getElementById("shipListContent").innerHTML = html;
-
-    renderAllChecks();
 }
 
     // --- XỬ LÝ ĐĂNG NHẬP ---
@@ -765,25 +730,13 @@ html += `
         if(efficiency >= 100) color = "green";
         else if(efficiency >= 70) color = "orange";
 
-       let checks = shipChecksData[s] || {};
-let checkHtml = "";
-
-Object.values(checks).forEach(c => {
-    checkHtml += `- ${c}<br>`;
-});
-
-html += `<div class="summary-item">
-    <b>🚢 Tàu: ${s}</b><br>
-    - Tổng nhân công: ${result[s].totalWorkers} lượt người<br>
-    - Tổng giờ thực tế: ${realHours.toLocaleString()} giờ<br>
-    - Giờ định mức PP: <b>${savedPP.toLocaleString()}</b> giờ<br>
-    - Hiệu quả tàu: <b style="color:${color}">${efficiency.toFixed(1)}%</b><br>
-
-    <div style="margin-top:5px; padding-left:10px;">
-        <b>Checklist:</b><br>
-        ${checkHtml || "Chưa có"}
-    </div>
-</div>`;
+        html += `<div class="summary-item">
+            <b>🚢 Tàu: ${s}</b><br>
+            - Tổng nhân công: ${result[s].totalWorkers} lượt người<br>
+            - Tổng giờ thực tế: ${realHours.toLocaleString()} giờ<br>
+            - Giờ định mức PP: <b>${savedPP.toLocaleString()}</b> giờ<br>
+            - Hiệu quả tàu: <b style="color:${color}">${efficiency.toFixed(1)}%</b>
+        </div>`;
     }
 
     box.innerHTML = html;
@@ -1043,56 +996,7 @@ window.changePage = function(page) {
 
     window.scrollTo(0, 0); // scroll lên đầu
 }
-
-
     
-  import { get, child } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
-
-window.addCheck = function(shipId) {
-    const input = document.getElementById("check_" + shipId);
-    const val = input.value.trim();
-
-    if (!val) return;
-
-    push(ref(db, "shipChecks/" + shipId), val)
-    .then(() => {
-        input.value = "";
-    });
-}
-window.deleteCheck = function(shipId, checkId) {
-    remove(ref(db, "shipChecks/" + shipId + "/" + checkId))
-        .then(() => renderChecks(shipId));
-}  
-
-
-
-function renderAllChecks() {
-    Object.keys(shipsData).forEach(shipId => {
-        renderChecks(shipId);
-    });
-}
-
-function renderChecks(shipId) {
-    let safeId = shipId.replace(/\s/g, "_");
-
-    const box = document.getElementById("list_" + safeId);
-    if (!box) return;
-
-    let data = shipChecksData[shipId] || {};
-    let html = "";
-
-    Object.entries(data).forEach(([id, val]) => {
-        html += `
-        <div style="display:flex; justify-content:space-between; font-size:12px;">
-            <span>• ${val}</span>
-            <span style="cursor:pointer; color:red;"
-                onclick="deleteCheck('${shipId}','${id}')">✖</span>
-        </div>`;
-    });
-
-    box.innerHTML = html;
-}
-
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

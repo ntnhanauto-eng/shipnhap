@@ -462,7 +462,14 @@ onValue(ref(db, "shipChecks"), snapshot => {
 // 1. Lắng nghe danh sách tàu từ Firebase
 onValue(ref(db, "ships"), snapshot => {
     shipsData = snapshot.val() || {};
-    renderShipSelects(); // Cập nhật các ô chọn tàu
+
+    renderShipSelects();
+
+    // 🔥 QUAN TRỌNG: nếu đang mở thì render lại
+    if(document.getElementById("shipManagerBox").style.display === "block") {
+        renderShipManagerList();
+    }
+});
     // Nếu đang mở bảng quản lý tàu thì vẽ lại bảng đó luôn
     if(document.getElementById("shipManagerBox").style.display === "block") {
         renderShipManagerList();

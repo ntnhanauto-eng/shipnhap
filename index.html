@@ -951,20 +951,21 @@ function handleInputState(el) {
 
 // Áp dụng cho toàn bộ input + select
 document.querySelectorAll("input, select").forEach(el => {
-    // Khi nhập
-    el.addEventListener("input", () => handleInputState(el));
 
-    // Khi rời khỏi ô (blur)
+    // Khi blur (rời khỏi ô)
     el.addEventListener("blur", () => {
         if (el.value.trim() === "") {
             el.classList.add("error");
+        } else {
+            el.classList.remove("error");
         }
     });
 
-    // Khi focus thì bỏ error
+    // Khi focus → bỏ lỗi
     el.addEventListener("focus", () => {
         el.classList.remove("error");
     });
+
 });
 
    window.handleButton = function(type) {

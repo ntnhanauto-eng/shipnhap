@@ -1024,25 +1024,30 @@ window.changePage = function(step){
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+
+    // Set ngày mặc định
     document.getElementById("date").valueAsDate = new Date();
-});
 
-const workersInput = document.getElementById("workers");
+    // Lấy input sau khi DOM đã load
+    const workersInput = document.getElementById("workers");
 
-// Chỉ cho nhập số
-workersInput.addEventListener("input", function () {
-    // Xóa ký tự không phải số
-    this.value = this.value.replace(/\D/g, '');
+    if (workersInput) {
+        workersInput.addEventListener("input", function () {
+            // Chỉ cho nhập số
+            this.value = this.value.replace(/\D/g, '');
 
-    // Giới hạn 3 chữ số
-    if (this.value.length > 3) {
-        this.value = this.value.slice(0, 3);
+            // Giới hạn 3 ký tự
+            if (this.value.length > 3) {
+                this.value = this.value.slice(0, 3);
+            }
+
+            // Giới hạn max 999
+            if (Number(this.value) > 999) {
+                this.value = "999";
+            }
+        });
     }
 
-    // Giới hạn max = 999
-    if (Number(this.value) > 999) {
-        this.value = "999";
-    }
 });
 
 

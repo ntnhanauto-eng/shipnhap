@@ -319,6 +319,28 @@ h2 {
     background: #e8f0fe;
     transition: 0.2s;
 }      
+
+/* Grid riêng cho nhóm nút chức năng */
+.button-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* 2 nút mỗi hàng */
+    gap: 10px;
+}
+
+/* Tablet trở lên: có thể 3 nút/hàng */
+@media (min-width: 600px) {
+    .button-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+/* Desktop lớn: 4 nút/hàng */
+@media (min-width: 900px) {
+    .button-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
         
     </style>
 </head>
@@ -378,14 +400,12 @@ h2 {
     </div>
 
     <div class="card">
-        <div class="flex">
-            <button onclick="exportExcel()">📥 Xuất Excel</button>
-            <button id="btnManageShips" class="admin-only" onclick="toggleShipManager()">🚢 Quản Lý Danh Sách Tàu</button>
-            <button id="btnWorkHours" class="admin-only" onclick="toggleWorkHours()">⏱️ Giờ Công Tàu</button>
-            <button id="btnSummary" onclick="showSummary()">📊 Xem BÁO CÁO</button>
-            
-          
-        </div>
+        <div class="button-grid">
+    <button onclick="exportExcel()">📥 Xuất Excel</button>
+    <button id="btnManageShips" class="admin-only" onclick="toggleShipManager()">🚢 Danh Sách Tàu</button>
+    <button id="btnWorkHours" class="admin-only" onclick="toggleWorkHours()">⏱️ Giờ Công Tàu</button>
+    <button id="btnSummary" onclick="showSummary()">📊 Xem BÁO CÁO</button>
+</div>
         
         <div id="summary" style="display:none; margin-top:15px;">
     <select id="summaryShipFilter" style="margin-bottom:10px;">

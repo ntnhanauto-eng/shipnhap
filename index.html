@@ -373,6 +373,34 @@ input, select {
         transform: translateY(0);
     }
 }
+
+.footer {
+    text-align: center;
+    font-size: 12px;
+    color: #777;
+    margin-top: 20px;
+    padding: 10px 0;
+
+    /* nếu muốn cố định dưới màn hình */
+    position: relative;
+}
+
+/* 🔥 Nếu muốn luôn dính đáy màn hình thì dùng cái này thay cho trên */
+/*
+.footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: #f0f2f5;
+    text-align: center;
+    font-size: 12px;
+    color: #777;
+    padding: 8px 0;
+    border-top: 1px solid #ddd;
+}
+*/
+
         
     </style>
 </head>
@@ -1084,6 +1112,9 @@ window.changePage = function(page) {
     
     <button onclick="loginAdmin()">Đăng nhập</button>
   </div>
+</div>
+    <div class="footer">
+   @ 04-2026 Developed by Nguyen Thanh Nhan - E/R Outfitting 1
 </div>
 </body>
 </html>

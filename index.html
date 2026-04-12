@@ -452,10 +452,10 @@ input.error, select.error {
 onValue(ref(db, "shipChecks"), snapshot => {
     shipChecksData = snapshot.val() || {};
 
-    renderAllChecks(); // ✅ cập nhật UI
+    renderAllChecks();
 
     if(document.getElementById("summary").style.display === "block") {
-        showSummary(); // ✅ cập nhật báo cáo luôn
+        showSummary();
     }
 });
 
@@ -538,7 +538,9 @@ function renderShipManagerList() {
                 <button onclick="addCheck('${shipId}')" 
                     style="width:auto; padding:4px 6px;">➕</button>
 
-                <div id="list_${shipId}" style="margin-top:5px;"></div>
+                let safeId = shipId.replace(/\s/g, "_");
+
+<div id="list_${safeId}" style="margin-top:5px;"></div>
             </td>
 
             <td>
@@ -1045,12 +1047,11 @@ window.addCheck = function(shipId) {
 
     if (!val) return;
 
-    const checkRef = ref(db, "shipChecks/" + shipId);
-    push(checkRef, val).then(() => {
+    push(ref(db, "shipChecks/" + shipId), val)
+    .then(() => {
         input.value = "";
     });
 }
-
 window.deleteCheck = function(shipId, checkId) {
     remove(ref(db, "shipChecks/" + shipId + "/" + checkId))
         .then(() => renderChecks(shipId));
@@ -1065,7 +1066,9 @@ function renderAllChecks() {
 }
 
 function renderChecks(shipId) {
-    const box = document.getElementById("list_" + shipId);
+    let safeId = shipId.replace(/\s/g, "_");
+
+    const box = document.getElementById("list_" + safeId);
     if (!box) return;
 
     let data = shipChecksData[shipId] || {};

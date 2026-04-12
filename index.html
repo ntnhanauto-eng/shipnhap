@@ -785,61 +785,62 @@ document.querySelectorAll("input, select").forEach(el => {
     });
 });
 
-    window.handleButton = function(type) {
+   window.handleButton = function(type) {
 
-    // 1. Reset màu tất cả nút
-    document.querySelectorAll(".btn-grid button").forEach(btn => {
-        btn.classList.remove("btn-active");
-    });
+    const summaryBox = document.getElementById("summary");
+    const hoursBox = document.getElementById("workHoursBox");
+    const shipBox = document.getElementById("shipManagerBox");
 
-    // 2. Ẩn toàn bộ nội dung
-    document.getElementById("summary").style.display = "none";
-    document.getElementById("workHoursBox").style.display = "none";
-    document.getElementById("shipManagerBox").style.display = "none";
+    const btnSummary = document.getElementById("btnSummary");
+    const btnHours = document.getElementById("btnWorkHours");
+    const btnShips = document.getElementById("btnManageShips");
 
-    // 3. Xử lý từng loại
+    // ===== EXPORT (không toggle)
     if(type === "export") {
         exportExcel();
         return;
     }
 
-    if(type === "ships") {
-        let btn = document.getElementById("btnManageShips");
-        let box = document.getElementById("shipManagerBox");
-
-        if(box.style.display === "block") {
-            box.style.display = "none"; // bấm lại thì tắt
-        } else {
-            box.style.display = "block";
-            btn.classList.add("btn-active");
-            renderShipManagerList();
-        }
-    }
-
-    if(type === "hours") {
-        let btn = document.getElementById("btnWorkHours");
-        let box = document.getElementById("workHoursBox");
-
-        if(box.style.display === "block") {
-            box.style.display = "none";
-        } else {
-            box.style.display = "block";
-            btn.classList.add("btn-active");
-            renderWorkHoursInputs();
-        }
-    }
+    // ===== LẤY BOX & BUTTON HIỆN TẠI
+    let currentBox = null;
+    let currentBtn = null;
 
     if(type === "summary") {
-        let btn = document.getElementById("btnSummary");
-        let box = document.getElementById("summary");
-
-        if(box.style.display === "block") {
-            box.style.display = "none";
-        } else {
-            btn.classList.add("btn-active");
-            showSummary();
-        }
+        currentBox = summaryBox;
+        currentBtn = btnSummary;
     }
+    if(type === "hours") {
+        currentBox = hoursBox;
+        currentBtn = btnHours;
+    }
+    if(type === "ships") {
+        currentBox = shipBox;
+        currentBtn = btnShips;
+    }
+
+    // ===== KIỂM TRA TRẠNG THÁI TRƯỚC
+    let isOpen = currentBox.style.display === "block";
+
+    // ===== ẨN TẤT CẢ
+    summaryBox.style.display = "none";
+    hoursBox.style.display = "none";
+    shipBox.style.display = "none";
+
+    document.querySelectorAll(".btn-grid button").forEach(btn => {
+        btn.classList.remove("btn-active");
+    });
+
+    // ===== NẾU ĐANG MỞ → TẮT LUÔN
+    if(isOpen) return;
+
+    // ===== NGƯỢC LẠI → MỞ
+    currentBox.style.display = "block";
+    currentBtn.classList.add("btn-active");
+
+    // ===== LOAD DATA
+    if(type === "summary") showSummary();
+    if(type === "hours") renderWorkHoursInputs();
+    if(type === "ships") renderShipManagerList();
 }
     
 </script>

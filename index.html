@@ -451,6 +451,12 @@ input.error, select.error {
 
 onValue(ref(db, "shipChecks"), snapshot => {
     shipChecksData = snapshot.val() || {};
+
+    renderAllChecks(); // ✅ cập nhật UI
+
+    if(document.getElementById("summary").style.display === "block") {
+        showSummary(); // ✅ cập nhật báo cáo luôn
+    }
 });
 
 // 1. Lắng nghe danh sách tàu từ Firebase
@@ -1042,7 +1048,6 @@ window.addCheck = function(shipId) {
     const checkRef = ref(db, "shipChecks/" + shipId);
     push(checkRef, val).then(() => {
         input.value = "";
-        renderChecks(shipId);
     });
 }
 

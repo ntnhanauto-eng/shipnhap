@@ -296,6 +296,35 @@ input.error, select.error {
 .pagination button:disabled {
     opacity: 0.4;
     cursor: not-allowed;
+}   
+
+#shipListContent table {
+    width: 100%;
+    min-width: 250px; /* tránh co quá nhỏ */
+    border-collapse: collapse;
+}
+
+#shipListContent th,
+#shipListContent td {
+    padding: 8px;
+    font-size: 13px;
+    word-break: break-word;
+}
+
+#shipListContent th {
+    background: #f8f9fa;
+}
+
+#shipListContent td:last-child {
+    text-align: center;
+    width: 60px;
+}
+
+  #shipListContent td:first-child {
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }      
         
     </style>
@@ -389,7 +418,7 @@ input.error, select.error {
         <input type="text" id="newShipName" placeholder="Nhập tên tàu mới (VD: S580)">
         <button onclick="addShip()">➕ Thêm Tàu</button>
     </div>
-    <div id="shipListContent" style="margin-top:10px;"></div>
+    <div id="shipListContent" style="margin-top:10px; overflow-x:auto;"></div>
 </div>
     </div>
 
@@ -482,10 +511,21 @@ window.deleteShip = function(shipId) {
 function renderShipManagerList() {
     let html = `<table><tr><th>Tên Tàu</th><th style="width:60px">Xóa</th></tr>`;
     Object.keys(shipsData).sort().forEach(shipId => {
-        html += `<tr>
-            <td><b>${shipId}</b></td>
-            <td><button class="btn-delete" onclick="deleteShip('${shipId}')" style="margin:0; padding:5px;">🗑️</button></td>
-        </tr>`;
+       html += `<tr>
+    <td><b>${shipId}</b></td>
+    <td>
+        <button class="btn-delete" 
+            onclick="deleteShip('${shipId}')"
+            style="
+                margin:0;
+                padding:4px 6px;
+                width:auto;
+                font-size:12px;
+            ">
+            🗑️
+        </button>
+    </td>
+</tr>`;
     });
     html += "</table>";
     document.getElementById("shipListContent").innerHTML = html;

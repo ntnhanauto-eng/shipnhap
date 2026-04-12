@@ -417,7 +417,7 @@ h2 {
     </div>
 </div>
         <div class="flex">
-            <input type="number" id="workers" placeholder="Số người thực hiện">
+           <input type="number" id="workers" placeholder="Số người thực hiện" min="0" max="999" step="1">
             <input type="text" id="job" placeholder="Nội dung công việc">
         </div>
         <button onclick="saveLog()">💾 Lưu Thông Tin</button>
@@ -648,7 +648,13 @@ function renderShipManagerList() {
     window.saveLog = function(){
         const shipVal = document.getElementById("ship").value;
         const dateVal = document.getElementById("date").value;
-        const workerVal = document.getElementById("workers").value;
+       const workerVal = Number(document.getElementById("workers").value);
+
+// Kiểm tra hợp lệ
+if (isNaN(workerVal) || workerVal < 0 || workerVal > 999) {
+    alert("Số người chỉ được từ 0 đến 999!");
+    return;
+}
         const jobVal = document.getElementById("job").value;
 
         if(shipVal === 'all' || !dateVal || !workerVal) {
@@ -1009,6 +1015,28 @@ window.changePage = function(step){
 document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("date").valueAsDate = new Date();
 });
+
+const workersInput = document.getElementById("workers");
+
+// Chỉ cho nhập số
+workersInput.addEventListener("input", function () {
+    // Xóa ký tự không phải số
+    this.value = this.value.replace(/\D/g, '');
+
+    // Giới hạn 3 chữ số
+    if (this.value.length > 3) {
+        this.value = this.value.slice(0, 3);
+    }
+
+    // Giới hạn max = 999
+    if (Number(this.value) > 999) {
+        this.value = "999";
+    }
+});
+
+
+
+    
     
     
 </script>

@@ -270,16 +270,33 @@ input.error, select.error {
 
 .pagination button {
     width: auto;
-    padding: 3px 6px;     /* nhỏ lại */
-    font-size: 11px;      /* chữ nhỏ hơn */
-    border-radius: 4px;   /* bo ít lại */
-    min-width: 28px;      /* giữ form đẹp */
+    padding: 4px 8px;        /* nhỏ lại */
+    font-size: 12px;         /* chữ nhỏ */
+    border-radius: 5px;
+
+    background: #fff;        /* nền trắng */
+    color: #000;             /* chữ đen */
+    border: 1px solid #ccc;  /* viền nhẹ */
+
+    cursor: pointer;
+}
+/* Hover nhẹ */
+.pagination button:hover {
+    background: #f1f1f1;
 }
 
+/* Trang đang chọn */
 .pagination button.active {
-    background: #28a745;
-}       
-        
+    background: #fff;        /* vẫn trắng */
+    color: #28a745;          /* xanh chữ */
+    border: 1px solid #28a745;
+    font-weight: bold;
+}      
+  /* Disable */
+.pagination button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}      
         
     </style>
 </head>

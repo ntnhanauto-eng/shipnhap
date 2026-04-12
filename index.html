@@ -739,9 +739,20 @@ function renderUpcomingEvents() {
     const todayStr = today.toISOString().split('T')[0];
     const sevenDaysStr = sevenDaysLater.toISOString().split('T')[0];
 
-    const upcomingEvents = Object.entries(rawData)
-        .filter(([id, item]) => item.date >= todayStr && item.date <= sevenDaysStr)
-        .sort((a, b) => new Date(a[1].date) - new Date(b[1].date));
+    // Thay đoạn cũ bằng đoạn này:
+const upcomingEvents = Object.entries(rawData)
+    .filter(([id, item]) => {
+        // Chuyển ngày của công việc thành object Date để so sánh chính xác
+        const itemDate = new Date(item.date);
+        const today = new Date();
+        
+        // Đặt giờ về 00:00:00 để so sánh đúng ngày
+        today.setHours(0, 0, 0, 0);
+        
+        // Chỉ lấy những ngày >= ngày hôm nay
+        return itemDate >= today;
+    })
+    .sort((a, b) => new Date(a[1].date) - new Date(b[1].date));
 
     const tbody = document.getElementById("upcomingEventsBody");
     if (!tbody) return;

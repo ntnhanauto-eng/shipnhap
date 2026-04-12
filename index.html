@@ -241,6 +241,22 @@ input.error, select.error {
     margin: 10px auto;
     padding: 10px 20px;
 }
+
+.btn-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* 2 cột */
+    gap: 10px;
+}
+
+.btn-grid button {
+    width: 100%;
+}
+
+/* trạng thái khi bấm */
+.btn-active {
+    background: #28a745 !important;
+}
+        
         
         
     </style>
@@ -311,14 +327,13 @@ input.error, select.error {
     </div>
 
     <div class="card">
-        <div class="flex">
-            <button onclick="exportExcel()">📥 Xuất Excel</button>
-            <button id="btnWorkHours" class="admin-only" onclick="toggleWorkHours()">⏱️ Giờ Công Tàu</button>
-            <button id="btnManageShips" class="admin-only" onclick="toggleShipManager()">🚢 Danh Sách Tàu</button>
-            <button id="btnSummary" onclick="showSummary()">📊 Xem BÁO CÁO</button>
-            
-          
-        </div>
+       <div class="btn-grid">
+    <button id="btnExport" onclick="handleButton('export')">📥 Xuất Excel</button>
+    <button id="btnManageShips" class="admin-only" onclick="handleButton('ships')">🚢 Danh Sách Tàu</button>
+
+    <button id="btnWorkHours" class="admin-only" onclick="handleButton('hours')">⏱️ Giờ Công Tàu</button>
+    <button id="btnSummary" onclick="handleButton('summary')">📊 Xem BÁO CÁO</button>
+</div>
         
         <div id="summary" style="display:none; margin-top:15px;"></div>
         
@@ -770,7 +785,62 @@ document.querySelectorAll("input, select").forEach(el => {
     });
 });
 
-    
+    window.handleButton = function(type) {
+
+    // 1. Reset màu tất cả nút
+    document.querySelectorAll(".btn-grid button").forEach(btn => {
+        btn.classList.remove("btn-active");
+    });
+
+    // 2. Ẩn toàn bộ nội dung
+    document.getElementById("summary").style.display = "none";
+    document.getElementById("workHoursBox").style.display = "none";
+    document.getElementById("shipManagerBox").style.display = "none";
+
+    // 3. Xử lý từng loại
+    if(type === "export") {
+        exportExcel();
+        return;
+    }
+
+    if(type === "ships") {
+        let btn = document.getElementById("btnManageShips");
+        let box = document.getElementById("shipManagerBox");
+
+        if(box.style.display === "block") {
+            box.style.display = "none"; // bấm lại thì tắt
+        } else {
+            box.style.display = "block";
+            btn.classList.add("btn-active");
+            renderShipManagerList();
+        }
+    }
+
+    if(type === "hours") {
+        let btn = document.getElementById("btnWorkHours");
+        let box = document.getElementById("workHoursBox");
+
+        if(box.style.display === "block") {
+            box.style.display = "none";
+        } else {
+            box.style.display = "block";
+            btn.classList.add("btn-active");
+            renderWorkHoursInputs();
+        }
+    }
+
+    if(type === "summary") {
+        let btn = document.getElementById("btnSummary");
+        let box = document.getElementById("summary");
+
+        if(box.style.display === "block") {
+            box.style.display = "none";
+        } else {
+            btn.classList.add("btn-active");
+            showSummary();
+        }
+    }
+}
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

@@ -1051,11 +1051,7 @@ window.deleteCheck = function(shipId, checkId) {
         .then(() => renderChecks(shipId));
 }  
 
-let shipChecksData = {};
 
-onValue(ref(db, "shipChecks"), snapshot => {
-    shipChecksData = snapshot.val() || {};
-});
 
 function renderAllChecks() {
     Object.keys(shipsData).forEach(shipId => {

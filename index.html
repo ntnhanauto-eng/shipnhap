@@ -235,6 +235,12 @@ input.error, select.error {
     border-color: #dc3545;
     background: #fdecea;
 }
+.btn-save {
+    width: auto;
+    display: block;
+    margin: 10px auto;
+    padding: 10px 20px;
+}
         
         
     </style>
@@ -265,7 +271,7 @@ input.error, select.error {
             <input type="number" id="workers" placeholder="Số người thực hiện">
             <input type="text" id="job" placeholder="Nội dung công việc">
         </div>
-        <button onclick="saveLog()">💾 Lưu Thông Tin</button>
+        <button class="btn-save" onclick="saveLog()">💾 Lưu Thông Tin</button>
     </div>
 
    <div class="card">

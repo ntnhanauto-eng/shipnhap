@@ -732,27 +732,22 @@ renderPagination();
 
 // --- HÀM RENDER CÔNG VIỆC 7 NGÀY TỚI ---
 function renderUpcomingEvents() {
+    // 1. Lấy mốc thời gian ngày hôm nay (00:00:00)
     const today = new Date();
-    const sevenDaysLater = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // 2. Lấy mốc thời gian 7 ngày tới (23:59:59)
+    const sevenDaysLater = new Date(today);
     sevenDaysLater.setDate(today.getDate() + 7);
 
-    const todayStr = today.toISOString().split('T')[0];
-    const sevenDaysStr = sevenDaysLater.toISOString().split('T')[0];
-
-    // Thay đoạn cũ bằng đoạn này:
-const upcomingEvents = Object.entries(rawData)
-    .filter(([id, item]) => {
-        // Chuyển ngày của công việc thành object Date để so sánh chính xác
-        const itemDate = new Date(item.date);
-        const today = new Date();
-        
-        // Đặt giờ về 00:00:00 để so sánh đúng ngày
-        today.setHours(0, 0, 0, 0);
-        
-        // Chỉ lấy những ngày >= ngày hôm nay
-        return itemDate >= today;
-    })
-    .sort((a, b) => new Date(a[1].date) - new Date(b[1].date));
+    // 3. Lọc dữ liệu
+    const upcomingEvents = Object.entries(rawData)
+        .filter(([id, item]) => {
+            const itemDate = new Date(item.date);
+            // Chỉ lấy từ hôm nay trở đi VÀ không quá 7 ngày tới
+            return itemDate >= today && itemDate <= sevenDaysLater;
+        })
+        .sort((a, b) => new Date(a[1].date) - new Date(b[1].date));
 
     const tbody = document.getElementById("upcomingEventsBody");
     if (!tbody) return;

@@ -324,6 +324,7 @@ input.error, select.error {
 
     <div class="card">
         <div class="table-wrap" id="tableContainer"></div>
+        <div id="pagination" style="text-align:center; margin-top:10px;"></div>
     </div>
 
     <div class="card">
@@ -352,6 +353,9 @@ input.error, select.error {
     </div>
 
 <script type="module">
+
+    let currentPage = 1;
+    const rowsPerPage = 50;
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getDatabase, ref, push, onValue, remove, update, set } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
     import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
@@ -536,48 +540,51 @@ function renderShipManagerList() {
             let d2 = new Date(b[1].date);
             return sortType === "asc" ? d1 - d2 : d2 - d1;
         });
-        currentFiltered = filteredArray;
-
-        renderTableUI(filteredArray);
+       currentFiltered = filteredArray;
+currentPage = 1; // reset về trang 1 khi filter
+renderTableUI();
+renderPagination();
     }
 
-    function renderTableUI(dataArray) {
-        let html = `<table>
-            <tr>
-                <th class="stt-col">STT</th>
-                <th class="ship-col">Tàu</th>
-                <th class="date-col">Ngày</th>
-                <th class="worker-col">Người</th>
-                <th>Công việc</th>
-                <th class="action-col admin-inline">Sửa/Xóa</th>
-            </tr>`;
+    function renderTableUI() {
 
-        let totalWorkers = 0;
-        dataArray.forEach(([id, x], index) => {
-            totalWorkers += Number(x.workers || 0);
-            html += `<tr>
-                <td class="stt-col">${index + 1}</td>
-                <td class="ship-col">${x.ship_id}</td>
-                <td class="date-col">${x.date}</td>
-                <td class="worker-col">${x.workers}</td>
-                <td>${x.job}</td>
-                <td class="action-col admin-inline">
-                    <div class="action-buttons">
-                        <button class="btn-edit" onclick="editItem('${id}')">✏️</button>
-                        <button class="btn-delete" onclick="deleteItem('${id}')">🗑️</button>
-                    </div>
-                </td>
-            </tr>`;
-        });
+    let start = (currentPage - 1) * rowsPerPage;
+    let end = start + rowsPerPage;
+    let dataArray = currentFiltered.slice(start, end);
 
-        html += `<tr class="total-row">
-            <td colspan="3" style="text-align:right">TỔNG CỘNG:</td>
-            <td class="worker-col">${totalWorkers}</td>
-            <td colspan="${isAdmin ? 2 : 1}">${isAdmin ? 'người' : 'người'}</td>
-        </tr></table>`;
-        
-        document.getElementById("tableContainer").innerHTML = html;
-    }
+    let html = `<table>
+        <tr>
+            <th class="stt-col">STT</th>
+            <th class="ship-col">Tàu</th>
+            <th class="date-col">Ngày</th>
+            <th class="worker-col">Người</th>
+            <th>Công việc</th>
+            <th class="action-col admin-inline">Sửa/Xóa</th>
+        </tr>`;
+
+    let totalWorkers = 0;
+
+    dataArray.forEach(([id, x], index) => {
+        totalWorkers += Number(x.workers || 0);
+
+        html += `<tr>
+            <td class="stt-col">${start + index + 1}</td>
+            <td class="ship-col">${x.ship_id}</td>
+            <td class="date-col">${x.date}</td>
+            <td class="worker-col">${x.workers}</td>
+            <td>${x.job}</td>
+            <td class="action-col admin-inline">
+                <div class="action-buttons">
+                    <button class="btn-edit" onclick="editItem('${id}')">✏️</button>
+                    <button class="btn-delete" onclick="deleteItem('${id}')">🗑️</button>
+                </div>
+            </td>
+        </tr>`;
+    });
+
+    html += `</table>`;
+    document.getElementById("tableContainer").innerHTML = html;
+}
 
     window.editItem = function(id){
         if(!isAdmin) return;
@@ -847,6 +854,45 @@ document.querySelectorAll("input, select").forEach(el => {
     if(type === "hours") renderWorkHoursInputs();
     if(type === "ships") renderShipManagerList();
 }
+
+function renderPagination() {
+    const totalPages = Math.ceil(currentFiltered.length / rowsPerPage);
+    let html = "";
+
+    if (totalPages <= 1) {
+        document.getElementById("pagination").innerHTML = "";
+        return;
+    }
+
+    // Nút Prev
+    html += `<button onclick="changePage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>⬅️</button>`;
+
+    // Hiển thị số trang
+    for (let i = 1; i <= totalPages; i++) {
+        html += `<button onclick="changePage(${i})" 
+            style="${i === currentPage ? 'background:#28a745' : ''}">
+            ${i}
+        </button>`;
+    }
+
+    // Nút Next
+    html += `<button onclick="changePage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>➡️</button>`;
+
+    document.getElementById("pagination").innerHTML = html;
+}
+
+window.changePage = function(page) {
+    const totalPages = Math.ceil(currentFiltered.length / rowsPerPage);
+
+    if (page < 1 || page > totalPages) return;
+
+    currentPage = page;
+    renderTableUI();
+    renderPagination();
+
+    window.scrollTo(0, 0); // scroll lên đầu
+}
+    
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

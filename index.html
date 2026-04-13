@@ -592,9 +592,7 @@ function updateAuthMenuVisibility(user) {
 }
 
 // Gọi hàm khi trạng thái đăng nhập thay đổi (Sử dụng Firebase Auth)
-onAuthStateChanged(auth, (user) => {
-    updateAuthMenuVisibility(user);
-});
+
 
     const firebaseConfig = {
   apiKey: "AIzaSyCdBCy8ttrdcfQoSPr3nNmsynmBtnkYv0o",
@@ -1296,7 +1294,9 @@ window.changePage = function(page) {
 
     window.scrollTo(0, 0); // scroll lên đầu
 }
-    
+onAuthStateChanged(auth, (user) => {
+    updateAuthMenuVisibility(user);
+});    
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

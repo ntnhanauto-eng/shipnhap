@@ -600,11 +600,6 @@ input, select {
     </div>
 
 <script type="module">
-    const Chart = window.Chart;
-const ChartDataLabels = window.ChartDataLabels;
-    if (!Chart.registry.plugins.get('datalabels')) {
-    Chart.register(ChartDataLabels);
-}
     // Thay vì valueAsDate, dùng cách thủ công để định dạng chắc chắn là YYYY-MM-DD
 const today = new Date();
 const yyyy = today.getFullYear();
@@ -1008,7 +1003,6 @@ document.getElementById("summaryDetail").innerHTML =
 
 // 👉 tạo chart rỗng (CHỈ TẠO 1 LẦN)
 const ctx = document.getElementById('summaryChart').getContext('2d');
-    Chart.register(ChartDataLabels);
 
 if(!window.myChart){
     window.myChart = new Chart(ctx, {
@@ -1043,21 +1037,6 @@ if(!window.myChart){
                     text: 'So sánh Giờ Công'
                 }
             },
-
-             datalabels: {
-            anchor: 'end',
-            align: 'top',
-            color: '#000',
-            font: {
-                weight: 'bold',
-                size: 12
-            },
-            formatter: function(value) {
-                return value.toLocaleString(); // hiển thị 1,000
-            }
-        }
-    },
-            
            scales: {
     y: {
         beginAtZero: true,
@@ -1764,7 +1743,7 @@ function updateChartData(result, selectedShip){
     <div id="loginModal" class="modal">
   <div class="modal-content">
     <span class="close" onclick="closeLogin()">&times;</span>
-    <h3>🔐 Đăng nhập Admin</h3>
+    <h3>🔐 Admin</h3>
     
     <input type="email" id="loginEmail" placeholder="Email">
     <input type="password" id="loginPass" placeholder="Mật khẩu">

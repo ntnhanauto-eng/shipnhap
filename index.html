@@ -1009,6 +1009,7 @@ function renderSummaryDetail(ship){
 }
 
     function renderSummaryChart(result){
+        Chart.register(ChartDataLabels);
 
     let labels = [];
     let realData = [];
@@ -1031,7 +1032,7 @@ function renderSummaryDetail(ship){
     }
 
     window.myChart = new Chart(ctx, {
-        Chart.register(ChartDataLabels);
+        
         type: 'bar',
         data: {
             labels: labels,
@@ -1057,7 +1058,7 @@ function renderSummaryDetail(ship){
                 title: {
                     display: true,
                     text: 'So sánh Giờ Công Thực Tế vs Giờ Công PP'
-                }
+                },
                  // 🔥 THÊM ĐOẠN NÀY
         datalabels: {
             anchor: 'end',

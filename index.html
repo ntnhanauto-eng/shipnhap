@@ -868,7 +868,7 @@ window.toggleAdvancedSearch = function() {
         }
     }
 
- window.showSummary = function(){
+window.showSummary = function(){
     const box = document.getElementById("summary");
     box.style.display = "block";
 
@@ -921,66 +921,48 @@ window.toggleAdvancedSearch = function() {
 
     box.innerHTML = html;
 
-   // ===== VẼ BIỂU ĐỒ =====
-const ctx = document.getElementById('summaryChart').getContext('2d');
+    // ===== VẼ BIỂU ĐỒ =====
+    const ctx = document.getElementById('summaryChart').getContext('2d');
 
-// 🔥 FIX 1: đăng ký plugin
-Chart.register(ChartDataLabels);
+    // Nếu đã có chart cũ thì destroy
+    if(window.myChart) {
+        window.myChart.destroy();
+    }
 
-// 🔥 FIX 2: xóa chart cũ
-if(window.myChart) {
-    window.myChart.destroy();
-}
-
-window.myChart = new Chart(ctx, {
-    type: 'bar',
-    data: {
-        labels: labels,
-        datasets: [
-            {
-                label: 'Giờ thực tế',
-                data: realData,
-                backgroundColor: 'rgba(26,115,232,0.7)'
-            },
-            {
-                label: 'Giờ PP',
-                data: ppDataArr,
-                backgroundColor: 'rgba(52,168,83,0.7)'
-            }
-        ]
-    },
-    options: {
-        responsive: true,
-        plugins: {
-            legend: { position: 'top' },
-
-            title: {
-                display: true,
-                text: 'So sánh Giờ Công Thực Tế vs Giờ Công PP'
-            },
-
-            // 🔥 FIX 3: HIỂN THỊ SỐ
-            datalabels: {
-                display: true,
-                anchor: 'end',
-                align: 'top',
-                formatter: function(value) {
-                    return value.toLocaleString();
+    window.myChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Giờ thực tế',
+                    data: realData,
+                    backgroundColor: 'rgba(26,115,232,0.7)'
                 },
-                font: {
-                    weight: 'bold',
-                    size: 12
-                },
-                color: '#000'
-            }
+                {
+                    label: 'Giờ PP',
+                    data: ppDataArr,
+                    backgroundColor: 'rgba(52,168,83,0.7)'
+                }
+            ]
         },
-        scales: {
-            y: {
-                beginAtZero: true
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { position: 'top' },
+                title: {
+                    display: true,
+                    text: 'So sánh Giờ Công Thực Tế vs Giờ Công PP'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
             }
         }
-    }
-});
+    });
+}
 
     window.toggleWorkHours = function(){
         const box = document.getElementById("workHoursBox");

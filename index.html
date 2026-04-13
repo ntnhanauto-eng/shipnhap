@@ -965,7 +965,10 @@ window.showSummary = function(){
     });
 
     // ===== DROPDOWN =====
-    let shipOptions = `<option value="all">Tất cả tàu</option>`;
+    let shipOptions = `
+<option value="">-- Chọn tàu --</option>
+<option value="all">Tất cả tàu</option>
+`;
     Object.keys(result).sort().forEach(s => {
         shipOptions += `<option value="${s}">${s}</option>`;
     });
@@ -990,8 +993,47 @@ window.showSummary = function(){
     // lưu cache
     window.summaryDataCache = result;
 
-    renderSummaryChart(result);
-    renderSummaryDetail("all");
+   // lưu cache
+window.summaryDataCache = result;
+
+// 👉 chưa hiển thị dữ liệu
+document.getElementById("summaryDetail").innerHTML =
+    "<i>👉 Vui lòng chọn tàu để xem báo cáo</i>";
+
+// 👉 tạo chart rỗng (CHỈ TẠO 1 LẦN)
+const ctx = document.getElementById('summaryChart').getContext('2d');
+
+if(!window.myChart){
+    window.myChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: [],
+            datasets: [
+                {
+                    label: 'Giờ thực tế',
+                    data: []
+                },
+                {
+                    label: 'Giờ PP',
+                    data: []
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { position: 'top' },
+                title: {
+                    display: true,
+                    text: 'So sánh Giờ Công'
+                }
+            },
+            scales: {
+                y: { beginAtZero: true }
+            }
+        }
+    });
+}
 }
 
     window.toggleWorkHours = function(){
@@ -1022,7 +1064,27 @@ window.showSummary = function(){
 
 window.filterSummary = function(){
     const ship = document.getElementById("summaryShipFilter").value;
+    window.filterSummary = function(){
+    const ship = document.getElementById("summaryShipFilter").value;
+    const data = window.summaryDataCache;
+
+    // chưa chọn
+    if(!ship){
+        document.getElementById("summaryDetail").innerHTML =
+            "<i>👉 Vui lòng chọn tàu để xem báo cáo</i>";
+
+        // clear chart data (KHÔNG destroy)
+        window.myChart.data.labels = [];
+        window.myChart.data.datasets[0].data = [];
+        window.myChart.data.datasets[1].data = [];
+        window.myChart.update();
+
+        return;
+    }
+
     renderSummaryDetail(ship);
+    updateChartData(data, ship); // 🔥 dùng update thay vì render lại
+}
 }
 
 function renderSummaryDetail(ship){
@@ -1618,6 +1680,33 @@ function renderProgressInputs(){
     .then(() => {
         alert("✅ Đã lưu hạng mục cho " + shipName);
     });
+}
+
+function updateChartData(result, selectedShip){
+
+    let labels = [];
+    let realData = [];
+    let ppDataArr = [];
+
+    for(let s in result){
+
+        if(selectedShip !== "all" && s !== selectedShip) continue;
+
+        let key = s.replace(/\s/g,'_');
+        let savedPP = ppData[key]?.hours || 0;
+        let realHours = result[s].totalWorkers * 8;
+
+        labels.push(s);
+        realData.push(realHours);
+        ppDataArr.push(savedPP);
+    }
+
+    // 🔥 CHỈ UPDATE DATA — KHÔNG TẠO LẠI CHART
+    window.myChart.data.labels = labels;
+    window.myChart.data.datasets[0].data = realData;
+    window.myChart.data.datasets[1].data = ppDataArr;
+
+    window.myChart.update();
 }
     
     

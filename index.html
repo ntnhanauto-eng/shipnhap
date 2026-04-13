@@ -741,12 +741,17 @@ function renderUpcomingEvents() {
     sevenDaysLater.setDate(today.getDate() + 7);
 
     // 3. Lọc dữ liệu
-    const upcomingEvents = Object.entries(rawData)
-        .filter(([id, item]) => {
-            const itemDate = new Date(item.date);
-            // Chỉ lấy từ hôm nay trở đi VÀ không quá 7 ngày tới
-            return itemDate >= today && itemDate <= sevenDaysLater;
-        })
+  const upcomingEvents = Object.entries(rawData)
+    .filter(([id, item]) => {
+        const itemDate = new Date(item.date);
+
+        // điều kiện: trong 7 ngày + có chữ PLAN:
+        return (
+            itemDate >= today &&
+            itemDate <= sevenDaysLater &&
+            (item.job || "").toUpperCase().includes("PLAN:")
+        );
+    })
         .sort((a, b) => new Date(a[1].date) - new Date(b[1].date));
 
     const tbody = document.getElementById("upcomingEventsBody");

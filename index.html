@@ -569,6 +569,7 @@ input, select {
     <button id="btnWorkHours" class="admin-only" onclick="handleButton('hours')">⏱️ Giờ Công Tàu</button>
     <button id="btnSummary" onclick="handleButton('summary')">📊 Xem BÁO CÁO</button>
     <button id="btnProgress" class="admin-only" onclick="handleButton('progress')">Nhập tiến độ tàu</button>
+     <button id="btnChecklist" class="admin-only" onclick="handleButton('checklist')">📋 Mục kiểm tra</button>
 </div>
         
         <div id="summary" style="display:none; margin-top:15px;"></div>
@@ -590,7 +591,10 @@ input, select {
     <h4>📌 Nhập tiến độ thực tế (%)</h4>
     <div id="progressContent"></div>
 </div>
-       
+   <div id="checklistBox" class="card admin-only" style="display:none; margin-top:15px;">
+    <h4>📋 Nhập hạng mục kiểm tra</h4>
+    <div id="checklistContent"></div>
+</div>    
 
         
     </div>
@@ -1040,6 +1044,10 @@ function renderSummaryDetail(ship){
             efficiency = (savedPP / realHours) * 100;
         }
         let progress = progressData[key]?.percent || 0;
+        let checkedItems = progressData[key]?.items || [];
+let checkedText = checkedItems.length > 0 
+    ? checkedItems.join(", ") 
+    : "Chưa có";
 
         let color = "red";
         if(efficiency >= 100) color = "green";
@@ -1053,6 +1061,8 @@ function renderSummaryDetail(ship){
     - Giờ định mức PP: <b>${savedPP.toLocaleString()}</b> giờ<br>
     - Hiệu quả tàu: <b style="color:${color}">${efficiency.toFixed(1)} %</b><br>
     - Tiến độ thực tế: <b style="color:#1a73e8">${progress} %</b>
+    <br>
+- Các hạng mục đã kiểm tra: <b>${checkedText}</b>
 </div>`;
     });
 
@@ -1352,6 +1362,8 @@ document.querySelectorAll("input, select").forEach(el => {
 
     const progressBox = document.getElementById("progressBox");
     const btnProgress = document.getElementById("btnProgress");
+    const checklistBox = document.getElementById("checklistBox");
+    const btnChecklist = document.getElementById("btnChecklist");
 
     // ===== EXPORT (không toggle)
     if(type === "export") {
@@ -1380,6 +1392,10 @@ document.querySelectorAll("input, select").forEach(el => {
     currentBox = progressBox;
     currentBtn = btnProgress;
 }
+    if(type === "checklist") {
+    currentBox = checklistBox;
+    currentBtn = btnChecklist;
+}
 
     // ===== KIỂM TRA TRẠNG THÁI TRƯỚC
     let isOpen = currentBox.style.display === "block";
@@ -1389,6 +1405,7 @@ document.querySelectorAll("input, select").forEach(el => {
     hoursBox.style.display = "none";
     shipBox.style.display = "none";
     progressBox.style.display = "none";
+    checklistBox.style.display = "none";
 
     document.querySelectorAll(".btn-grid button").forEach(btn => {
         btn.classList.remove("btn-active");
@@ -1406,6 +1423,7 @@ document.querySelectorAll("input, select").forEach(el => {
     if(type === "hours") renderWorkHoursInputs();
     if(type === "ships") renderShipManagerList();
     if(type === "progress") renderProgressInputs();
+    if(type === "checklist") renderChecklistInputs();
 }
 
 function renderPagination() {
@@ -1554,6 +1572,53 @@ function renderProgressInputs(){
 });
 }
 
+    function renderChecklistInputs(){
+    let ships = Object.keys(shipsData).sort();
+
+    let html = `
+<table style="width:100%; table-layout:fixed;">
+<tr>
+    <th style="width:80px;">Tàu</th>
+    <th>Hạng mục kiểm tra (cách nhau dấu ,)</th>
+    <th style="width:60px;">Lưu</th>
+</tr>`;
+
+    ships.forEach(s => {
+        let key = s.replace(/\s/g,'_');
+        let val = (progressData[key]?.items || []).join(", ");
+
+        html += `<tr>
+            <td>${s}</td>
+            <td>
+                <input type="text" id="check_${key}" value="${val}">
+            </td>
+            <td>
+                <button onclick="saveChecklist('${s}')">💾</button>
+            </td>
+        </tr>`;
+    });
+
+    html += "</table>";
+
+    document.getElementById("checklistContent").innerHTML = html;
+}
+
+    window.saveChecklist = function(shipName){
+    let key = shipName.replace(/\s/g,'_');
+
+    let val = document.getElementById("check_" + key).value.trim();
+
+    let items = val ? val.split(",").map(x => x.trim()) : [];
+
+    set(ref(db, "progress/" + key), {
+        ship: shipName,
+        percent: progressData[key]?.percent || 0,
+        items: items
+    })
+    .then(() => {
+        alert("✅ Đã lưu hạng mục cho " + shipName);
+    });
+}
     
     
 </script>

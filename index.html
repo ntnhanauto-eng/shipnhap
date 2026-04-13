@@ -868,10 +868,8 @@ window.toggleAdvancedSearch = function() {
         }
     }
 
-   window.showSummary = function(){
+  window.showSummary = function(){
     const box = document.getElementById("summary");
-
-    // LUÔN mở (không toggle nữa)
     box.style.display = "block";
 
     let result = {};
@@ -881,6 +879,11 @@ window.toggleAdvancedSearch = function() {
     });
 
     let html = "<h4>📊 Báo cáo tổng hợp</h4>";
+
+    let labels = [];
+    let realData = [];
+    let ppDataArr = [];
+
     for(let s in result){
         let key = s.replace(/\s/g,'_');
         let savedPP = ppData[key]?.hours || 0;
@@ -902,9 +905,63 @@ window.toggleAdvancedSearch = function() {
             - Giờ định mức PP: <b>${savedPP.toLocaleString()}</b> giờ<br>
             - Hiệu quả tàu: <b style="color:${color}">${efficiency.toFixed(1)}%</b>
         </div>`;
+
+        // ===== DATA CHO BIỂU ĐỒ =====
+        labels.push(s);
+        realData.push(realHours);
+        ppDataArr.push(savedPP);
     }
 
+    // ===== CANVAS CHO BIỂU ĐỒ =====
+    html += `
+        <div style="margin-top:20px;">
+            <canvas id="summaryChart"></canvas>
+        </div>
+    `;
+
     box.innerHTML = html;
+
+    // ===== VẼ BIỂU ĐỒ =====
+    const ctx = document.getElementById('summaryChart').getContext('2d');
+
+    // Nếu đã có chart cũ thì destroy
+    if(window.myChart) {
+        window.myChart.destroy();
+    }
+
+    window.myChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Giờ thực tế',
+                    data: realData,
+                    backgroundColor: 'rgba(26,115,232,0.7)'
+                },
+                {
+                    label: 'Giờ PP',
+                    data: ppDataArr,
+                    backgroundColor: 'rgba(52,168,83,0.7)'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { position: 'top' },
+                title: {
+                    display: true,
+                    text: 'So sánh Giờ Công Thực Tế vs Giờ Công PP'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
 }
        
 
@@ -1256,5 +1313,6 @@ window.changePage = function(page) {
     <div class="footer">
    @ 04-2026 Developed by Nguyen Thanh Nhan - E/R Outfitting 1
 </div>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </body>
 </html>

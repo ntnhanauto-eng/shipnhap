@@ -989,6 +989,7 @@ window.showSummary = function(){
     `;
 
     box.innerHTML = html;
+    document.getElementById("summaryShipFilter").value = "";
 
     // lưu cache
     window.summaryDataCache = result;
@@ -1087,15 +1088,16 @@ if(!window.myChart){
 
 
     window.filterSummary = function(){
+
     const ship = document.getElementById("summaryShipFilter").value;
     const data = window.summaryDataCache;
 
-    // chưa chọn
+    // 👉 chưa chọn gì
     if(!ship){
         document.getElementById("summaryDetail").innerHTML =
             "<i>👉 Vui lòng chọn tàu để xem báo cáo</i>";
 
-        // clear chart data (KHÔNG destroy)
+        // clear chart
         window.myChart.data.labels = [];
         window.myChart.data.datasets[0].data = [];
         window.myChart.data.datasets[1].data = [];
@@ -1104,9 +1106,11 @@ if(!window.myChart){
         return;
     }
 
+    // 👉 LUÔN render lại (fix lỗi phải chọn lần 2)
     renderSummaryDetail(ship);
-    updateChartData(data, ship); // 🔥 dùng update thay vì render lại
-}
+
+    // 👉 update chart
+    updateChartData(data, ship);
 }
 
 function renderSummaryDetail(ship){

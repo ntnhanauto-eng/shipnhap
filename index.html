@@ -1477,7 +1477,13 @@ initMarquee();
 function renderProgressInputs(){
     let ships = Object.keys(shipsData).sort();
 
-    let html = "<table><tr><th>Tàu</th><th>% Tiến độ</th><th>Lưu</th></tr>";
+    let html = `
+<table>
+<tr>
+    <th style="width:100px">Tàu</th>
+    <th style="width:80px">% Tiến độ</th>
+    <th style="width:60px">Lưu</th>
+</tr>`;
 
     ships.forEach(s => {
         let key = s.replace(/\s/g,'_');
@@ -1487,6 +1493,7 @@ function renderProgressInputs(){
             <td>${s}</td>
             <td>
                 <input type="number" min="0" max="100"
+    style="width:70px; text-align:center;"
                     id="progress_${key}" value="${val}">
             </td>
             <td>

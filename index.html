@@ -1503,9 +1503,9 @@ function renderProgressInputs(){
         alert("✅ Đã lưu tiến độ cho " + shipName);
     })
     .catch(err => {
-        console.error(err);
-        alert("❌ Lỗi lưu dữ liệu!");
-    });
+    console.error("Lỗi Firebase:", err);
+    alert("❌ Lỗi lưu dữ liệu: " + err.message);
+});
 }
 
     

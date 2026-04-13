@@ -1037,17 +1037,19 @@ function renderSummaryDetail(ship){
         data: {
             labels: labels,
             datasets: [
-               {
+              {
     label: 'Giờ thực tế',
     data: realData,
     backgroundColor: 'rgba(26,115,232,1)',
-    datalabels: { display: true } // 🔥 thêm
+    borderColor: '#1a73e8',
+    borderWidth: 2
 },
 {
     label: 'Giờ PP',
     data: ppDataArr,
     backgroundColor: 'rgba(52,168,83,1)',
-    datalabels: { display: true } // 🔥 thêm
+    borderColor: '#34a853',
+    borderWidth: 2
 }
             ]
         },

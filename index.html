@@ -401,6 +401,23 @@ input, select {
 }
 */
 
+        .table-title {
+    text-align: center;
+    font-weight: bold;
+    color: #34a853;
+    margin-bottom: 8px;
+    font-size: 16px;
+
+    /* cho giống viền xanh */
+    border: 2px solid #34a853;
+    border-bottom: none;
+    border-radius: 12px 12px 0 0;
+    background: #f0fff4;
+    padding: 8px;
+
+    /* hiệu ứng nhẹ */
+    box-shadow: 0 0 6px rgba(52, 168, 83, 0.25);
+}
         
     </style>
 </head>
@@ -486,12 +503,15 @@ input, select {
     </div>
 </div>
 
-    <div class="card">
- <div class="table-wrap">
-    <div id="tableContainer"></div>
-    <div id="pagination" class="pagination"></div>
-</div>
+   <div class="card">
+
+    <h3 class="table-title">KẾ HOẠCH và NHÂN LỰC THỰC TẾ</h3>
+
+    <div class="table-wrap">
+        <div id="tableContainer"></div>
+        <div id="pagination" class="pagination"></div>
     </div>
+</div>
 
     <div class="card">
        <div class="btn-grid">

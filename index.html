@@ -406,13 +406,12 @@ input, select {
 #authMenu {
     position: fixed;
     top: 100px;
-    right: -140px; /* ẩn ngoài màn hình */
+    right: -120px; /* 👈 chỉ ẩn nút, CHỪA mũi tên */
     display: flex;
     align-items: center;
     transition: right 0.3s ease;
-    z-index: 2000;
+    z-index: 9999;
 }
-
 /* Khi mở */
 #authMenu.open {
     right: 0;

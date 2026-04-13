@@ -905,18 +905,83 @@ window.showSummary = function(){
     box.style.display = "block";
 
     let result = {};
+
     Object.values(rawData).forEach(x => {
         if(!result[x.ship_id]) result[x.ship_id] = { totalWorkers:0 };
         result[x.ship_id].totalWorkers += Number(x.workers);
     });
 
-    let html = "<h4>📊 Báo cáo tổng hợp</h4>";
+    // ===== DROPDOWN =====
+    let shipOptions = `<option value="all">Tất cả tàu</option>`;
+    Object.keys(result).sort().forEach(s => {
+        shipOptions += `<option value="${s}">${s}</option>`;
+    });
 
-    let labels = [];
-    let realData = [];
-    let ppDataArr = [];
+    let html = `
+        <h4>📊 Báo cáo tổng hợp</h4>
 
-    for(let s in result){
+        <label><b>🚢 Chọn tàu:</b></label>
+        <select id="summaryShipFilter" onchange="filterSummary()">
+            ${shipOptions}
+        </select>
+
+        <div id="summaryDetail" style="margin-top:10px;"></div>
+
+        <div style="margin-top:20px;">
+            <canvas id="summaryChart"></canvas>
+        </div>
+    `;
+
+    box.innerHTML = html;
+
+    // lưu cache
+    window.summaryDataCache = result;
+
+    renderSummaryChart(result);
+    renderSummaryDetail("all");
+}
+
+    window.toggleWorkHours = function(){
+        const box = document.getElementById("workHoursBox");
+        box.style.display = (box.style.display === "none") ? "block" : "none";
+        if(box.style.display === "block") {
+            renderWorkHoursInputs();
+            document.getElementById("summary").style.display = "none";
+        }
+    }
+
+   function renderWorkHoursInputs(){
+    // Lấy danh sách tàu thực tế từ shipsData thay vì ghi tay
+    let ships = Object.keys(shipsData).sort(); 
+    let html = "<table><tr><th>Tàu</th><th>Giờ PP</th><th>Lưu</th></tr>";
+    ships.forEach(s => {
+        let key = s.replace(/\s/g,'_');
+        let val = ppData[key]?.hours || "";
+        html += `<tr>
+            <td>${s}</td>
+            <td><input type="text" id="pp_${key}" value="${val.toLocaleString()}" oninput="window.formatInput(this)"></td>
+            <td><button onclick="savePP('${s}')" style="width:50px">💾</button></td>
+        </tr>`;
+    });
+    html += "</table>";
+    document.getElementById("workHoursContent").innerHTML = html;
+}
+
+window.filterSummary = function(){
+    const ship = document.getElementById("summaryShipFilter").value;
+    renderSummaryDetail(ship);
+}
+
+function renderSummaryDetail(ship){
+    const box = document.getElementById("summaryDetail");
+    const result = window.summaryDataCache;
+
+    let html = "";
+
+    Object.keys(result).forEach(s => {
+
+        if(ship !== "all" && s !== ship) return;
+
         let key = s.replace(/\s/g,'_');
         let savedPP = ppData[key]?.hours || 0;
         let realHours = result[s].totalWorkers * 8;
@@ -930,33 +995,37 @@ window.showSummary = function(){
         if(efficiency >= 100) color = "green";
         else if(efficiency >= 70) color = "orange";
 
-        html += `<div class="summary-item">
+        html += `
+        <div class="summary-item">
             <b>🚢 Tàu: ${s}</b><br>
             - Tổng nhân công: ${result[s].totalWorkers} lượt người<br>
             - Tổng giờ thực tế: ${realHours.toLocaleString()} giờ<br>
             - Giờ định mức PP: <b>${savedPP.toLocaleString()}</b> giờ<br>
-            - Hiệu quả tàu: <b style="color:${color}">${efficiency.toFixed(1)}%</b>
+            - Hiệu quả tàu: <b style="color:${color}">${efficiency.toFixed(1)} %</b>
         </div>`;
+    });
 
-        // ===== DATA CHO BIỂU ĐỒ =====
+    box.innerHTML = html;
+}
+
+    function renderSummaryChart(result){
+
+    let labels = [];
+    let realData = [];
+    let ppDataArr = [];
+
+    for(let s in result){
+        let key = s.replace(/\s/g,'_');
+        let savedPP = ppData[key]?.hours || 0;
+        let realHours = result[s].totalWorkers * 8;
+
         labels.push(s);
         realData.push(realHours);
         ppDataArr.push(savedPP);
     }
 
-    // ===== CANVAS CHO BIỂU ĐỒ =====
-    html += `
-        <div style="margin-top:20px;">
-            <canvas id="summaryChart"></canvas>
-        </div>
-    `;
-
-    box.innerHTML = html;
-
-    // ===== VẼ BIỂU ĐỒ =====
     const ctx = document.getElementById('summaryChart').getContext('2d');
 
-    // Nếu đã có chart cũ thì destroy
     if(window.myChart) {
         window.myChart.destroy();
     }
@@ -995,33 +1064,10 @@ window.showSummary = function(){
         }
     });
 }
+    
 
-    window.toggleWorkHours = function(){
-        const box = document.getElementById("workHoursBox");
-        box.style.display = (box.style.display === "none") ? "block" : "none";
-        if(box.style.display === "block") {
-            renderWorkHoursInputs();
-            document.getElementById("summary").style.display = "none";
-        }
-    }
 
-   function renderWorkHoursInputs(){
-    // Lấy danh sách tàu thực tế từ shipsData thay vì ghi tay
-    let ships = Object.keys(shipsData).sort(); 
-    let html = "<table><tr><th>Tàu</th><th>Giờ PP</th><th>Lưu</th></tr>";
-    ships.forEach(s => {
-        let key = s.replace(/\s/g,'_');
-        let val = ppData[key]?.hours || "";
-        html += `<tr>
-            <td>${s}</td>
-            <td><input type="text" id="pp_${key}" value="${val.toLocaleString()}" oninput="window.formatInput(this)"></td>
-            <td><button onclick="savePP('${s}')" style="width:50px">💾</button></td>
-        </tr>`;
-    });
-    html += "</table>";
-    document.getElementById("workHoursContent").innerHTML = html;
-}
-
+    
     window.savePP = function(shipName){
         let key = shipName.replace(/\s/g,'_');
         let val = document.getElementById("pp_" + key).value.replace(/,/g,'');

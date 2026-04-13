@@ -1031,20 +1031,23 @@ function renderSummaryDetail(ship){
     }
 
     window.myChart = new Chart(ctx, {
+        Chart.register(ChartDataLabels);
         type: 'bar',
         data: {
             labels: labels,
             datasets: [
-                {
-                    label: 'Giờ thực tế',
-                    data: realData,
-                    backgroundColor: 'rgba(26,115,232,0.7)'
-                },
-                {
-                    label: 'Giờ PP',
-                    data: ppDataArr,
-                    backgroundColor: 'rgba(52,168,83,0.7)'
-                }
+               {
+    label: 'Giờ thực tế',
+    data: realData,
+    backgroundColor: 'rgba(26,115,232,0.7)',
+    datalabels: { display: true } // 🔥 thêm
+},
+{
+    label: 'Giờ PP',
+    data: ppDataArr,
+    backgroundColor: 'rgba(52,168,83,0.7)',
+    datalabels: { display: true } // 🔥 thêm
+}
             ]
         },
         options: {
@@ -1055,6 +1058,19 @@ function renderSummaryDetail(ship){
                     display: true,
                     text: 'So sánh Giờ Công Thực Tế vs Giờ Công PP'
                 }
+                 // 🔥 THÊM ĐOẠN NÀY
+        datalabels: {
+            anchor: 'end',
+            align: 'top',
+            color: '#000',
+            font: {
+                weight: 'bold',
+                size: 12
+            },
+            formatter: function(value) {
+                return value.toLocaleString(); // format 1,000
+            }
+        }
             },
             scales: {
                 y: {

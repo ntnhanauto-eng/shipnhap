@@ -403,12 +403,13 @@ input, select {
 #marqueeBox {
     width: 100%;
     overflow: hidden;
-    background: #fff;
-    border-radius: 8px;
-    margin-bottom: 10px;
-    border: 1px solid #eee;
-}
 
+    background: transparent;   /* 🔥 trùng nền body */
+    border: none;              /* bỏ viền */
+    box-shadow: none;          /* nếu có shadow thì bỏ */
+
+    margin-bottom: 10px;
+}
 #marqueeText {
     display: inline-block;
     white-space: nowrap;

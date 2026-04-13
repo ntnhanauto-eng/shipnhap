@@ -1008,16 +1008,24 @@ if(!window.myChart){
         type: 'bar',
         data: {
             labels: [],
-            datasets: [
-                {
-                    label: 'Giờ thực tế',
-                    data: []
-                },
-                {
-                    label: 'Giờ PP',
-                    data: []
-                }
-            ]
+           datasets: [
+    {
+        label: 'Giờ thực tế',
+        data: [],
+        backgroundColor: '#1a73e8',   // xanh đậm
+        borderColor: '#0b57d0',
+        borderWidth: 2,
+        borderRadius: 6
+    },
+    {
+        label: 'Giờ PP',
+        data: [],
+        backgroundColor: '#34a853',   // xanh lá đậm
+        borderColor: '#1e7e34',
+        borderWidth: 2,
+        borderRadius: 6
+    }
+]
         },
         options: {
             responsive: true,
@@ -1028,9 +1036,24 @@ if(!window.myChart){
                     text: 'So sánh Giờ Công'
                 }
             },
-            scales: {
-                y: { beginAtZero: true }
-            }
+           scales: {
+    y: {
+        beginAtZero: true,
+        ticks: {
+            color: '#000',   // chữ đậm
+            font: { weight: 'bold' }
+        },
+        grid: {
+            color: 'rgba(0,0,0,0.1)' // lưới nhẹ
+        }
+    },
+    x: {
+        ticks: {
+            color: '#000',
+            font: { weight: 'bold' }
+        }
+    }
+}
         }
     });
 }

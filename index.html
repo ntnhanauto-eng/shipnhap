@@ -401,56 +401,7 @@ input, select {
 }
 */
 
-
-/* ===== MENU ADMIN TRƯỢT ===== */
-#authMenu {
-    position: fixed;
-    top: 100px;
-    right: -110px; /* 👈 chỉ ẩn nút, CHỪA mũi tên */
-    display: flex;
-    align-items: center;
-    transition: right 0.3s ease;
-    z-index: 9999;
-}
-/* Khi mở */
-#authMenu.open {
-    right: 0;
-}
-
-/* Mũi tên */
-#authToggle {
-    width: 22px;
-    height: 40px;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    background: #28a745;
-    color: #fff;
-
-    font-size: 14px;
-    font-weight: bold;
-
-    border-radius: 6px 0 0 6px;
-    cursor: pointer;
-
-    box-shadow: 0 0 4px rgba(0,0,0,0.2);
-}
-
-/* Nút login */
-#authBtn {
-    width: 140px;
-    padding: 10px;
-    font-size: 13px;
-    background: #28a745;
-    color: white;
-    border: none;
-    border-radius: 0 8px 8px 0;
-}
-
-
-        
+       
         
     </style>
 </head>
@@ -458,10 +409,7 @@ input, select {
 
     <div class="header-container">
         <h2>🚢 E/R CASING</h2>
-        <div id="authMenu">
-   <div id="authToggle" onclick="toggleAuthMenu()">❯</div>
-    <button id="authBtn" onclick="handleAuth()">🔐 Admin</button>
-</div>
+        <button id="authBtn" onclick="handleAuth()">🔐 Admin Đăng Nhập</button>
     </div>
     
     <div class="card admin-only">
@@ -1287,27 +1235,6 @@ window.changePage = function(page) {
     renderPagination();
 
     window.scrollTo(0, 0); // scroll lên đầu
-}
-
-let authTimeout = null;
-
-window.toggleAuthMenu = function() {
-    const menu = document.getElementById("authMenu");
-    const arrow = document.getElementById("authToggle");
-
-    menu.classList.toggle("open");
-
-    // đổi hướng mũi tên
-    arrow.innerText = menu.classList.contains("open") ? "❮" : "❯";
-
-    if (authTimeout) clearTimeout(authTimeout);
-
-    if (menu.classList.contains("open")) {
-        authTimeout = setTimeout(() => {
-            menu.classList.remove("open");
-            arrow.innerText = "❯";
-        }, 5000);
-    }
 }
     
     

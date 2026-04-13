@@ -406,7 +406,7 @@ input, select {
 #authMenu {
     position: fixed;
     top: 100px;
-    right: -120px; /* 👈 chỉ ẩn nút, CHỪA mũi tên */
+    right: -110px; /* 👈 chỉ ẩn nút, CHỪA mũi tên */
     display: flex;
     align-items: center;
     transition: right 0.3s ease;
@@ -419,8 +419,23 @@ input, select {
 
 /* Mũi tên */
 #authToggle {
-    width: 30px;
-    text-align: center;
+    width: 22px;
+    height: 40px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    background: #28a745;
+    color: #fff;
+
+    font-size: 14px;
+    font-weight: bold;
+
+    border-radius: 6px 0 0 6px;
+    cursor: pointer;
+
+    box-shadow: 0 0 4px rgba(0,0,0,0.2);
 }
 
 /* Nút login */
@@ -444,7 +459,7 @@ input, select {
     <div class="header-container">
         <h2>🚢 E/R CASING</h2>
         <div id="authMenu">
-    <div id="authToggle" onclick="toggleAuthMenu()">➤</div>
+   <div id="authToggle" onclick="toggleAuthMenu()">❯</div>
     <button id="authBtn" onclick="handleAuth()">🔐 Admin</button>
 </div>
     </div>
@@ -1278,21 +1293,19 @@ let authTimeout = null;
 
 window.toggleAuthMenu = function() {
     const menu = document.getElementById("authMenu");
+    const arrow = document.getElementById("authToggle");
 
-    // Toggle mở
     menu.classList.toggle("open");
 
-    // Đổi mũi tên
-    document.getElementById("authToggle").innerText =
-        menu.classList.contains("open") ? "➤" : "➤";
+    // đổi hướng mũi tên
+    arrow.innerText = menu.classList.contains("open") ? "❮" : "❯";
 
-    // Clear timeout cũ
     if (authTimeout) clearTimeout(authTimeout);
 
-    // Nếu đang mở → auto đóng sau 5s
     if (menu.classList.contains("open")) {
         authTimeout = setTimeout(() => {
             menu.classList.remove("open");
+            arrow.innerText = "❯";
         }, 5000);
     }
 }

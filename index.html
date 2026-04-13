@@ -401,30 +401,7 @@ input, select {
 }
 */
 
-  <style>
-/* ... các style cũ ... */
-.auth-wrapper {
-    position: fixed;
-    top: 80px; 
-    right: -120px; /* Ẩn ra khỏi màn hình */
-    transition: right 0.5s ease;
-    z-index: 9999;
-}
-.auth-wrapper.active {
-    right: 10px; /* Vị trí hiện ra */
-}
-#authBtn {
-    width: 120px;
-    padding: 12px;
-    background: #34a853; /* Màu xanh lá truyền thống */
-    color: white;
-    border: none;
-    border-radius: 20px 0 0 20px;
-    cursor: pointer;
-    box-shadow: -2px 2px 10px rgba(0,0,0,0.2);
-    font-weight: bold;
-}
-</style>     
+       
         
     </style>
 </head>
@@ -432,9 +409,7 @@ input, select {
 
     <div class="header-container">
         <h2>🚢 E/R CASING</h2>
-        <div id="authContainer" class="auth-wrapper">
-    <button id="authBtn" onclick="handleAuth()">🔐 Đăng Nhập</button>
-</div>
+        <button id="authBtn" onclick="handleAuth()">🔐 Admin Đăng Nhập</button>
     </div>
     
     <div class="card admin-only">
@@ -560,39 +535,6 @@ document.getElementById("date").value = `${yyyy}-${mm}-${dd}`;
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getDatabase, ref, push, onValue, remove, update, set } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
     import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-
-
-    let autoHideTimer;
-
-// Hàm cập nhật trạng thái menu
-function updateAuthMenuVisibility(user) {
-    const container = document.getElementById("authContainer");
-    const btn = document.getElementById("authBtn");
-
-    if (user) {
-        // ĐÃ ĐĂNG NHẬP: Hiện cố định, đổi màu nút sang đỏ để Boss nhận diện
-        container.classList.add("active");
-        btn.innerText = "🔒 Đăng Xuất";
-        btn.style.background = "#d93025"; 
-        clearTimeout(autoHideTimer);
-    } else {
-        // CHƯA ĐĂNG NHẬP: Ẩn vào, hiện ra nhắc 5 giây rồi ẩn
-        btn.innerText = "🔐 Đăng Nhập";
-        btn.style.background = "#34a853";
-        
-        // Hiện ra sau 1 giây
-        setTimeout(() => {
-            container.classList.add("active");
-            // Tự ẩn sau 5 giây
-            autoHideTimer = setTimeout(() => {
-                container.classList.remove("active");
-            }, 5000);
-        }, 1000);
-    }
-}
-
-// Gọi hàm khi trạng thái đăng nhập thay đổi (Sử dụng Firebase Auth)
-
 
     const firebaseConfig = {
   apiKey: "AIzaSyCdBCy8ttrdcfQoSPr3nNmsynmBtnkYv0o",
@@ -1294,9 +1236,7 @@ window.changePage = function(page) {
 
     window.scrollTo(0, 0); // scroll lên đầu
 }
-onAuthStateChanged(auth, (user) => {
-    updateAuthMenuVisibility(user);
-});    
+    
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

@@ -400,7 +400,33 @@ input, select {
     border-top: 1px solid #ddd;
 }
 */
+#marqueeBox {
+    width: 100%;
+    overflow: hidden;
+    background: #fff;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    border: 1px solid #eee;
+}
 
+#marqueeText {
+    display: inline-block;
+    white-space: nowrap;
+    color: red;
+    font-weight: bold;
+    padding: 8px 0;
+    animation: marqueeMove 12s linear infinite;
+}
+
+/* chạy từ phải → trái */
+@keyframes marqueeMove {
+    0% {
+        transform: translateX(100%);
+    }
+    100% {
+        transform: translateX(-100%);
+    }
+}
        
         
     </style>
@@ -408,6 +434,9 @@ input, select {
 <body id="mainBody">
 
     <div class="header-container">
+        <div id="marqueeBox">
+    <div id="marqueeText"></div>
+</div>
         <h2>🚢 E/R CASING</h2>
         <button id="authBtn" onclick="handleAuth()">🔐 Admin Đăng Nhập</button>
     </div>
@@ -1292,7 +1321,28 @@ window.changePage = function(page) {
 
     window.scrollTo(0, 0); // scroll lên đầu
 }
-    
+
+
+
+    // ===== TEXT CHẠY RANDOM =====
+const messages = [
+    "🔥 An toàn là trên hết!",
+    "🚢 Hoàn thành đúng tiến độ!",
+    "💪 Làm việc hiệu quả - tiết kiệm giờ công!",
+    "⚙️ Kiểm tra kỹ trước khi bàn giao!",
+    "📅 PLAN rõ ràng - công việc trôi chảy!"
+];
+
+function initMarquee() {
+    const randomText = messages[Math.floor(Math.random() * messages.length)];
+    const el = document.getElementById("marqueeText");
+    if (el) {
+        el.innerText = randomText;
+    }
+}
+
+// chạy khi load
+initMarquee();
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

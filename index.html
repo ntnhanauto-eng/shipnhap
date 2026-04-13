@@ -1478,11 +1478,11 @@ function renderProgressInputs(){
     let ships = Object.keys(shipsData).sort();
 
     let html = `
-<table>
+<table style="width:100%; table-layout:fixed;">
 <tr>
-    <th style="width:70px">Tàu</th>
-    <th style="width:80px">% Tiến độ</th>
-    <th style="width:60px">Lưu</th>
+    <th style="width:80px;">Tàu</th>
+    <th style="width:90px;">% Tiến độ</th>
+    <th style="width:60px;">Lưu</th>
 </tr>`;
 
     ships.forEach(s => {
@@ -1490,11 +1490,18 @@ function renderProgressInputs(){
         let val = progressData[key]?.percent || "";
 
         html += `<tr>
-            <td>${s}</td>
+            <td style="
+    width:80px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+">
+    ${s}
+</td>
             <td>
-                <input type="number" min="0" max="100"
-    style="width:70px; text-align:center;"
-                    id="progress_${key}" value="${val}">
+               <input type="number" min="0" max="100"
+    id="progress_${key}" value="${val}"
+    style="width:80px; text-align:center;">
             </td>
             <td>
                 <button onclick="saveProgress('${s}')" style="width:50px">💾</button>

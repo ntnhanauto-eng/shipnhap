@@ -550,18 +550,17 @@ input, select {
     <div class="flex">
         <input type="text" id="newShipName" placeholder="Nhập tên tàu mới (VD: S580)">
         <button onclick="addShip()">➕ Thêm Tàu</button>
-    </div>
-
-            
+    </div>           
+    <div id="shipListContent" style="margin-top:10px; overflow-x:auto;"></div>
+</div>
+               
 <div id="progressBox" class="card admin-only" style="display:none; margin-top:15px;">
     <h4>📌 Nhập tiến độ thực tế (%)</h4>
     <div id="progressContent"></div>
 </div>
        
 
-            
-    <div id="shipListContent" style="margin-top:10px; overflow-x:auto;"></div>
-</div>
+        
     </div>
 
 <script type="module">

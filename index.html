@@ -1468,17 +1468,43 @@ function renderProgressInputs(){
 }
 
 
-    window.saveProgress = function(shipName){
+   window.saveProgress = function(shipName){
     let key = shipName.replace(/\s/g,'_');
-    let val = document.getElementById("progress_" + key).value;
 
-    if(val === "") return alert("Nhập %!");
+    let input = document.getElementById("progress_" + key);
+    if(!input) {
+        alert("Không tìm thấy ô nhập!");
+        return;
+    }
 
+    let val = input.value.trim();
+
+    // kiểm tra rỗng
+    if(val === ""){
+        alert("Vui lòng nhập % tiến độ!");
+        return;
+    }
+
+    // chuyển sang số
+    val = Number(val);
+
+    // kiểm tra hợp lệ
+    if(isNaN(val) || val < 0 || val > 100){
+        alert("Giá trị phải từ 0 → 100!");
+        return;
+    }
+
+    // lưu Firebase
     set(ref(db, "progress/" + key), {
         ship: shipName,
-        percent: Number(val)
-    }).then(() => {
-        alert("Đã lưu tiến độ cho " + shipName);
+        percent: val
+    })
+    .then(() => {
+        alert("✅ Đã lưu tiến độ cho " + shipName);
+    })
+    .catch(err => {
+        console.error(err);
+        alert("❌ Lỗi lưu dữ liệu!");
     });
 }
 

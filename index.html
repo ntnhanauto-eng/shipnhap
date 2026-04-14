@@ -1007,7 +1007,6 @@ const ctx = document.getElementById('summaryChart').getContext('2d');
 if(!window.myChart){
     window.myChart = new Chart(ctx, {
         type: 'bar',
-         plugins: [ChartDataLabels],
         data: {
             labels: [],
            datasets: [
@@ -1038,21 +1037,6 @@ if(!window.myChart){
                     text: 'So sánh Giờ Công'
                 }
             },
-
-            datalabels: {
-                anchor: 'end',
-                align: 'top',
-                color: '#000',
-                font: {
-                    weight: 'bold',
-                    size: 12
-                },
-                formatter: function(value) {
-                    return value.toLocaleString(); // format 1,000
-                }
-            }
-        },
-            
            scales: {
     y: {
         beginAtZero: true,
@@ -1173,7 +1157,81 @@ let checkedText = checkedItems.length > 0
     box.innerHTML = html;
 }
 
-    
+    function renderSummaryChart(result){
+        Chart.register(ChartDataLabels);
+
+    let labels = [];
+    let realData = [];
+    let ppDataArr = [];
+
+    for(let s in result){
+        let key = s.replace(/\s/g,'_');
+        let savedPP = ppData[key]?.hours || 0;
+        let realHours = result[s].totalWorkers * 8;
+
+        labels.push(s);
+        realData.push(realHours);
+        ppDataArr.push(savedPP);
+    }
+
+    const ctx = document.getElementById('summaryChart').getContext('2d');
+
+    if(window.myChart) {
+        window.myChart.destroy();
+    }
+
+    window.myChart = new Chart(ctx, {
+        
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+              {
+    label: 'Giờ thực tế',
+    data: realData,
+    backgroundColor: 'rgba(26,115,232,1)',
+    borderColor: '#1a73e8',
+    borderWidth: 2
+},
+{
+    label: 'Giờ PP',
+    data: ppDataArr,
+    backgroundColor: 'rgba(52,168,83,1)',
+    borderColor: '#34a853',
+    borderWidth: 2
+}
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { position: 'top' },
+                title: {
+                    display: true,
+                    text: 'So sánh Giờ Công Thực Tế vs Giờ Công PP'
+                },
+                 // 🔥 THÊM ĐOẠN NÀY
+        datalabels: {
+            anchor: 'end',
+            align: 'top',
+            color: '#000',
+            font: {
+                weight: 'bold',
+                size: 12
+            },
+            formatter: function(value) {
+                return value.toLocaleString(); // format 1,000
+            }
+        }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+}
     
 
 

@@ -483,27 +483,68 @@ input, select {
     resize: none;        /* không cho kéo tay */
     line-height: 1.4;
 }
-    /* 📦 Vật tư - viền xanh lá */
+   /* 📦 Vật tư */
 .mat-box {
     border: 2px solid #34a853;
-    box-shadow: 0 0 5px rgba(52,168,83,0.3);
+    border-radius: 10px;
+    
+    background: #fff;
+
+    /* 🔥 đổ bóng nhẹ, nổi khung */
+    box-shadow: 
+        0 2px 6px rgba(0,0,0,0.08),
+        0 0 4px rgba(52,168,83,0.2);
+
+    transition: all 0.25s ease;
 }
 
-/* 📝 Ghi chú - xanh đậm */
+/* 📝 Ghi chú */
 .note-box {
     border: 2px solid #1a73e8;
-    box-shadow: 0 0 5px rgba(26,115,232,0.3);
+    border-radius: 10px;
+
+    background: #fff;
+
+    box-shadow: 
+        0 2px 6px rgba(0,0,0,0.08),
+        0 0 4px rgba(26,115,232,0.2);
+
+    transition: all 0.25s ease;
+}
+    .mat-box:hover {
+    box-shadow: 
+        0 6px 15px rgba(52,168,83,0.25),
+        0 0 6px rgba(52,168,83,0.3);
+
+    transform: translateY(-2px);
+}
+
+.note-box:hover {
+    box-shadow: 
+        0 6px 15px rgba(26,115,232,0.25),
+        0 0 6px rgba(26,115,232,0.3);
+
+    transform: translateY(-2px);
 }
 
    .mat-box:focus {
     border-color: #2e7d32;
-    box-shadow: 0 0 8px rgba(52,168,83,0.6);
+    box-shadow: 
+        0 0 0 2px rgba(52,168,83,0.2),
+        0 6px 18px rgba(52,168,83,0.35);
+
+    outline: none;
 }
 
 .note-box:focus {
     border-color: #0b57d0;
-    box-shadow: 0 0 8px rgba(26,115,232,0.6);
+    box-shadow: 
+        0 0 0 2px rgba(26,115,232,0.2),
+        0 6px 18px rgba(26,115,232,0.35);
+
+    outline: none;
 }     
+        
 
         
         

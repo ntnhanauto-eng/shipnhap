@@ -1681,13 +1681,14 @@ function renderProgressInputs(){
     function renderChecklistInputs(){
     let ships = Object.keys(shipsData).sort();
 
-    let html = `
-<table style="width:100%; table-layout:fixed;">
+   let html = `
+<div style="overflow-x:auto;">
+<table style="min-width:450px; width:100%; border-collapse:collapse;">
 <tr>
     <th style="width:80px;">Tàu</th>
-    <th>Hạng mục kiểm tra (cách nhau dấu ,)</th>
+    <th style="min-width:200px;">Hạng mục kiểm tra</th>
     <th style="width:60px;">Lưu</th>
-</tr>`;
+</tr>
 
     ships.forEach(s => {
         let key = s.replace(/\s/g,'_');
@@ -1696,7 +1697,14 @@ function renderProgressInputs(){
         html += `<tr>
             <td>${s}</td>
             <td>
-                <input type="text" id="check_${key}" value="${val}">
+               <input type="text" id="check_${key}" value="${val}" 
+style="
+    width:100%;
+    min-width:150px;
+    box-sizing:border-box;
+    font-size:13px;
+    padding:6px;
+">
             </td>
             <td>
                 <button onclick="saveChecklist('${s}')">💾</button>
@@ -1704,9 +1712,9 @@ function renderProgressInputs(){
         </tr>`;
     });
 
-    html += "</table>";
+  html += "</table></div>";
 
-    document.getElementById("checklistContent").innerHTML = html;
+document.getElementById("checklistContent").innerHTML = html;
 }
 
     window.saveChecklist = function(shipName){

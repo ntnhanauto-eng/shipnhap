@@ -573,6 +573,7 @@ input, select {
     <button id="btnSummary" onclick="handleButton('summary')">📊 Xem BÁO CÁO</button>
     <button id="btnProgress" class="admin-only" onclick="handleButton('progress')">📌 Nhập tiến độ tàu</button>
      <button id="btnChecklist" class="admin-only" onclick="handleButton('checklist')">📋 Mục kiểm tra</button>
+    <button id="btnExtra" onclick="handleButton('extra')">📦 Vật tư & Ghi chú</button>
 </div>
         
         <div id="summary" style="display:none; margin-top:15px;"></div>
@@ -598,7 +599,16 @@ input, select {
     <h4>📋 Nhập hạng mục kiểm tra</h4>
     <div id="checklistContent"></div>
 </div>    
+<div id="extraBox" class="card" style="display:none; margin-top:15px;">
+    <h4>📦 Vật tư & 📝 Ghi chú</h4>
 
+    <label><b>🚢 Chọn tàu:</b></label>
+    <select id="extraShip" onchange="renderExtraDetail()">
+        <option value="">-- Chọn tàu --</option>
+    </select>
+
+    <div id="extraDetail" style="margin-top:15px;"></div>
+</div>
         
     </div>
 
@@ -796,6 +806,12 @@ function renderShipManagerList() {
         ppData = snapshot.val() || {};
         if(document.getElementById("summary").style.display === "block") showSummary();
     });
+
+    let extraData = {};
+
+onValue(ref(db, "shipExtra"), snapshot => {
+    extraData = snapshot.val() || {};
+});
 
     window.applyFilter = function(){
         const from = document.getElementById("fromDate").value;
@@ -1471,6 +1487,9 @@ document.querySelectorAll("input, select").forEach(el => {
     const checklistBox = document.getElementById("checklistBox");
     const btnChecklist = document.getElementById("btnChecklist");
 
+   const extraBox = document.getElementById("extraBox");
+   const btnExtra = document.getElementById("btnExtra");
+
     // ===== EXPORT (không toggle)
     if(type === "export") {
         exportExcel();
@@ -1502,6 +1521,10 @@ document.querySelectorAll("input, select").forEach(el => {
     currentBox = checklistBox;
     currentBtn = btnChecklist;
 }
+    if(type === "extra") {
+    currentBox = extraBox;
+    currentBtn = btnExtra;
+}
 
     // ===== KIỂM TRA TRẠNG THÁI TRƯỚC
     let isOpen = currentBox.style.display === "block";
@@ -1512,6 +1535,7 @@ document.querySelectorAll("input, select").forEach(el => {
     shipBox.style.display = "none";
     progressBox.style.display = "none";
     checklistBox.style.display = "none";
+    extraBox.style.display = "none";
 
     document.querySelectorAll(".btn-grid button").forEach(btn => {
         btn.classList.remove("btn-active");
@@ -1530,6 +1554,7 @@ document.querySelectorAll("input, select").forEach(el => {
     if(type === "ships") renderShipManagerList();
     if(type === "progress") renderProgressInputs();
     if(type === "checklist") renderChecklistInputs();
+    if(type === "extra") renderExtraSelect();
 }
 
 function renderPagination() {
@@ -1779,6 +1804,73 @@ function updateChartData(result, selectedShip){
         }
     });
 });
+
+function renderExtraSelect(){
+    let ships = Object.keys(shipsData).sort();
+
+    let html = `<option value="">-- Chọn tàu --</option>`;
+    ships.forEach(s => {
+        html += `<option value="${s}">${s}</option>`;
+    });
+
+    document.getElementById("extraShip").innerHTML = html;
+    document.getElementById("extraDetail").innerHTML = "";
+}
+window.renderExtraDetail = function(){
+
+    const ship = document.getElementById("extraShip").value;
+    if(!ship) return;
+
+    let materials = (extraData[ship]?.materials || []).join("\n");
+    let notes = (extraData[ship]?.notes || []).join("\n");
+
+    let readonly = isAdmin ? "" : "readonly";
+
+    let html = `
+    <div style="margin-bottom:20px;">
+        <h4>📦 Vật tư</h4>
+        <textarea id="matBox" ${readonly}
+            style="width:100%; height:100px;">${materials}</textarea>
+
+        ${isAdmin ? `<button onclick="saveMaterial()">💾 Lưu vật tư</button>` : ""}
+    </div>
+
+    <div>
+        <h4>📝 Ghi chú</h4>
+        <textarea id="noteBox" ${readonly}
+            style="width:100%; height:100px;">${notes}</textarea>
+
+        ${isAdmin ? `<button onclick="saveNote()">💾 Lưu ghi chú</button>` : ""}
+    </div>
+    `;
+
+    document.getElementById("extraDetail").innerHTML = html;
+}
+
+    window.saveMaterial = function(){
+    const ship = document.getElementById("extraShip").value;
+    let val = document.getElementById("matBox").value;
+
+    let arr = val.split("\n").map(x => x.trim()).filter(x => x);
+
+    set(ref(db, "shipExtra/" + ship), {
+        ...extraData[ship],
+        materials: arr
+    }).then(()=> alert("✅ Đã lưu vật tư"));
+}
+
+window.saveNote = function(){
+    const ship = document.getElementById("extraShip").value;
+    let val = document.getElementById("noteBox").value;
+
+    let arr = val.split("\n").map(x => x.trim()).filter(x => x);
+
+    set(ref(db, "shipExtra/" + ship), {
+        ...extraData[ship],
+        notes: arr
+    }).then(()=> alert("✅ Đã lưu ghi chú"));
+}
+    
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

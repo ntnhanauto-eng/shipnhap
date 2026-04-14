@@ -1019,7 +1019,7 @@ setTimeout(() => {
         window.myChart.destroy();
         window.myChart = null;
     }
-
+   Chart.register(ChartDataLabels);
     // 🔥 Tạo chart mới
     window.myChart = new Chart(ctx, {
         type: 'bar',
@@ -1044,17 +1044,36 @@ setTimeout(() => {
                 }
             ]
         },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { position: 'top' },
-                title: {
-                    display: true,
-                    text: 'So sánh Giờ Công'
-                }
+      options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+        legend: { position: 'top' },
+        title: {
+            display: true,
+            text: 'So sánh Giờ Công'
+        },
+
+        // 🔥 HIỂN THỊ SỐ TRÊN CỘT
+        datalabels: {
+            anchor: 'end',   // vị trí trên đỉnh cột
+            align: 'top',
+            color: '#000',
+            font: {
+                weight: 'bold',
+                size: 12
+            },
+            formatter: function(value) {
+                return value.toLocaleString(); // 1000 -> 1,000
             }
         }
+    },
+    scales: {
+        y: {
+            beginAtZero: true
+        }
+    }
+}
     });
 
 }, 200);

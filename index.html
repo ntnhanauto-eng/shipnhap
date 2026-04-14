@@ -472,7 +472,14 @@ input, select {
     resize: none;        /* không cho kéo tay */
     line-height: 1.4;
 }
-
+   .auto-textarea {
+    width: 100%;
+    min-height: 100px;   /* min như hiện tại */
+    max-height: 500px;   /* max */
+    overflow-y: auto;    /* scroll khi vượt */
+    resize: none;        /* không cho kéo tay */
+    line-height: 1.4;
+}
         
     </style>
 </head>
@@ -1865,6 +1872,20 @@ window.renderExtraDetail = function(){
 
     document.getElementById("extraDetail").innerHTML = html;
     document.getElementById("extraDetail").innerHTML = html;
+    setTimeout(() => {
+    const matBox = document.getElementById("matBox");
+    const noteBox = document.getElementById("noteBox");
+
+    if (matBox) {
+        autoResizeTextarea(matBox);
+        matBox.addEventListener("input", () => autoResizeTextarea(matBox));
+    }
+
+    if (noteBox) {
+        autoResizeTextarea(noteBox);
+        noteBox.addEventListener("input", () => autoResizeTextarea(noteBox));
+    }
+}, 0);
 
 // 🔥 GẮN AUTO RESIZE TẠI ĐÂY
 setTimeout(() => {
@@ -1907,7 +1928,15 @@ window.saveNote = function(){
     }).then(()=> alert("✅ Đã lưu ghi chú"));
 }
  
-    
+ function autoResizeTextarea(el) {
+    el.style.height = "auto"; // reset
+    el.style.height = el.scrollHeight + "px";
+
+    // nếu vượt 500px thì fix lại
+    if (el.scrollHeight > 500) {
+        el.style.height = "500px";
+    }
+}   
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
     

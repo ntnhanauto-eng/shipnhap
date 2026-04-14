@@ -1750,7 +1750,7 @@ function updateChartData(result, selectedShip){
         signOut(auth).then(() => {
             location.reload();
         });
-    }, 3600000); // 1 giờ
+    }, 60000); // 1 giờ
 }
 
 ["click", "keydown", "mousemove"].forEach(event => {

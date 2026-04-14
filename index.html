@@ -1746,11 +1746,11 @@ function updateChartData(result, selectedShip){
 
     // Set logout sau 1 giờ = 3600000 ms
     logoutTimer = setTimeout(() => {
-        alert("🔒 Phiên đăng nhập đã hết hạn (1 giờ). Vui lòng đăng nhập lại!");
+        alert("🔒 Phiên đăng nhập đã hết hạn!");
         signOut(auth).then(() => {
             location.reload();
         });
-    }, 60000); // 1 giờ
+    }, 300000); // 5 phút
 }
 
 ["click", "keydown", "mousemove"].forEach(event => {

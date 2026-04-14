@@ -600,6 +600,7 @@ input, select {
     </div>
 
 <script type="module">
+    let logoutTimer = null;
     // Thay vì valueAsDate, dùng cách thủ công để định dạng chắc chắn là YYYY-MM-DD
 const today = new Date();
 const yyyy = today.getFullYear();
@@ -743,6 +744,7 @@ function renderShipManagerList() {
             body.classList.add("is-admin");
             btn.innerText = "🔐 Thoát Admin";
             btn.classList.add("logout-mode");
+            startAutoLogout();
         } else {
             isAdmin = false;
             body.classList.remove("is-admin");
@@ -1734,7 +1736,30 @@ function updateChartData(result, selectedShip){
 
     window.myChart.update();
 }
-    
+
+    function startAutoLogout() {
+
+    // Xóa timer cũ nếu có
+    if (logoutTimer) {
+        clearTimeout(logoutTimer);
+    }
+
+    // Set logout sau 1 giờ = 3600000 ms
+    logoutTimer = setTimeout(() => {
+        alert("🔒 Phiên đăng nhập đã hết hạn (1 giờ). Vui lòng đăng nhập lại!");
+        signOut(auth).then(() => {
+            location.reload();
+        });
+    }, 3600000); // 1 giờ
+}
+
+["click", "keydown", "mousemove"].forEach(event => {
+    document.addEventListener(event, () => {
+        if (isAdmin) {
+            startAutoLogout(); // reset lại 1h
+        }
+    });
+});
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

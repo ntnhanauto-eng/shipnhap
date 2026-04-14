@@ -1880,21 +1880,21 @@ window.renderExtraDetail = function(){
 
     let readonly = isAdmin ? "" : "readonly";
 
-    let html = `
+   let html = `
     <div style="margin-bottom:20px;">
         <h4>📦 Vật tư</h4>
-      <textarea id="matBox" class="auto-textarea mat-box" ${readonly}></textarea>
+        <textarea id="matBox" class="auto-textarea mat-box" ${readonly}>${materials}</textarea>
 
         ${isAdmin ? `<button onclick="saveMaterial()">💾 Lưu vật tư</button>` : ""}
     </div>
 
     <div>
         <h4>📝 Ghi chú</h4>
-      <textarea id="noteBox" class="auto-textarea note-box" ${readonly}></textarea>
+        <textarea id="noteBox" class="auto-textarea note-box" ${readonly}>${notes}</textarea>
 
         ${isAdmin ? `<button onclick="saveNote()">💾 Lưu ghi chú</button>` : ""}
     </div>
-    `;
+`;
 
     document.getElementById("extraDetail").innerHTML = html;
     document.getElementById("extraDetail").innerHTML = html;

@@ -464,6 +464,15 @@ input, select {
     width: 100% !important;
     height: 300px !important;
 }    
+  .auto-textarea {
+    width: 100%;
+    min-height: 100px;   /* min như hiện tại */
+    max-height: 500px;   /* max */
+    overflow-y: auto;    /* scroll khi vượt */
+    resize: none;        /* không cho kéo tay */
+    line-height: 1.4;
+}
+
         
     </style>
 </head>
@@ -1816,6 +1825,18 @@ function renderExtraSelect(){
     document.getElementById("extraShip").innerHTML = html;
     document.getElementById("extraDetail").innerHTML = "";
 }
+
+    function autoResizeTextarea(el) {
+    el.style.height = "auto"; // reset
+    el.style.height = el.scrollHeight + "px";
+
+    // nếu vượt 500px thì fix lại
+    if (el.scrollHeight > 500) {
+        el.style.height = "500px";
+    }
+}  
+
+    
 window.renderExtraDetail = function(){
 
     const ship = document.getElementById("extraShip").value;
@@ -1829,22 +1850,37 @@ window.renderExtraDetail = function(){
     let html = `
     <div style="margin-bottom:20px;">
         <h4>📦 Vật tư</h4>
-        <textarea id="matBox" ${readonly}
-            style="width:100%; height:100px;">${materials}</textarea>
+       <textarea id="matBox" class="auto-textarea" ${readonly}>${materials}</textarea>
 
         ${isAdmin ? `<button onclick="saveMaterial()">💾 Lưu vật tư</button>` : ""}
     </div>
 
     <div>
         <h4>📝 Ghi chú</h4>
-        <textarea id="noteBox" ${readonly}
-            style="width:100%; height:100px;">${notes}</textarea>
+       <textarea id="noteBox" class="auto-textarea" ${readonly}>${notes}</textarea>
 
         ${isAdmin ? `<button onclick="saveNote()">💾 Lưu ghi chú</button>` : ""}
     </div>
     `;
 
     document.getElementById("extraDetail").innerHTML = html;
+    document.getElementById("extraDetail").innerHTML = html;
+
+// 🔥 GẮN AUTO RESIZE TẠI ĐÂY
+setTimeout(() => {
+    const matBox = document.getElementById("matBox");
+    const noteBox = document.getElementById("noteBox");
+
+    if (matBox) {
+        autoResizeTextarea(matBox);
+        matBox.addEventListener("input", () => autoResizeTextarea(matBox));
+    }
+
+    if (noteBox) {
+        autoResizeTextarea(noteBox);
+        noteBox.addEventListener("input", () => autoResizeTextarea(noteBox));
+    }
+}, 0);
 }
 
     window.saveMaterial = function(){
@@ -1870,7 +1906,7 @@ window.saveNote = function(){
         notes: arr
     }).then(()=> alert("✅ Đã lưu ghi chú"));
 }
-    
+ 
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

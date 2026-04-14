@@ -460,7 +460,10 @@ input, select {
         transform: translateX(-100%);
     }
 }
-       
+   #summaryChart {
+    width: 100% !important;
+    height: 300px !important;
+}    
         
     </style>
 </head>
@@ -1004,64 +1007,57 @@ document.getElementById("summaryDetail").innerHTML =
     "<i>👉 Vui lòng chọn tàu để xem báo cáo</i>";
 
 // 👉 tạo chart rỗng (CHỈ TẠO 1 LẦN)
-const ctx = document.getElementById('summaryChart').getContext('2d');
+setTimeout(() => {
 
-if(!window.myChart){
+    const canvas = document.getElementById('summaryChart');
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+
+    // 🔥 Nếu đã có chart → destroy trước
+    if (window.myChart) {
+        window.myChart.destroy();
+        window.myChart = null;
+    }
+
+    // 🔥 Tạo chart mới
     window.myChart = new Chart(ctx, {
         type: 'bar',
         data: {
             labels: [],
-           datasets: [
-    {
-        label: 'Giờ thực tế',
-        data: [],
-        backgroundColor: '#1a73e8',   // xanh đậm
-        borderColor: '#0b57d0',
-        borderWidth: 2,
-        borderRadius: 6
-    },
-    {
-        label: 'Giờ PP',
-        data: [],
-        backgroundColor: '#34a853',   // xanh lá đậm
-        borderColor: '#1e7e34',
-        borderWidth: 2,
-        borderRadius: 6
-    }
-]
+            datasets: [
+                {
+                    label: 'Giờ thực tế',
+                    data: [],
+                    backgroundColor: '#1a73e8',
+                    borderColor: '#0b57d0',
+                    borderWidth: 2,
+                    borderRadius: 6
+                },
+                {
+                    label: 'Giờ PP',
+                    data: [],
+                    backgroundColor: '#34a853',
+                    borderColor: '#1e7e34',
+                    borderWidth: 2,
+                    borderRadius: 6
+                }
+            ]
         },
         options: {
             responsive: true,
+            maintainAspectRatio: false,
             plugins: {
                 legend: { position: 'top' },
                 title: {
                     display: true,
                     text: 'So sánh Giờ Công'
                 }
-            },
-           scales: {
-    y: {
-        beginAtZero: true,
-        ticks: {
-            color: '#000',   // chữ đậm
-            font: { weight: 'bold' }
-        },
-        grid: {
-            color: 'rgba(0,0,0,0.1)' // lưới nhẹ
-        }
-    },
-    x: {
-        ticks: {
-            color: '#000',
-            font: { weight: 'bold' }
-        }
-    }
-}
+            }
         }
     });
-}
-}
 
+}, 200);
     window.toggleWorkHours = function(){
         const box = document.getElementById("workHoursBox");
         box.style.display = (box.style.display === "none") ? "block" : "none";
@@ -1711,7 +1707,7 @@ function renderProgressInputs(){
 }
 
 function updateChartData(result, selectedShip){
-
+     if (!window.myChart) return;
     let labels = [];
     let realData = [];
     let ppDataArr = [];

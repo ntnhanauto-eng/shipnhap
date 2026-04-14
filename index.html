@@ -1007,6 +1007,7 @@ const ctx = document.getElementById('summaryChart').getContext('2d');
 if(!window.myChart){
     window.myChart = new Chart(ctx, {
         type: 'bar',
+         plugins: [ChartDataLabels],
         data: {
             labels: [],
            datasets: [
@@ -1037,6 +1038,21 @@ if(!window.myChart){
                     text: 'So sánh Giờ Công'
                 }
             },
+
+            datalabels: {
+                anchor: 'end',
+                align: 'top',
+                color: '#000',
+                font: {
+                    weight: 'bold',
+                    size: 12
+                },
+                formatter: function(value) {
+                    return value.toLocaleString(); // format 1,000
+                }
+            }
+        },
+            
            scales: {
     y: {
         beginAtZero: true,

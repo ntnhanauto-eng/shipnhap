@@ -1928,15 +1928,7 @@ window.saveNote = function(){
     }).then(()=> alert("✅ Đã lưu ghi chú"));
 }
  
- function autoResizeTextarea(el) {
-    el.style.height = "auto"; // reset
-    el.style.height = el.scrollHeight + "px";
 
-    // nếu vượt 500px thì fix lại
-    if (el.scrollHeight > 500) {
-        el.style.height = "500px";
-    }
-}   
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
     

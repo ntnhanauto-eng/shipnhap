@@ -545,7 +545,35 @@ input, select {
     outline: none;
 }     
         
+.textarea-wrap {
+    position: relative;
+}
 
+.highlight-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+
+    padding: 10px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+
+    color: transparent; /* ẩn text gốc */
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.highlight-layer mark {
+    background: yellow;
+    color: transparent;
+}
+
+.textarea-wrap textarea {
+    position: relative;
+    background: transparent;
+}
         
         
     </style>
@@ -1940,25 +1968,39 @@ window.renderExtraDetail = function(){
 
     let readonly = isAdmin ? "" : "readonly";
 
-   let html = `
-    <div style="margin-bottom:20px;">
-        <h4>📦 Vật tư</h4>
+  let html = `
+<div style="margin-bottom:10px;">
+    <input type="text" id="searchExtra" 
+        placeholder="🔍 Tìm nhanh vật tư / ghi chú..."
+        oninput="highlightSearch()">
+</div>
+
+<div style="margin-bottom:20px;">
+    <h4>📦 Vật tư</h4>
+
+    <div class="textarea-wrap">
+        <div class="highlight-layer" id="matHighlight"></div>
         <textarea id="matBox" class="auto-textarea mat-box" ${readonly}>${materials}</textarea>
-
-        ${isAdmin ? `<button onclick="saveMaterial()">💾 Lưu vật tư</button>` : ""}
     </div>
 
-    <div>
-        <h4>📝 Ghi chú</h4>
+    ${isAdmin ? `<button onclick="saveMaterial()">💾 Lưu vật tư</button>` : ""}
+</div>
+
+<div>
+    <h4>📝 Ghi chú</h4>
+
+    <div class="textarea-wrap">
+        <div class="highlight-layer" id="noteHighlight"></div>
         <textarea id="noteBox" class="auto-textarea note-box" ${readonly}>${notes}</textarea>
-
-        ${isAdmin ? `<button onclick="saveNote()">💾 Lưu ghi chú</button>` : ""}
     </div>
+
+    ${isAdmin ? `<button onclick="saveNote()">💾 Lưu ghi chú</button>` : ""}
+</div>
 `;
 
     document.getElementById("extraDetail").innerHTML = html;
     document.getElementById("extraDetail").innerHTML = html;
-    setTimeout(() => {
+  setTimeout(() => {
     const matBox = document.getElementById("matBox");
     const noteBox = document.getElementById("noteBox");
 
@@ -1971,24 +2013,14 @@ window.renderExtraDetail = function(){
         autoResizeTextarea(noteBox);
         noteBox.addEventListener("input", () => autoResizeTextarea(noteBox));
     }
+
+    // 🔥 THÊM Ở ĐÂY
+    syncScroll("matBox", "matHighlight");
+    syncScroll("noteBox", "noteHighlight");
+
+    highlightSearch();
+
 }, 0);
-
-// 🔥 GẮN AUTO RESIZE TẠI ĐÂY
-setTimeout(() => {
-    const matBox = document.getElementById("matBox");
-    const noteBox = document.getElementById("noteBox");
-
-    if (matBox) {
-        autoResizeTextarea(matBox);
-        matBox.addEventListener("input", () => autoResizeTextarea(matBox));
-    }
-
-    if (noteBox) {
-        autoResizeTextarea(noteBox);
-        noteBox.addEventListener("input", () => autoResizeTextarea(noteBox));
-    }
-}, 0);
-}
 
     window.saveMaterial = function(){
     const ship = document.getElementById("extraShip").value;
@@ -2013,7 +2045,54 @@ window.saveNote = function(){
         notes: arr
     }).then(()=> alert("✅ Đã lưu ghi chú"));
 }
- 
+
+   function syncScroll(textId, highlightId) {
+    const textarea = document.getElementById(textId);
+    const layer = document.getElementById(highlightId);
+
+    if (!textarea || !layer) return;
+
+    textarea.addEventListener("scroll", () => {
+        layer.scrollTop = textarea.scrollTop;
+        layer.scrollLeft = textarea.scrollLeft;
+    });
+}
+
+
+
+    
+   window.highlightSearch = function() {
+    const keyword = document.getElementById("searchExtra").value.toLowerCase();
+
+    updateHighlight("matBox", "matHighlight", keyword);
+    updateHighlight("noteBox", "noteHighlight", keyword);
+}
+
+function updateHighlight(textId, highlightId, keyword) {
+    const textarea = document.getElementById(textId);
+    const layer = document.getElementById(highlightId);
+
+    if (!textarea || !layer) return;
+
+    let text = textarea.value;
+
+    if (!keyword) {
+        layer.innerHTML = text;
+        return;
+    }
+
+    // escape ký tự đặc biệt
+    const safeKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    const regex = new RegExp(`(${safeKeyword})`, "gi");
+
+    let highlighted = text.replace(regex, "<mark>$1</mark>");
+
+    layer.innerHTML = highlighted;
+}
+
+
+    
 
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

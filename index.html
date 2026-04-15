@@ -2159,6 +2159,46 @@ window.saveNote = function(){
     }
 
     document.getElementById("dashboardChecklist").innerHTML = checkHTML;
+
+    // ===== 3. CẢNH BÁO CHƯA ĐỦ 3 HẠNG MỤC =====
+let warn = getChecklistWarnings();
+
+let warnHTML = "";
+
+if (warn.length === 0) {
+    warnHTML = "✔ Tất cả tàu đã đủ 3 hạng mục kiểm tra";
+} else {
+    warn.forEach(w => {
+        warnHTML += `
+        ⚠️ <b>${w.ship}</b>: mới có ${w.count}/3 hạng mục<br>
+        `;
+    });
+}
+
+document.getElementById("dashboardChecklist").innerHTML += `
+<hr>
+<b>🚨 Cảnh báo thiếu checklist</b><br>
+${warnHTML}
+`;    
+}
+
+    function getChecklistWarnings() {
+    let warnings = [];
+
+    Object.keys(shipsData).forEach(ship => {
+        let key = ship.replace(/\s/g, "_");
+        let items = progressData[key]?.items || [];
+
+        if (items.length > 0 && items.length < 3) {
+            warnings.push({
+                ship,
+                count: items.length,
+                items
+            });
+        }
+    });
+
+    return warnings;
 }
 
 </script>

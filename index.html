@@ -1999,7 +1999,7 @@ window.renderExtraDetail = function(){
 `;
 
     document.getElementById("extraDetail").innerHTML = html;
-    document.getElementById("extraDetail").innerHTML = html;
+    
   setTimeout(() => {
     const matBox = document.getElementById("matBox");
     const noteBox = document.getElementById("noteBox");
@@ -2022,41 +2022,7 @@ window.renderExtraDetail = function(){
 
 }, 0);
 
-    window.saveMaterial = function(){
-    const ship = document.getElementById("extraShip").value;
-    let val = document.getElementById("matBox").value;
-
-    let arr = val.split("\n").map(x => x.trim()).filter(x => x);
-
-    set(ref(db, "shipExtra/" + ship), {
-        ...extraData[ship],
-        materials: arr
-    }).then(()=> alert("✅ Đã lưu vật tư"));
-}
-
-window.saveNote = function(){
-    const ship = document.getElementById("extraShip").value;
-    let val = document.getElementById("noteBox").value;
-
-    let arr = val.split("\n").map(x => x.trim()).filter(x => x);
-
-    set(ref(db, "shipExtra/" + ship), {
-        ...extraData[ship],
-        notes: arr
-    }).then(()=> alert("✅ Đã lưu ghi chú"));
-}
-
-   function syncScroll(textId, highlightId) {
-    const textarea = document.getElementById(textId);
-    const layer = document.getElementById(highlightId);
-
-    if (!textarea || !layer) return;
-
-    textarea.addEventListener("scroll", () => {
-        layer.scrollTop = textarea.scrollTop;
-        layer.scrollLeft = textarea.scrollLeft;
-    });
-}
+   
 
 
 
@@ -2091,7 +2057,41 @@ function updateHighlight(textId, highlightId, keyword) {
     layer.innerHTML = highlighted;
 }
 
+ window.saveMaterial = function(){
+    const ship = document.getElementById("extraShip").value;
+    let val = document.getElementById("matBox").value;
 
+    let arr = val.split("\n").map(x => x.trim()).filter(x => x);
+
+    set(ref(db, "shipExtra/" + ship), {
+        ...extraData[ship],
+        materials: arr
+    }).then(()=> alert("✅ Đã lưu vật tư"));
+}
+
+window.saveNote = function(){
+    const ship = document.getElementById("extraShip").value;
+    let val = document.getElementById("noteBox").value;
+
+    let arr = val.split("\n").map(x => x.trim()).filter(x => x);
+
+    set(ref(db, "shipExtra/" + ship), {
+        ...extraData[ship],
+        notes: arr
+    }).then(()=> alert("✅ Đã lưu ghi chú"));
+}
+
+   function syncScroll(textId, highlightId) {
+    const textarea = document.getElementById(textId);
+    const layer = document.getElementById(highlightId);
+
+    if (!textarea || !layer) return;
+
+    textarea.addEventListener("scroll", () => {
+        layer.scrollTop = textarea.scrollTop;
+        layer.scrollLeft = textarea.scrollLeft;
+    });
+}
     
 
 </script>

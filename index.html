@@ -574,15 +574,40 @@ input, select {
     position: relative;
     background: transparent;
 }
-        
-   .dashboard-header {
-    background: linear-gradient(135deg, #1a73e8, #34a853);
-    color: white;
-    padding: 12px 15px;
+  .dashboard-header {
+    background: transparent;          /* ❌ bỏ nền */
+    color: #1a73e8;
+
+    padding: 10px 12px;
     border-radius: 12px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+
+    border: 2px solid #34a853;       /* ✅ viền xanh lá */
+    
+    box-shadow: 0 3px 10px rgba(52,168,83,0.15); /* nhẹ thôi */
+
     margin-bottom: 10px;
 }
+   #dashboardBox {
+    border: 2px solid #34a853;
+    border-radius: 14px;
+
+    box-shadow: 
+        0 6px 18px rgba(0,0,0,0.08),
+        0 0 10px rgba(52,168,83,0.2);
+
+    transition: all 0.3s ease;
+}
+
+/* hiệu ứng hover cho đẹp */
+#dashboardBox:hover {
+    transform: translateY(-2px);
+    box-shadow: 
+        0 10px 25px rgba(0,0,0,0.12),
+        0 0 15px rgba(52,168,83,0.35);
+}
+
+
+        
 
 #dashboardTitle {
     margin: 0;

@@ -637,7 +637,19 @@ input, select {
 }
 
 
+.textarea-wrap textarea,
+.highlight-layer {
+    font-family: inherit;
+    font-size: 14px;
+    line-height: 1.6;
 
+    padding: 10px;
+
+    white-space: pre-wrap;
+    word-wrap: break-word;
+
+    box-sizing: border-box;
+}
 
 
 
@@ -2050,6 +2062,10 @@ function renderExtraSelect(){
     if (el.scrollHeight > 500) {
         el.style.height = "500px";
     }
+         const layer = el.previousElementSibling;
+    if (layer) {
+        layer.style.height = el.style.height;
+    }
 }  
 
     
@@ -2149,7 +2165,7 @@ function updateHighlight(textId, highlightId, keyword) {
 
     let highlighted = text.replace(regex, "<mark>$1</mark>");
 
-    layer.innerHTML = highlighted;
+    layer.innerHTML = highlighted + "\n";
 }
 
  window.saveMaterial = function(){
@@ -2186,6 +2202,8 @@ window.saveNote = function(){
         layer.scrollTop = textarea.scrollTop;
         layer.scrollLeft = textarea.scrollLeft;
     });
+          layer.scrollTop = textarea.scrollTop;
+    layer.scrollLeft = textarea.scrollLeft;
 }
     function renderDashboard() {
     const today = new Date().toISOString().slice(0, 10);

@@ -556,13 +556,11 @@ input, select {
     right: 0;
     bottom: 0;
 
-    padding: 10px;
-    white-space: pre-wrap;
-    word-wrap: break-word;
-
-    color: transparent; /* ẩn text gốc */
+    color: transparent;
     overflow: hidden;
     pointer-events: none;
+
+    z-index: 1;
 }
 
 .highlight-layer mark {
@@ -572,6 +570,7 @@ input, select {
 
 .textarea-wrap textarea {
     position: relative;
+    z-index: 2;
     background: transparent;
 }
   .dashboard-header {
@@ -651,7 +650,20 @@ input, select {
     box-sizing: border-box;
 }
 
+.textarea-wrap {
+    position: relative;
+    width: 100%;
+}
 
+.textarea-wrap textarea,
+.textarea-wrap .highlight-layer {
+    font-family: inherit;
+    font-size: 14px;
+    line-height: 1.5;
+    padding: 8px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
 
 
         
@@ -2165,7 +2177,8 @@ function updateHighlight(textId, highlightId, keyword) {
 
     let highlighted = text.replace(regex, "<mark>$1</mark>");
 
-    layer.innerHTML = highlighted + "\n";
+   layer.innerHTML = highlighted
+    .replace(/\n$/g, "\n\n"); // fix dòng cuối bị lệch
 }
 
  window.saveMaterial = function(){

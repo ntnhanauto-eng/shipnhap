@@ -1143,30 +1143,48 @@ setTimeout(() => {
                 }
             ]
         },
-      options: {
+     options: {
     responsive: true,
     maintainAspectRatio: false,
+
+    layout: {
+        padding: {
+            top: 30   // 🔥 tạo khoảng trống phía trên
+        }
+    },
+
     plugins: {
-        legend: { position: 'top' },
-        title: {
-            display: true,
-            text: 'So sánh Giờ Công'
+        legend: { 
+            position: 'top',
+            labels: {
+                padding: 20   // 🔥 đẩy chữ legend xuống thấp hơn 1 chút
+            }
         },
 
-        // 🔥 HIỂN THỊ SỐ TRÊN CỘT
+        title: {
+            display: true,
+            text: 'So sánh Giờ Công',
+            padding: {
+                top: 10,
+                bottom: 10
+            }
+        },
+
         datalabels: {
-            anchor: 'end',   // vị trí trên đỉnh cột
+            anchor: 'end',
             align: 'top',
+            offset: 5,   // 🔥 đẩy số lên cao hơn cột
             color: '#000',
             font: {
                 weight: 'bold',
                 size: 12
             },
             formatter: function(value) {
-                return value.toLocaleString(); // 1000 -> 1,000
+                return value.toLocaleString();
             }
         }
     },
+
     scales: {
         y: {
             beginAtZero: true

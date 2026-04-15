@@ -589,6 +589,17 @@ input, select {
      <div id="marqueeBox">
     <div id="marqueeText"></div>
     </div>
+    <!-- 📊 DASHBOARD CHÈN Ở ĐÂY -->
+<div class="card" id="dashboardBox">
+    <h3>📊 Dashboard hôm nay</h3>
+
+    <div id="dashboardSummary"></div>
+
+    <hr>
+
+    <h4>📋 Nhắc nhở kiểm tra còn sót</h4>
+    <div id="dashboardChecklist"></div>
+</div>
     
     <div class="card admin-only">
         <h3>Nhập Dữ Liệu</h3>
@@ -764,6 +775,7 @@ onValue(ref(db, "ships"), snapshot => {
     // Nếu đang mở bảng quản lý tàu thì vẽ lại bảng đó luôn
     if(document.getElementById("shipManagerBox").style.display === "block") {
         renderShipManagerList();
+        renderDashboard();
     }
 });
 
@@ -771,6 +783,7 @@ onValue(ref(db, "ships"), snapshot => {
     progressData = snapshot.val() || {};
     if(document.getElementById("summary").style.display === "block") {
         showSummary();
+        renderDashboard();
     }
 });
 
@@ -911,6 +924,7 @@ function renderShipManagerList() {
         rawData = snapshot.val() || {};
         applyFilter();
         renderUpcomingEvents(); // <--- Dòng này giúp bảng tự cập nhật ngay khi mở web hoặc khi Boss sửa dữ liệu
+        renderDashboard();
     });
 
     onValue(ref(db, "workHours"), snapshot => {
@@ -2092,7 +2106,60 @@ window.saveNote = function(){
         layer.scrollLeft = textarea.scrollLeft;
     });
 }
-    
+    function renderDashboard() {
+    const today = new Date().toISOString().slice(0, 10);
+
+    let shipMap = {}; // { ship: workers }
+
+    // ===== 1. TÍNH NHÂN LỰC HÔM NAY THEO TÀU =====
+    Object.values(rawData).forEach(x => {
+        if (x.date === today) {
+            if (!shipMap[x.ship_id]) shipMap[x.ship_id] = 0;
+            shipMap[x.ship_id] += Number(x.workers || 0);
+        }
+    });
+
+    let totalWorkers = 0;
+    let html = "";
+
+    Object.keys(shipMap).forEach(ship => {
+        totalWorkers += shipMap[ship];
+        html += `🚢 <b>${ship}</b>: ${shipMap[ship]} người<br>`;
+    });
+
+    if (Object.keys(shipMap).length === 0) {
+        html = "Không có dữ liệu hôm nay";
+    }
+
+    html += `<hr><b>Tổng nhân lực: ${totalWorkers} người</b>`;
+
+    document.getElementById("dashboardSummary").innerHTML = html;
+
+
+    // ===== 2. NHẮC CHECKLIST CHƯA CÓ =====
+    let missingChecklist = [];
+
+    Object.keys(shipsData).forEach(ship => {
+        let key = ship.replace(/\s/g, "_");
+        let items = progressData[key]?.items || [];
+
+        if (!items || items.length === 0) {
+            missingChecklist.push(ship);
+        }
+    });
+
+    let checkHTML = "";
+
+    if (missingChecklist.length === 0) {
+        checkHTML = "✔ Tất cả tàu đã có checklist";
+    } else {
+        missingChecklist.forEach(s => {
+            checkHTML += `⚠️ <b>${s}</b> chưa có hạng mục kiểm tra<br>`;
+        });
+    }
+
+    document.getElementById("dashboardChecklist").innerHTML = checkHTML;
+}
 
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

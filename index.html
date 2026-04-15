@@ -575,7 +575,26 @@ input, select {
     background: transparent;
 }
         
-        
+   .dashboard-header {
+    background: linear-gradient(135deg, #1a73e8, #34a853);
+    color: white;
+    padding: 12px 15px;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+    margin-bottom: 10px;
+}
+
+#dashboardTitle {
+    margin: 0;
+    font-size: 18px;
+    font-weight: bold;
+}
+
+.dashboard-sub {
+    font-size: 12px;
+    opacity: 0.9;
+    margin-top: 3px;
+}     
     </style>
 </head>
 <body id="mainBody">
@@ -591,7 +610,10 @@ input, select {
     </div>
     <!-- 📊 DASHBOARD CHÈN Ở ĐÂY -->
 <div class="card" id="dashboardBox">
+    <div class="dashboard-header">
     <h3 id="dashboardTitle">📊 Dashboard</h3>
+    <div class="dashboard-sub" id="dashboardSub"></div>
+</div>
 
     <div id="dashboardSummary"></div>
 
@@ -1766,6 +1788,8 @@ function initMarquee() {
 // chạy khi load
 initMarquee();
 updateDashboardTitle();
+setInterval(updateDashboardTitle, 60000); // mỗi 1 phút
+updateDashboardTitle();
 
 
 function renderProgressInputs(){
@@ -2203,29 +2227,31 @@ ${warnHTML}
 }
 
 function updateDashboardTitle() {
-    const today = new Date();
+    const now = new Date();
 
-    const dd = String(today.getDate()).padStart(2, '0');
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const yyyy = today.getFullYear();
+    const dd = String(now.getDate()).padStart(2, '0');
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const yyyy = now.getFullYear();
 
-    // 👉 lấy thứ trong tuần
     const days = [
-        "Chủ nhật",
-        "Thứ 2",
-        "Thứ 3",
-        "Thứ 4",
-        "Thứ 5",
-        "Thứ 6",
-        "Thứ 7"
+        "Chủ nhật","Thứ 2","Thứ 3","Thứ 4",
+        "Thứ 5","Thứ 6","Thứ 7"
     ];
 
-    const dayName = days[today.getDay()];
+    const dayName = days[now.getDay()];
 
     const title = `📊 HÔM NAY – ${dayName}, ${dd}/${mm}/${yyyy}`;
 
-    const el = document.getElementById("dashboardTitle");
-    if (el) el.innerText = title;
+    document.getElementById("dashboardTitle").innerText = title;
+
+    // 👉 thêm dòng phụ (giờ realtime)
+    const hh = String(now.getHours()).padStart(2, '0');
+    const min = String(now.getMinutes()).padStart(2, '0');
+
+    const sub = `⏱ Cập nhật lúc: ${hh}:${min}`;
+
+    const subEl = document.getElementById("dashboardSub");
+    if (subEl) subEl.innerText = sub;
 }
 
 

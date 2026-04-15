@@ -619,7 +619,30 @@ input, select {
     font-size: 12px;
     opacity: 0.9;
     margin-top: 3px;
-}     
+}  
+
+.new-row {
+    background: #fff3cd !important; /* vàng nhẹ */
+    animation: fadeHighlight 30s forwards;
+}
+
+/* hiệu ứng mờ dần */
+@keyframes fadeHighlight {
+    0% {
+        background: #ffeeba;
+    }
+    100% {
+        background: transparent;
+    }
+}
+
+
+
+
+
+
+
+        
     </style>
 </head>
 <body id="mainBody">
@@ -951,7 +974,7 @@ function renderShipManagerList() {
             return;
         }
 
-        let data = { ship_id: shipVal, date: dateVal, workers: Number(workerVal), job: jobVal };
+        let data = { ship_id: shipVal, date: dateVal, workers: Number(workerVal), job: jobVal,  createdAt: Date.now() };
 
         if(editId){
             update(ref(db, "logs/" + editId), data).then(() => {
@@ -1075,10 +1098,18 @@ function renderUpcomingEvents() {
     let totalWorkers = 0;
 
     dataArray.forEach(([id, x], index) => {
+
+    let isNew = false;
+
+    if (x.createdAt) {
+        isNew = (Date.now() - x.createdAt) < 30000;
+    }
+
+    let rowClass = isNew ? "new-row" : "";
         
         totalWorkers += Number(x.workers || 0);
 
-        html += `<tr>
+       html += `<tr class="${rowClass}">
             <td class="stt-col">${start + index + 1}</td>
             <td class="ship-col">${x.ship_id}</td>
             <td class="date-col">${x.date}</td>
@@ -2279,7 +2310,9 @@ function updateDashboardTitle() {
     if (subEl) subEl.innerText = sub;
 }
 
-
+setInterval(() => {
+    renderTableUI();
+}, 5000); // 🔥 refresh highlight mỗi 5 giây
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

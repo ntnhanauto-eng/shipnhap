@@ -1149,7 +1149,7 @@ setTimeout(() => {
 
     layout: {
         padding: {
-            top: 30   // 🔥 tạo khoảng trống phía trên
+            top: 40   // 🔥 tạo khoảng trống phía trên
         }
     },
 
@@ -1172,8 +1172,8 @@ setTimeout(() => {
 
         datalabels: {
             anchor: 'end',
-            align: 'top',
-            offset: 5,   // 🔥 đẩy số lên cao hơn cột
+            align: 'end',
+            offset: 10,   // 🔥 đẩy số lên cao hơn cột
             color: '#000',
             font: {
                 weight: 'bold',
@@ -1187,7 +1187,8 @@ setTimeout(() => {
 
     scales: {
         y: {
-            beginAtZero: true
+            beginAtZero: true,
+             grace: '15%'   // 🔥 thêm khoảng trống phía trên
         }
     }
 }

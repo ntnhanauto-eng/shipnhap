@@ -2209,7 +2209,20 @@ function updateDashboardTitle() {
     const mm = String(today.getMonth() + 1).padStart(2, '0');
     const yyyy = today.getFullYear();
 
-    const title = `📊 HÔM NAY ${dd}/${mm}/${yyyy}`;
+    // 👉 lấy thứ trong tuần
+    const days = [
+        "Chủ nhật",
+        "Thứ 2",
+        "Thứ 3",
+        "Thứ 4",
+        "Thứ 5",
+        "Thứ 6",
+        "Thứ 7"
+    ];
+
+    const dayName = days[today.getDay()];
+
+    const title = `📊 HÔM NAY – ${dayName}, ${dd}/${mm}/${yyyy}`;
 
     const el = document.getElementById("dashboardTitle");
     if (el) el.innerText = title;

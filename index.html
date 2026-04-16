@@ -2288,33 +2288,42 @@ const today = `${yyyy}-${mm}-${dd}`;
     let shipMap = {}; // { ship: workers }
 
     // ===== 1. TÍNH NHÂN LỰC HÔM NAY THEO TÀU =====
-    Object.values(rawData).forEach(x => {
-        if (x.date === today) {
-            if (!shipMap[x.ship_id]) shipMap[x.ship_id] = 0;
-            shipMap[x.ship_id] += Number(x.workers || 0);
-        }
-    });
+   // ===== 1. TÍNH NHÂN LỰC HÔM NAY THEO TÀU =====
+Object.values(rawData).forEach(x => {
+    if (x.date === today) {
+        if (!shipMap[x.ship_id]) shipMap[x.ship_id] = 0;
+        shipMap[x.ship_id] += Number(x.workers || 0);
+    }
+});
 
-    let totalWorkers = 0;
-    let html = "";
+let totalWorkers = 0;
+let html = "";
+
+// 👉 kiểm tra trước khi loop
+if (Object.keys(shipMap).length === 0) {
+
+    html = "Không có dữ liệu hôm nay";
+
+} else {
 
     Object.keys(shipMap).forEach(ship => {
         totalWorkers += shipMap[ship];
-      html += `
-<div class="dash-row" onclick="toggleShipDetail('${ship}')">
-    🚢 <b>${ship}</b>: ${shipMap[ship]} người
-</div>
 
-<div id="detail-${ship}" class="dash-detail"></div>
-`;
+        html += `
+        <div class="dash-row" onclick="toggleShipDetail('${ship}')">
+            🚢 <b>${ship}</b>: ${shipMap[ship]} người
+        </div>
 
-    if (Object.keys(shipMap).length === 0) {
-        html = "Không có dữ liệu hôm nay";
-    }
+        <div id="detail-${ship}" class="dash-detail"></div>
+        `;
+    });
 
+    // 👉 chỉ thêm tổng 1 lần (ngoài loop)
     html += `<hr><b>Tổng nhân lực: ${totalWorkers} người</b>`;
+}
 
-    document.getElementById("dashboardSummary").innerHTML = html;
+// 👉 render 1 lần duy nhất
+document.getElementById("dashboardSummary").innerHTML = html;
 
 
     // ===== 2. NHẮC CHECKLIST CHƯA CÓ =====

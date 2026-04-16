@@ -2373,8 +2373,8 @@ ${warnHTML}
 }
 
 window.toggleShipDetail = function(ship) {
-
-     const today = new Date().toISOString().slice(0, 10);
+      const box = document.getElementById("detail-" + ship);
+     
 
     // 🔥 DEBUG Ở ĐÂY
     console.log("TODAY:", today);

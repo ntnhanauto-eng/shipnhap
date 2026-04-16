@@ -1,0 +1,20 @@
+{
+  "short_name": "Casing System",
+  "name": "Casing",
+  "icons": [
+    {
+      "src": "casing.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg"
+    },
+    {
+      "src": "casing.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#2ecc71",
+  "background_color": "#0f171e"
+}

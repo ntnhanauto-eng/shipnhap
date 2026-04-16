@@ -1123,7 +1123,7 @@ function renderUpcomingEvents() {
             html += `<tr>
                 <td style="white-space:nowrap; font-size:12px;">${item.date}</td>
                 <td style="font-weight:bold;">${item.ship_id}</td>
-                <td>${item.job}</td>
+               <td>${(item.job || "").replace(/^PLAN:\s*/i, "")}</td>
             </tr>`;
         });
     }

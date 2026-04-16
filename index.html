@@ -664,13 +664,16 @@ input, select {
     white-space: pre-wrap;
     word-wrap: break-word;
 }
- .textarea-wrap textarea,
+.textarea-wrap textarea,
 .textarea-wrap .highlight-layer {
     font-family: monospace;
+    line-height: 22px;   /* 🔥 FIX khoảng cách dòng */
+    white-space: pre-wrap;
+    word-break: break-word;
 }
 .textarea-wrap textarea,
 .textarea-wrap .highlight-layer {
-    line-height: 20px; /* KHÔNG dùng 1.5 */
+    line-height: 22px; /* KHÔNG dùng 1.5 */
 }
 
    textarea {
@@ -2238,8 +2241,7 @@ function updateHighlight(textId, highlightId, keyword) {
 
     let highlighted = text.replace(regex, "<mark>$1</mark>");
 
-   layer.innerHTML = highlighted
-    .replace(/\n$/g, "\n\n"); // fix dòng cuối bị lệch
+ layer.innerHTML = highlighted.replace(/\n/g, "<br>");
 }
 
  window.saveMaterial = function(){

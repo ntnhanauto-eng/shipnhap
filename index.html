@@ -2376,6 +2376,18 @@ window.toggleShipDetail = function(ship) {
 
     const box = document.getElementById("detail-" + ship);
 
+    const today = new Date().toISOString().slice(0, 10);
+
+    // 🔥 DEBUG Ở ĐÂY
+    console.log("TODAY:", today);
+    console.log("RAWDATA:", rawData);
+
+    // 👉 nếu đang mở → đóng lại
+    if (box.innerHTML.trim() !== "") {
+        box.innerHTML = "";
+        return;
+    }
+
     // 👉 nếu đang mở → đóng lại
     if (box.innerHTML.trim() !== "") {
         box.innerHTML = "";

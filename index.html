@@ -1010,8 +1010,7 @@ document.getElementById("date").value = `${yyyy}-${mm}-${dd}`;
     function showNotification(message) {
 
     const box = document.createElement("div");
-
-    box.innerText = message;
+    box.innerText = "🔔 " + message;
 
     box.style.position = "fixed";
     box.style.top = "20px";
@@ -1022,11 +1021,35 @@ document.getElementById("date").value = `${yyyy}-${mm}-${dd}`;
     box.style.borderRadius = "8px";
     box.style.boxShadow = "0 4px 12px rgba(0,0,0,0.2)";
     box.style.zIndex = "9999";
+    box.style.transition = "all 0.3s ease";
+    box.style.transform = "translateX(100%)";
 
     document.body.appendChild(box);
 
+    // 👉 Animation trượt vào
     setTimeout(() => {
-        box.remove();
+        box.style.transform = "translateX(0)";
+    }, 10);
+
+    // 👉 RUNG (Android)
+    if (navigator.vibrate) {
+        navigator.vibrate([200, 100, 200]);
+    }
+
+    // 👉 ÂM THANH (PC + Mobile)
+    try {
+        const audio = new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg");
+        audio.play();
+    } catch (e) {
+        console.log("Không phát được âm thanh:", e);
+    }
+
+    // 👉 Ẩn + animation trượt ra
+    setTimeout(() => {
+        box.style.transform = "translateX(100%)";
+        setTimeout(() => {
+            box.remove();
+        }, 300);
     }, 5000);
 }
 

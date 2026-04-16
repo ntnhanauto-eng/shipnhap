@@ -655,46 +655,22 @@ input, select {
     width: 100%;
 }
 
-.textarea-wrap {
-    position: relative;
-}
-
 .textarea-wrap textarea,
 .textarea-wrap .highlight-layer {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    
-    font-family: monospace;
+    font-family: inherit;
     font-size: 14px;
-
-    line-height: 22px;            /* 🔥 QUAN TRỌNG */
-    padding: 10px;
-
-    white-space: pre-wrap;        /* 🔥 QUAN TRỌNG */
-    word-break: break-word;
-
-    box-sizing: border-box;
+    line-height: 1.5;
+    padding: 8px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
 }
-
-/* textarea nằm trên */
-.textarea-wrap textarea {
-    z-index: 2;
-    background: transparent;
-    color: #000;
+ .textarea-wrap textarea,
+.textarea-wrap .highlight-layer {
+    font-family: monospace;
 }
-
-/* highlight nằm dưới */
-.highlight-layer {
-    z-index: 1;
-    color: transparent;
-    pointer-events: none;
-}
-
-.highlight-layer mark {
-    background: yellow;
-    color: transparent;
+.textarea-wrap textarea,
+.textarea-wrap .highlight-layer {
+    line-height: 20px; /* KHÔNG dùng 1.5 */
 }
 
    textarea {
@@ -748,7 +724,10 @@ input, select {
 }
 
 
-
+.highlight-layer {
+    white-space: pre-wrap;
+    line-height: 22px;
+}
 
 
 
@@ -2253,23 +2232,21 @@ function updateHighlight(textId, highlightId, keyword) {
 
     let text = textarea.value;
 
-    // escape HTML
+    // 🔥 QUAN TRỌNG: giữ nguyên xuống dòng bằng &nbsp;
     let html = text
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
+        .replace(/>/g, "&gt;")
+        .replace(/\n/g, "<br>");
 
-    // highlight
     if (keyword) {
         const safeKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const regex = new RegExp(`(${safeKeyword})`, "gi");
         html = html.replace(regex, "<mark>$1</mark>");
     }
 
-    // 🔥 QUAN TRỌNG: giữ dòng trống thật
-    html = html
-        .replace(/\n\n/g, "\n \n")   // giữ dòng trống
-        .replace(/\n/g, "<br>");
+    // 🔥 FIX DÒNG TRỐNG
+    html = html.replace(/(<br>\s*){2,}/g, "<br>&nbsp;<br>");
 
     layer.innerHTML = html;
 }

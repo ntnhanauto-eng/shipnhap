@@ -2377,9 +2377,13 @@ const today = `${yyyy}-${mm}-${dd}`;
     // ===== 1. TÍNH NHÂN LỰC HÔM NAY THEO TÀU =====
    // ===== 1. TÍNH NHÂN LỰC HÔM NAY THEO TÀU =====
 Object.values(rawData).forEach(x => {
-    if (x.date === today) {
+
+    // ❗ CHỈ lấy dữ liệu hôm nay + có người
+    if (x.date === today && Number(x.workers) > 0) {
+
         if (!shipMap[x.ship_id]) shipMap[x.ship_id] = 0;
-        shipMap[x.ship_id] += Number(x.workers || 0);
+
+        shipMap[x.ship_id] += Number(x.workers);
     }
 });
 

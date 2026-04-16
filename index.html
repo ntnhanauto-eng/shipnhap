@@ -2373,28 +2373,33 @@ ${warnHTML}
 }
 
 window.toggleShipDetail = function(ship) {
-      const box = document.getElementById("detail-" + ship);
-     
 
-    // 🔥 DEBUG Ở ĐÂY
-    console.log("TODAY:", today);
-    console.log("RAWDATA:", rawData);
-
-   
+    const box = document.getElementById("detail-" + ship);
 
     // 👉 nếu đang mở → đóng lại
     if (box.innerHTML.trim() !== "") {
         box.innerHTML = "";
+        openedShip = null;
         return;
     }
+
+    // 👉 đóng tàu cũ nếu có
+    if (openedShip && openedShip !== ship) {
+        const oldBox = document.getElementById("detail-" + openedShip);
+        if (oldBox) oldBox.innerHTML = "";
+    }
+
     openedShip = ship;
 
+    // 👉 lấy ngày chuẩn (KHÔNG bị lệch timezone)
     const now = new Date();
-const yyyy = now.getFullYear();
-const mm = String(now.getMonth() + 1).padStart(2, '0');
-const dd = String(now.getDate()).padStart(2, '0');
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    const today = `${yyyy}-${mm}-${dd}`;
 
-const today = `${yyyy}-${mm}-${dd}`;
+    // 🔥 debug nếu cần
+    console.log("TODAY:", today);
 
     // 👉 lọc dữ liệu
     const result = Object.entries(rawData).filter(([id, x]) => {

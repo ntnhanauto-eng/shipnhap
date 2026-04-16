@@ -687,7 +687,37 @@ input, select {
     line-height: 20px !important;
 }
 
+.dash-row {
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 6px;
+    transition: 0.2s;
+}
 
+.dash-row:hover {
+    background: #e8f0fe;
+}
+
+.dash-detail {
+    padding-left: 15px;
+    margin-bottom: 6px;
+}
+
+.detail-row {
+    font-size: 13px;
+    padding: 4px 0;
+}
+
+.detail-total {
+    font-weight: bold;
+    margin-top: 5px;
+    color: #1a73e8;
+}
+
+.empty {
+    font-style: italic;
+    color: #888;
+}
 
 
 
@@ -2270,8 +2300,13 @@ const today = `${yyyy}-${mm}-${dd}`;
 
     Object.keys(shipMap).forEach(ship => {
         totalWorkers += shipMap[ship];
-        html += `🚢 <b>${ship}</b>: ${shipMap[ship]} người<br>`;
-    });
+      html += `
+<div class="dash-row" onclick="toggleShipDetail('${ship}')">
+    🚢 <b>${ship}</b>: ${shipMap[ship]} người
+</div>
+
+<div id="detail-${ship}" class="dash-detail"></div>
+`;
 
     if (Object.keys(shipMap).length === 0) {
         html = "Không có dữ liệu hôm nay";
@@ -2327,6 +2362,52 @@ document.getElementById("dashboardChecklist").innerHTML += `
 ${warnHTML}
 `;    
 }
+
+window.toggleShipDetail = function(ship) {
+
+    const box = document.getElementById("detail-" + ship);
+
+    // 👉 nếu đang mở → đóng lại
+    if (box.innerHTML.trim() !== "") {
+        box.innerHTML = "";
+        return;
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+
+    // 👉 lọc dữ liệu
+    const result = Object.entries(rawData).filter(([id, x]) => {
+        return x.ship_id === ship && x.date === today;
+    });
+
+    // 👉 render
+    let html = "";
+
+    if (result.length === 0) {
+        html = `<div class="empty">Không có dữ liệu hôm nay</div>`;
+    } else {
+
+        let total = 0;
+
+        result.forEach(([id, x]) => {
+
+            total += Number(x.workers || 0);
+
+            let jobText = (x.job || "").replace(/PLAN:/gi, "").trim();
+
+            html += `
+                <div class="detail-row">
+                    👷 ${x.workers} người — ${jobText}
+                </div>
+            `;
+        });
+
+        html += `<div class="detail-total">Tổng: ${total} người</div>`;
+    }
+
+    box.innerHTML = html;
+}
+                                 
 
     function getChecklistWarnings() {
     let warnings = [];

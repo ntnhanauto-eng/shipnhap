@@ -1154,15 +1154,11 @@ window.deleteShip = function(shipId) {
 // 6. Hàm hiển thị danh sách tàu kèm nút Xóa
 function renderShipManagerList() {
 
-    let html = `
-    <table>
-        <tr>
-            <th>Tên Tàu</th>
-            <th style="width:80px;">Nhóm</th>
-            <th style="width:60px;">Xóa</th>
-        </tr>
-    `;
-
+    let html = `<table><tr>
+    <th>Tên Tàu</th>
+    <th>Nhóm</th>
+    <th style="width:60px">Xóa</th>
+</tr>`;
     Object.keys(shipsData).sort().forEach(shipId => {
 
         let group = shipsData[shipId]?.group || "-";

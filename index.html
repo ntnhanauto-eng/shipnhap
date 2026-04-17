@@ -2641,7 +2641,7 @@ function renderCol(list, color) {
 
     return list.map(x => `
         <div class="check-item" style="color:${color}">
-            🚢 ${x.ship} (${x.count}/3)
+            ${x.ship} (${x.count}/3)
         </div>
     `).join("");
 }
@@ -2650,7 +2650,7 @@ let checkHTML = `
 <div class="check-grid">
 
     <div class="check-col green">
-        <div class="check-title">ĐỦ HẠNG MỤC</div>
+        <div class="check-title">ĐÃ ĐỦ</div>
         ${renderCol(doneList, "#188038")}
     </div>
 

@@ -822,7 +822,9 @@ button {
 
     <hr>
 
-    <h4>📋 HẠNG MỤC KIỂM TRA:</h4>
+    <h4 style="color:#1a73e8; font-weight:bold;">
+    📋 HẠNG MỤC KIỂM TRA:
+</h4>
     <div id="dashboardChecklist"></div>
 </div>
     
@@ -2527,9 +2529,11 @@ if (warn.length === 0) {
 
 document.getElementById("dashboardChecklist").innerHTML += `
 <hr>
-<b>🚨 TRẠNG THÁI KIỂM TRA:</b><br>
+<div style="color:#1a73e8; font-weight:bold;">
+    🚨 TRẠNG THÁI KIỂM TRA:
+</div>
 ${warnHTML}
-`;    
+`;   
 }
 
 window.toggleShipDetail = function(ship) {

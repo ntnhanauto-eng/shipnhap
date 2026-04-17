@@ -1370,7 +1370,8 @@ function renderUpcomingEvents() {
     let html = `<table>
         <tr>
             <th class="stt-col">STT</th>
-            <th class="ship-col">Tàu</th>
+           <th class="ship-col">Tàu</th>
+           <th style="width:70px;">Nhóm</th>
             <th class="date-col">Ngày</th>
             <th class="worker-col">Người</th>
             <th>Công việc</th>
@@ -1394,6 +1395,9 @@ function renderUpcomingEvents() {
        html += `<tr class="${rowClass}">
             <td class="stt-col">${start + index + 1}</td>
             <td class="ship-col">${x.ship_id}</td>
+            <td style="text-align:center;">
+            ${shipsData[x.ship_id]?.group || "-"}
+            </td>
             <td class="date-col">${x.date}</td>
             <td class="worker-col">${x.workers}</td>
             <td>${x.job}</td>
@@ -1408,9 +1412,10 @@ function renderUpcomingEvents() {
 
 html += `
 <tr class="total-row">
-    <td></td> <!-- STT -->
-    <td></td> <!-- Tàu -->
-    <td style="text-align:right;"><b>TỔNG:</b></td> <!-- Ngày -->
+   <td></td> <!-- STT -->
+<td></td> <!-- Tàu -->
+<td></td> <!-- Nhóm -->
+<td style="text-align:right;"><b>TỔNG:</b></td>
     
     <td class="worker-col" style="text-align:center;">
         <b>${totalWorkers.toLocaleString()}</b>

@@ -2540,31 +2540,25 @@ if (Object.keys(shipMap).length === 0) {
 
   // 👉 hiện nhóm sau tàu trên bảng Dashboard     
 let group = shipsData[ship]?.group || "-";
-        let key = ship.replace(/\s/g, "_");
+       let key = ship.replace(/\s/g, "_");
 let items = progressData[key]?.items || [];
 
-let bgColor = "#eee"; // mặc định
+let textColor = "#999"; // mặc định
 
 if (items.length === 0) {
-    bgColor = "#f28b82"; // 🔴 đỏ
+    textColor = "#d93025"; // 🔴 đỏ
 } else if (items.length < 3) {
-    bgColor = "#fbbc04"; // 🟡 vàng
+    textColor = "#f9ab00"; // 🟡 vàng
 } else {
-    bgColor = "#34a853"; // 🟢 xanh
+    textColor = "#188038"; // 🟢 xanh
 }
 
 html += `
-    <div class="dash-row" 
-     onclick="toggleShipDetail('${ship}')"
-     style="
-        background:${bgColor};
-        color:#fff;
-        border-radius:8px;
-        padding:6px;
-        margin-bottom:5px;
-     ">
-        🚢 <b>${ship}</b> (${group}): ${shipMap[ship]} người
-    </div>
+    <div class="dash-row" onclick="toggleShipDetail('${ship}')">
+    🚢 <b style="color:${textColor}">${ship}</b> 
+    <span style="color:${textColor}">(${group})</span> 
+    : ${shipMap[ship]} người
+</div>
 
     <div id="detail-${ship}" class="dash-detail"></div>
 `;

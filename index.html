@@ -800,7 +800,10 @@ button {
     overflow: hidden;
 }
 
-
+.status-check {
+    padding-bottom: 20px;
+    display: block;
+}
         
  
         
@@ -2621,7 +2624,7 @@ if (warn.length === 0) {
 
 document.getElementById("dashboardChecklist").innerHTML += `
 <hr>
-<div style="color:#1a73e8; font-weight:bold;">
+<div class="status-check" style="color:#1a73e8; font-weight:bold;">
     🚨 TRẠNG THÁI KIỂM TRA:
 </div>
 ${warnHTML}

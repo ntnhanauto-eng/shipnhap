@@ -2561,9 +2561,16 @@ if (items.length === 0) {
 
 let color = getShipColor(ship);
 
+// 🔥 nếu chưa có checklist → override màu đỏ
+if (!hasChecklist(ship)) {
+    color = "#d93025"; // đỏ cảnh báo
+}
+
 html += `
 <div class="dash-row" onclick="toggleShipDetail('${ship}')">
-    🚢 <b style="color:${color}">${ship}</b>: ${shipMap[ship]} người
+   🚢 <b style="color:${color}">
+${ship} ${!hasChecklist(ship) ? "⚠️" : ""}
+</b>: ${shipMap[ship]} người
 </div>
 <div id="detail-${ship}" class="dash-detail"></div>
 `;
@@ -2758,7 +2765,11 @@ function getShipColor(ship) {
     }
 }
 
-
+function hasChecklist(ship) {
+    let key = ship.replace(/\s/g, "_");
+    let items = progressData[key]?.items || [];
+    return items.length > 0;
+}
     
     
 </script>

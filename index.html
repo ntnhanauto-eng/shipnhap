@@ -804,7 +804,33 @@ button {
     padding-bottom: 20px;
     display: block;
 }
-        
+   .check-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+}
+
+.check-col {
+    border-radius: 8px;
+    padding: 8px;
+    background: #fff;
+    border: 2px solid #eee;
+}
+
+.check-title {
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 5px;
+}
+
+.check-col.green { border-color: #188038; }
+.check-col.orange { border-color: #f9ab00; }
+.check-col.red { border-color: #d93025; }
+
+.check-item {
+    font-size: 13px;
+    padding: 3px 0;
+}     
  
         
     </style>
@@ -2584,51 +2610,64 @@ document.getElementById("dashboardSummary").innerHTML = html;
 
 
     // ===== 2. NHẮC CHECKLIST CHƯA CÓ =====
-    let missingChecklist = [];
+ // ===== 2. PHÂN LOẠI CHECKLIST =====
 
-    Object.keys(shipsData).forEach(ship => {
-        let key = ship.replace(/\s/g, "_");
-        let items = progressData[key]?.items || [];
+let doneList = [];
+let partialList = [];
+let emptyList = [];
 
-        if (!items || items.length === 0) {
-            missingChecklist.push(ship);
-        }
-    });
+Object.keys(shipsData).forEach(ship => {
 
-    let checkHTML = "";
+    let key = ship.replace(/\s/g, "_");
 
-    if (missingChecklist.length === 0) {
-        checkHTML = "✔ Tất cả tàu đã có checklist";
+    let items = progressData?.[key]?.items;
+    if (!Array.isArray(items)) items = [];
+
+    let count = items.length;
+
+    if (count >= 3) {
+        doneList.push({ ship, count });
+    } else if (count > 0) {
+        partialList.push({ ship, count });
     } else {
-        missingChecklist.forEach(s => {
-            checkHTML += `⚠️ <b>${s}</b> chưa có<br>`;
-        });
+        emptyList.push({ ship, count });
     }
+});
 
-    document.getElementById("dashboardChecklist").innerHTML = checkHTML;
+// ===== RENDER 3 CỘT =====
 
-    // ===== 3. CẢNH BÁO CHƯA ĐỦ 3 HẠNG MỤC =====
-let warn = getChecklistWarnings();
+function renderCol(list, color) {
+    if (list.length === 0) return "<div class='empty'>Không có</div>";
 
-let warnHTML = "";
-
-if (warn.length === 0) {
-    warnHTML = "✔ Tất cả tàu đã đủ 3 hạng mục kiểm tra";
-} else {
-    warn.forEach(w => {
-        warnHTML += `
-        ⚠️ <b>${w.ship}</b>: mới có ${w.count}/3 hạng mục<br>
-        `;
-    });
+    return list.map(x => `
+        <div class="check-item" style="color:${color}">
+            🚢 ${x.ship} (${x.count}/3)
+        </div>
+    `).join("");
 }
 
-document.getElementById("dashboardChecklist").innerHTML += `
-<hr>
-<div class="status-check" style="color:#1a73e8; font-weight:bold;">
-    🚨 TRẠNG THÁI KIỂM TRA:
+let checkHTML = `
+<div class="check-grid">
+
+    <div class="check-col green">
+        <div class="check-title">ĐỦ HẠNG MỤC</div>
+        ${renderCol(doneList, "#188038")}
+    </div>
+
+    <div class="check-col orange">
+        <div class="check-title">CHƯA ĐỦ</div>
+        ${renderCol(partialList, "#f9ab00")}
+    </div>
+
+    <div class="check-col red">
+        <div class="check-title">CHƯA CÓ</div>
+        ${renderCol(emptyList, "#d93025")}
+    </div>
+
 </div>
-${warnHTML}
-`;   
+`;
+
+document.getElementById("dashboardChecklist").innerHTML = checkHTML; 
 }
 
 window.toggleShipDetail = function(ship) {

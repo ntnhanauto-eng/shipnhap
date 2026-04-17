@@ -1305,7 +1305,7 @@ function renderShipManagerList() {
         <select onchange="updateShipStatus('${shipId}', this.value)">
             <option value="active"
                 ${(shipsData[shipId]?.status || "active") === "active" ? "selected" : ""}>
-                🔧 Đang làm
+                Đang làm
             </option>
 
             <option value="done"

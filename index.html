@@ -896,7 +896,32 @@ button {
 .check-col.red .check-badge {
     background: #d93025;
 }
-        
+   .info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+}
+
+.info-box {
+    border-radius: 10px;
+    overflow: hidden;
+    text-align: center;
+    color: #fff;
+    font-weight: bold;
+    background: #0b57d0; /* xanh đậm */
+}
+
+.info-header {
+    padding: 6px;
+    background: #0b57d0;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(255,255,255,0.3);
+}
+
+.info-body {
+    padding: 10px;
+    font-size: 18px;
+}     
         
     </style>
 </head>
@@ -926,6 +951,13 @@ button {
     📋 HẠNG MỤC KIỂM TRA:
 </h4>
     <div id="dashboardChecklist"></div>
+    <hr>
+
+<h4 style="color:#1a73e8; font-weight:bold;">
+📊 THÔNG TIN:
+</h4>
+
+<div id="dashboardInfo"></div>
 </div>
     
     <div class="card admin-only">
@@ -2783,6 +2815,39 @@ let checkHTML = `
 `;
 
 document.getElementById("dashboardChecklist").innerHTML = checkHTML; 
+        // ===== THÔNG TIN TÀU =====
+
+let totalShips = Object.keys(shipsData).length;
+let doneShips = 0;
+let activeShips = 0;
+
+Object.values(shipsData).forEach(s => {
+    if (s.status === "done") doneShips++;
+    else activeShips++;
+});
+
+let infoHTML = `
+<div class="info-grid">
+
+    <div class="info-box">
+        <div class="info-header">TỔNG</div>
+        <div class="info-body">${totalShips}</div>
+    </div>
+
+    <div class="info-box">
+        <div class="info-header">BÀN GIAO</div>
+        <div class="info-body">${doneShips}</div>
+    </div>
+
+    <div class="info-box">
+        <div class="info-header">ĐANG LÀM</div>
+        <div class="info-body">${activeShips}</div>
+    </div>
+
+</div>
+`;
+
+document.getElementById("dashboardInfo").innerHTML = infoHTML;
 }
 
 window.toggleShipDetail = function(ship) {

@@ -2538,13 +2538,16 @@ if (Object.keys(shipMap).length === 0) {
     Object.keys(shipMap).forEach(ship => {
         totalWorkers += shipMap[ship];
 
-        html += `
-        <div class="dash-row" onclick="toggleShipDetail('${ship}')">
-            🚢 <b>${ship}</b>: ${shipMap[ship]} người
-        </div>
+  // 👉 hiện nhóm sau tàu trên bảng Dashboard     
+let group = shipsData[ship]?.group || "-";
 
-        <div id="detail-${ship}" class="dash-detail"></div>
-        `;
+html += `
+    <div class="dash-row" onclick="toggleShipDetail('${ship}')">
+        🚢 <b>${ship}</b> (${group}): ${shipMap[ship]} người
+    </div>
+
+    <div id="detail-${ship}" class="dash-detail"></div>
+`;
     });
 
     // 👉 chỉ thêm tổng 1 lần (ngoài loop)

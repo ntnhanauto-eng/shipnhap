@@ -1163,34 +1163,27 @@ function renderShipManagerList() {
 
         let group = shipsData[shipId]?.group || "-";
 
-        html += `
-        <tr>
-            <td>
-    <select onchange="updateShipGroup('${shipId}', this.value)">
-        <option value="">-- Chọn --</option>
-        <option value="EO1" ${shipsData[shipId]?.group === "EO1" ? "selected" : ""}>EO1</option>
-        <option value="EO2" ${shipsData[shipId]?.group === "EO2" ? "selected" : ""}>EO2</option>
-    </select>
-</td>
+      html += `
+<tr>
+    <td>${shipId}</td>
 
-            <td style="text-align:center;">
-                ${group}
-            </td>
+    <td>
+        <select onchange="updateShipGroup('${shipId}', this.value)">
+            <option value="">-- Chọn --</option>
+            <option value="EO1" ${shipsData[shipId]?.group === "EO1" ? "selected" : ""}>EO1</option>
+            <option value="EO2" ${shipsData[shipId]?.group === "EO2" ? "selected" : ""}>EO2</option>
+        </select>
+    </td>
 
-            <td>
-                <button class="btn-delete"
-                    onclick="deleteShip('${shipId}')"
-                    style="
-                        margin:0;
-                        padding:4px 6px;
-                        width:auto;
-                        font-size:12px;
-                    ">
-                    🗑️
-                </button>
-            </td>
-        </tr>
-        `;
+    <td>
+        <button class="btn-delete"
+            onclick="deleteShip('${shipId}')"
+            style="margin:0; padding:4px 6px; width:auto; font-size:12px;">
+            🗑️
+        </button>
+    </td>
+</tr>
+`;
     });
 
     html += "</table>";

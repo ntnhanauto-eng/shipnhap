@@ -1910,9 +1910,17 @@ let checkedText = checkedItems.length > 0
         
 let group = shipsData[s]?.group || "-";
 
+// 🔥 xác định trạng thái
+let isDone = shipsData[s]?.status === "done";
+let statusText = isDone ? "Đã bàn giao" : "Đang làm";
+let statusColor = isDone ? "#188038" : "#1a73e8"; // xanh lá / xanh dương
+
 html += `
 <div class="summary-item">
-    <b>🚢 Tàu: ${s} (${group})</b><br>
+    <b>
+        🚢 Tàu: ${s} (${group}) 
+        - <span style="color:${statusColor}">${statusText}</span>
+    </b><br>
     - Tổng nhân công: ${result[s].totalWorkers} lượt người<br>
     - Tổng giờ thực tế: ${realHours.toLocaleString()} giờ<br>
     - Giờ định mức PP: <b>${savedPP.toLocaleString()}</b> giờ<br>

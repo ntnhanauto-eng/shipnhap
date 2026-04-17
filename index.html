@@ -931,8 +931,8 @@ button {
     border-radius: 10px;
     overflow: hidden;
     text-align: center;
-    background: #1a73e8;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+
+    background: transparent; /* ❗ bỏ nền xanh full card */
 }
 
 /* 🔵 Tiêu đề: nền xanh - chữ trắng */
@@ -948,10 +948,12 @@ button {
     font-size: 20px;
     font-weight: bold;
     padding: 12px;
-    background: #ffffff;      /* 🔥 nền trắng */
-    color: #1a73e8;           /* 🔥 chữ xanh đậm */
-}
 
+    background: #ffffff !important;   /* 🔥 ép trắng */
+    color: #1a73e8 !important;        /* 🔥 chữ xanh */
+
+    display: block;
+}
 
         
         

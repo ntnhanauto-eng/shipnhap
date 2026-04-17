@@ -1228,10 +1228,11 @@ window.addShip = function() {
     if(!name) return alert("Vui lòng nhập tên tàu!");
     if(shipsData[name]) return alert("Tàu này đã tồn tại!");
 
-    set(ref(db, "ships/" + name), {
-        name: name,
-        group: group || null   // 👈 lưu null nếu không chọn
-    })
+   set(ref(db, "ships/" + name), {
+    name: name,
+    group: group || null,
+    status: "active" // 🔥 thêm dòng này
+})
     .then(() => {
         document.getElementById("newShipName").value = "";
         document.getElementById("shipGroup").value = "";
@@ -1259,21 +1260,35 @@ window.deleteShip = function(shipId) {
         console.log("Đã cập nhật nhóm cho", shipId);
     });
 }
+window.updateShipStatus = function(shipId, statusVal) {
 
+    const shipName = shipsData[shipId]?.name || shipId;
+    const group = shipsData[shipId]?.group || "";
+
+    set(ref(db, "ships/" + shipId), {
+        name: shipName,
+        group: group,
+        status: statusVal
+    })
+    .then(() => {
+        console.log("Đã cập nhật trạng thái", shipId);
+    });
+}
     
 // 6. Hàm hiển thị danh sách tàu kèm nút Xóa
 function renderShipManagerList() {
 
     let html = `<table><tr>
-    <th>Tên Tàu</th>
-    <th>Nhóm</th>
-    <th style="width:60px">Xóa</th>
+   <th>Tên Tàu</th>
+<th>Nhóm</th>
+<th>Trạng thái</th>
+<th style="width:60px">Xóa</th>
 </tr>`;
     Object.keys(shipsData).sort().forEach(shipId => {
 
         let group = shipsData[shipId]?.group || "-";
 
-      html += `
+     html += `
 <tr>
     <td>${shipId}</td>
 
@@ -1282,6 +1297,21 @@ function renderShipManagerList() {
             <option value="">-- Chọn --</option>
             <option value="EO1" ${shipsData[shipId]?.group === "EO1" ? "selected" : ""}>EO1</option>
             <option value="EO2" ${shipsData[shipId]?.group === "EO2" ? "selected" : ""}>EO2</option>
+        </select>
+    </td>
+
+    <!-- 🔥 THÊM CỘT NÀY -->
+    <td>
+        <select onchange="updateShipStatus('${shipId}', this.value)">
+            <option value="active"
+                ${(shipsData[shipId]?.status || "active") === "active" ? "selected" : ""}>
+                🔧 Đang làm
+            </option>
+
+            <option value="done"
+                ${shipsData[shipId]?.status === "done" ? "selected" : ""}>
+                ✅ Đã bàn giao
+            </option>
         </select>
     </td>
 

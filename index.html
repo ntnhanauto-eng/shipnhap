@@ -962,32 +962,7 @@ button {
 .done-row td {
     pointer-events: none; /* không cho bấm */
 }
-  .summary-group {
-    margin-bottom: 20px;
-    padding: 12px;
-    border-radius: 10px;
-}
-
-.active-group {
-    background: #e8f0fe;
-}
-
-.done-group {
-    background: #e6f4ea;
-    opacity: 0.85;
-}
-
-.summary-group h4 {
-    margin-bottom: 10px;
-    font-size: 16px;
-}
-
-.summary-item {
-    background: #fff;
-    padding: 10px;
-    border-radius: 8px;
-    margin-bottom: 8px;
-}      
+        
         
     </style>
 </head>
@@ -1905,47 +1880,45 @@ setTimeout(() => {
     updateChartData(data, ship);
 }
 
-const box = document.getElementById("summaryDetail");
-const result = window.summaryDataCache || {};
-    if (Object.keys(result).length === 0) {
-    box.innerHTML = "<i>Chưa có dữ liệu báo cáo</i>";
-    return;
-}
+function renderSummaryDetail(ship){
+    const box = document.getElementById("summaryDetail");
+    const result = window.summaryDataCache;
 
-let activeHTML = "";
-let doneHTML = "";
+    let html = "";
 
-Object.keys(result).forEach(s => {
+    Object.keys(result).forEach(s => {
 
-    if(ship !== "all" && s !== ship) return;
+        if(ship !== "all" && s !== ship) return;
 
-    let key = s.replace(/\s/g,'_');
-    let savedPP = ppData[key]?.hours || 0;
-    let realHours = result[s].totalWorkers * 8;
+        let key = s.replace(/\s/g,'_');
+        let savedPP = ppData[key]?.hours || 0;
+        let realHours = result[s].totalWorkers * 8;
 
-    let efficiency = 0;
-    if(realHours > 0){
-        efficiency = (savedPP / realHours) * 100;
-    }
+        let efficiency = 0;
+        if(realHours > 0){
+            efficiency = (savedPP / realHours) * 100;
+        }
+        let progress = progressData[key]?.percent || 0;
+        let checkedItems = progressData[key]?.items || [];
+let checkedText = checkedItems.length > 0 
+    ? checkedItems.join(", ") 
+    : "Chưa có";
 
-    let progress = progressData[key]?.percent || 0;
-    let checkedItems = progressData[key]?.items || [];
-    let checkedText = checkedItems.length > 0 
-        ? checkedItems.join(", ") 
-        : "Chưa có";
+        let color = "red";
+        if(efficiency >= 100) color = "green";
+        else if(efficiency >= 70) color = "orange";
+        
+let group = shipsData[s]?.group || "-";
 
-    let color = "red";
-    if(efficiency >= 100) color = "green";
-    else if(efficiency >= 70) color = "orange";
+// 🔥 xác định trạng thái
+let isDone = shipsData[s]?.status === "done";
+let statusText = isDone ? "Đã bàn giao" : "Đang làm";
+let statusColor = isDone ? "#188038" : "#1a73e8"; // xanh lá / xanh dương
 
-    let group = shipsData[s]?.group || "-";
-
-    // 🔥 XÁC ĐỊNH TRẠNG THÁI
-    let isDone = shipsData[s]?.status === "done";
-
-    let block = `
-    <div class="summary-item">
-            <b> 🚢 Tàu: ${s} (${group}) 
+html += `
+<div class="summary-item">
+    <b>
+        🚢 Tàu: ${s} (${group}) 
         - <span style="color:${statusColor}">${statusText}</span>
     </b><br>
     - Tổng nhân công: ${result[s].totalWorkers} lượt người<br>
@@ -1955,38 +1928,11 @@ Object.keys(result).forEach(s => {
     - Tiến độ thực tế: <b style="color:#1a73e8">${progress} %</b>
     <br>
 - Các hạng mục đã kiểm tra: <b>${checkedText}</b>
+</div>`;
+    });
 
-
-    </div>
-    `;
-
-    if (isDone) {
-        doneHTML += block;
-    } else {
-        activeHTML += block;
-    }
-});
-
-// ===== RENDER 2 NHÓM =====
-let html = "";
-
-// 👉 ĐANG LÀM
-html += `
-<div class="summary-group active-group">
-    <h4>🔧 ĐANG LÀM</h4>
-    ${activeHTML || "<i>Không có tàu</i>"}
-</div>
-`;
-
-// 👉 ĐÃ BÀN GIAO
-html += `
-<div class="summary-group done-group">
-    <h4>✅ ĐÃ BÀN GIAO</h4>
-    ${doneHTML || "<i>Không có tàu</i>"}
-</div>
-`;
-
-box.innerHTML = html;
+    box.innerHTML = html;
+}
 
     function renderSummaryChart(result){
         Chart.register(ChartDataLabels);

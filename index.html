@@ -863,7 +863,40 @@ button {
     padding: 3px 0;
     font-weight: bold; /* 🔥 đậm theo yêu cầu */
 }   
- 
+
+  .check-total {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 6px;
+}
+
+.check-badge {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    color: #fff;
+    font-weight: bold;
+    font-size: 13px;
+}
+
+/* màu theo cột */
+.check-col.green .check-badge {
+    background: #188038;
+}
+
+.check-col.orange .check-badge {
+    background: #f9ab00;
+}
+
+.check-col.red .check-badge {
+    background: #d93025;
+}
+        
         
     </style>
 </head>
@@ -2670,15 +2703,26 @@ Object.keys(shipsData).forEach(ship => {
 
 function renderCol(list, color) {
 
-    if (list.length === 0) {
-        return `<div class="empty">Không có</div>`;
+    let total = list.length;
+
+    let html = `
+        <div class="check-total">
+            <div class="check-badge">${total}</div>
+        </div>
+    `;
+
+    if (total === 0) {
+        html += `<div class="empty">Không có</div>`;
+        return html;
     }
 
-    return list.map(x => `
+    html += list.map(x => `
         <div class="check-item" style="color:${color}">
             ${x.ship} (${x.count}/3)
         </div>
     `).join("");
+
+    return html;
 }
 
 let checkHTML = `

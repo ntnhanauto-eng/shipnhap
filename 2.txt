@@ -1,0 +1,2813 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản Lý Casing</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 10px; background: #f0f2f5; }
+        
+        /* Header & Login */
+        .header-container { display: flex; justify-content: space-between; align-items: center; position: relative; margin-bottom: 10px; }
+        
+        
+       #authBtn { 
+    position: absolute; 
+    right: 0; 
+    top: 40px; /* hạ xuống một chút */
+
+    width: auto; 
+    padding: 6px 12px; 
+    font-size: 12px; 
+
+    background: rgba(52, 168, 83, 0.5); /* màu mờ */
+    color: #fff;
+
+    border-radius: 5px;
+    opacity: 0.7; /* làm mờ tổng thể */
+}
+
+    #authBtn:hover {
+    opacity: 1;
+    background: rgba(52, 168, 83, 0.9);
+}
+
+        
+        .logout-mode { background: #dc3545 !important; }
+
+        .card { background: #fff; padding: 15px; margin-bottom: 15px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        input, select, button { width: 100%; margin: 8px 0; padding: 12px; font-size: 15px; border-radius: 8px; border: 1px solid #ddd; }
+        button { background: #1a73e8; color: white; border: none; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        button:hover { background: #1557b0; }
+        .flex { display: grid; grid-template-columns: 1fr; gap: 10px; }
+        @media(min-width: 600px){ .flex { grid-template-columns: 1fr 1fr; } }
+        
+        .table-wrap { max-height: 650px; overflow: auto; border: 1px solid #eee; border-radius: 8px; }
+        table { width: 100%; border-collapse: collapse; min-width: 600px; table-layout: fixed; }
+        th, td { border-bottom: 1px solid #eee; padding: 10px; text-align: left; font-size: 14px; word-wrap: break-word; }
+        th { background: #f8f9fa; position: sticky; top: 0; z-index: 10; }
+
+        .stt-col { width: 45px; text-align: center; }
+        .ship-col { width: 80px; font-weight: bold; }
+        .date-col { width: 100px; }
+        .worker-col { width: 70px; text-align: center; }
+        .action-col { width: 90px; text-align: center; }
+        
+        .action-buttons { display: flex; gap: 5px; justify-content: center; }
+        .action-buttons button { width: 35px; height: 35px; padding: 0; margin: 0; }
+        .btn-edit { background: #ffc107; }
+        .btn-delete { background: #dc3545; }
+        
+        .summary-item { border-bottom: 1px solid #eee; padding: 10px 0; }
+        .total-row { background: #e8f0fe; font-weight: bold; color: #1a73e8; }
+
+        /* PHÂN QUYỀN CSS */
+        .admin-only { display: none; } /* Mặc định ẩn các tính năng admin */
+        body.is-admin .admin-only { display: block; }
+        body.is-admin .admin-inline { display: table-cell; }
+        .admin-inline { display: none; }
+
+        /* Tối ưu lại input để không bị tràn và hiển thị đẹp trên mobile */
+input, select, button { 
+    width: 100%; 
+    margin: 8px 0; 
+    padding: 12px; 
+    font-size: 14px; /* Giảm nhẹ font size cho mobile */
+    border-radius: 8px; 
+    border: 1px solid #ccc; 
+    -webkit-appearance: none; /* Giúp hiển thị đồng nhất trên iOS */
+}
+
+/* Fix lỗi ô Date bị dài hoặc không hiện định dạng */
+input[type="date"] {
+    position: relative;
+    min-height: 45px;
+}
+
+/* Tạo hàng riêng cho 2 ô ngày để chúng nằm cạnh nhau thay vì chồng lên nhau */
+.date-row {
+    display: flex;
+    gap: 10px;
+}
+
+.date-row .date-field {
+    flex: 1;
+}
+.date-row input {
+    flex: 1; /* Chia đều 50-50 */
+    min-width: 0; /* Ngăn chặn input phá vỡ layout flex */
+}
+
+/* Giữ Grid cho các thành phần khác */
+.flex { display: grid; grid-template-columns: 1fr; gap: 10px; }
+@media(min-width: 600px){ 
+    .flex { grid-template-columns: 1fr 1fr; } 
+}
+
+.date-field {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+
+.date-field label {
+    font-size: 13px;
+    color: #555;
+    margin-bottom: 3px;
+}
+
+/* Fix bảng giờ công mobile */
+#workHoursBox {
+    overflow-x: auto;
+}
+
+#workHoursBox table {
+    min-width: 400px;
+    width: 100%;
+    border-collapse: collapse;
+}
+
+#workHoursBox th, 
+#workHoursBox td {
+    padding: 8px;
+    font-size: 13px;
+    text-align: center;
+}
+
+#workHoursBox input {
+    padding: 8px;
+    font-size: 13px;
+    width: 100%;
+    min-width: 80px;
+    box-sizing: border-box;
+}
+
+/* Nút nhỏ lại cho mobile */
+#workHoursBox button {
+    padding: 6px;
+    font-size: 12px;
+}
+/* FIX bảng tiến độ */
+#progressBox {
+    overflow-x: auto;
+}
+
+#progressBox table {
+    min-width: 400px;
+    width: 100%;
+    border-collapse: collapse;
+}
+
+#progressBox th,
+#progressBox td {
+    padding: 8px;
+    font-size: 13px;
+    text-align: center;
+}
+
+#progressBox input {
+    padding: 8px;
+    font-size: 13px;
+    width: 100%;
+    min-width: 80px;
+    box-sizing: border-box;
+}
+
+#progressBox button {
+    padding: 6px;
+    font-size: 12px;
+}
+
+        
+
+  /* Tiêu đề E/R Casing */      
+h2 {
+    margin: 0;
+    color: white;
+    background: #28a745; /* xanh lá */
+    padding: 8px 15px;
+    border-radius: 8px;
+    flex-grow: 1;
+    text-align: center;
+}
+
+.header-container {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    background: #f0f2f5;
+    padding-top: 2px;
+    padding-bottom: 2px;
+}
+
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 2000;
+    left: 0; top: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.4);
+}
+
+.modal-content {
+    background: #fff;
+    margin: 15% auto;
+    padding: 20px;
+    width: 90%;
+    max-width: 350px;
+    border-radius: 12px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+    text-align: center;
+    animation: fadeIn 0.3s ease;
+}
+
+.modal-content h3 {
+    margin-bottom: 10px;
+}
+
+.close {
+    float: right;
+    font-size: 22px;
+    cursor: pointer;
+}
+
+@keyframes fadeIn {
+    from { transform: translateY(-20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+  .filter-row {
+    display: flex;
+    gap: 10px;
+}
+
+.filter-row select {
+    flex: 1; /* mỗi ô chiếm 50% */
+    min-width: 0;
+}      
+
+input, select {
+    width: 100%;
+    margin: 8px 0;
+    padding: 12px;
+    font-size: 14px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+
+    transition: all 0.25s ease; /* mượt */
+}
+
+/* 🟢 Khi focus */
+input:focus, select:focus {
+    border-color: #34a853;
+    background: #f0fff4;
+    box-shadow: 0 0 6px rgba(52,168,83,0.4);
+    outline: none;
+}
+
+/* 🔴 Khi lỗi */
+input.error, select.error {
+    border-color: #ccc;     /* giống bình thường */
+    background: #fff;       /* bỏ màu đỏ */
+}
+
+/* ⚪ Bình thường */
+input, select {
+    background: #fff;
+}
+.btn-save {
+    width: auto;
+    display: block;
+    margin: 10px auto;
+    padding: 10px 20px;
+}
+
+.btn-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* 2 cột */
+    gap: 10px;
+}
+
+.btn-grid button {
+    width: 100%;
+}
+
+/* trạng thái khi bấm */
+.btn-active {
+    background: #28a745 !important;
+}
+.pagination {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 3px;              /* giảm khoảng cách */
+    padding: 5px;          /* nhỏ lại */
+    border-top: 1px solid #eee;
+    background: #fff;
+    position: sticky;
+    bottom: 0;
+}
+
+.pagination button {
+    width: auto;
+    padding: 4px 8px;        /* nhỏ lại */
+    font-size: 12px;         /* chữ nhỏ */
+    border-radius: 5px;
+
+    background: #fff;        /* nền trắng */
+    color: #000;             /* chữ đen */
+    border: 1px solid #ccc;  /* viền nhẹ */
+
+    cursor: pointer;
+}
+/* Hover nhẹ */
+.pagination button:hover {
+    background: #f1f1f1;
+}
+
+/* Trang đang chọn */
+.pagination button.active {
+    background: #fff;        /* vẫn trắng */
+    color: #28a745;          /* xanh chữ */
+    border: 1px solid #28a745;
+    font-weight: bold;
+}      
+  /* Disable */
+.pagination button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}   
+
+#shipListContent table {
+    width: 100%;
+    min-width: 250px; /* tránh co quá nhỏ */
+    border-collapse: collapse;
+}
+
+#shipListContent th,
+#shipListContent td {
+    padding: 8px;
+    font-size: 13px;
+    word-break: break-word;
+}
+
+#shipListContent th {
+    background: #f8f9fa;
+}
+
+#shipListContent td:last-child {
+    text-align: center;
+    width: 60px;
+}
+
+  #shipListContent td:first-child {
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}      
+
+.table-wrap {
+    max-height: 650px;
+    overflow: auto;
+
+    border: 2px solid #34a853;
+    border-radius: 12px;
+    padding: 5px;
+    background: #fff;
+
+    /* 🔥 hiệu ứng glow nhẹ */
+    box-shadow: 0 0 6px rgba(52, 168, 83, 0.25);
+
+    /* mượt khi hover */
+    transition: all 0.25s ease;
+}
+
+/* 🔥 hover nâng nhẹ */
+.table-wrap:hover {
+    box-shadow: 0 4px 15px rgba(52, 168, 83, 0.35);
+    transform: translateY(-2px);
+}
+
+/* 🔥 animation khi load */
+.table-wrap {
+    animation: fadeSlideIn 0.4s ease;
+}
+
+@keyframes fadeSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.footer {
+    text-align: center;
+    font-size: 12px;
+    color: #777;
+    margin-top: 20px;
+    padding: 10px 0;
+
+    /* nếu muốn cố định dưới màn hình */
+    position: relative;
+}
+
+/* 🔥 Nếu muốn luôn dính đáy màn hình thì dùng cái này thay cho trên */
+/*
+.footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: #f0f2f5;
+    text-align: center;
+    font-size: 12px;
+    color: #777;
+    padding: 8px 0;
+    border-top: 1px solid #ddd;
+}
+*/
+#marqueeBox {
+    width: 100%;
+    overflow: hidden;
+
+    background: transparent;   /* 🔥 trùng nền body */
+    border: none;              /* bỏ viền */
+    box-shadow: none;          /* nếu có shadow thì bỏ */
+
+    margin-bottom: 10px;
+}
+#marqueeText {
+    display: inline-block;
+    white-space: nowrap;
+    color: red;
+    font-weight: bold;
+    padding: 8px 0;
+    animation: marqueeMove 12s linear infinite;
+}
+
+/* chạy từ phải → trái */
+@keyframes marqueeMove {
+    0% {
+        transform: translateX(100%);
+    }
+    100% {
+        transform: translateX(-100%);
+    }
+}
+   #summaryChart {
+    width: 100% !important;
+    height: 300px !important;
+}    
+ .auto-textarea {
+    width: 100%;
+    min-height: 100px;
+    max-height: 500px;
+    overflow-y: auto;
+    resize: none;
+
+    font-size: 14px;      /* 🔥 tăng giảm chữ */
+    line-height: 1.6;     /* 🔥 dễ đọc hơn */
+    padding: 10px;        /* 🔥 thoáng hơn */
+}
+   .auto-textarea {
+    width: 100%;
+    min-height: 100px;   /* min như hiện tại */
+    max-height: 500px;   /* max */
+    overflow-y: auto;    /* scroll khi vượt */
+    resize: none;        /* không cho kéo tay */
+    line-height: 1.4;
+}
+   /* 📦 Vật tư */
+.mat-box {
+    border: 2px solid #34a853;
+    border-radius: 10px;
+    
+    background: #fff;
+
+    /* 🔥 đổ bóng nhẹ, nổi khung */
+    box-shadow: 
+        0 2px 6px rgba(0,0,0,0.08),
+        0 0 4px rgba(52,168,83,0.2);
+
+    transition: all 0.25s ease;
+}
+
+/* 📝 Ghi chú */
+.note-box {
+    border: 2px solid #1a73e8;
+    border-radius: 10px;
+
+    background: #fff;
+
+    box-shadow: 
+        0 2px 6px rgba(0,0,0,0.08),
+        0 0 4px rgba(26,115,232,0.2);
+
+    transition: all 0.25s ease;
+}
+    .mat-box:hover {
+    box-shadow: 
+        0 6px 15px rgba(52,168,83,0.25),
+        0 0 6px rgba(52,168,83,0.3);
+
+    transform: translateY(-2px);
+}
+
+.note-box:hover {
+    box-shadow: 
+        0 6px 15px rgba(26,115,232,0.25),
+        0 0 6px rgba(26,115,232,0.3);
+
+    transform: translateY(-2px);
+}
+
+   .mat-box:focus {
+    border-color: #2e7d32;
+    box-shadow: 
+        0 0 0 2px rgba(52,168,83,0.2),
+        0 6px 18px rgba(52,168,83,0.35);
+
+    outline: none;
+}
+
+.note-box:focus {
+    border-color: #0b57d0;
+    box-shadow: 
+        0 0 0 2px rgba(26,115,232,0.2),
+        0 6px 18px rgba(26,115,232,0.35);
+
+    outline: none;
+}     
+        
+.textarea-wrap {
+    position: relative;
+}
+
+.highlight-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+
+    color: transparent;
+    overflow: hidden;
+    pointer-events: none;
+
+    z-index: 1;
+}
+
+.highlight-layer mark {
+    background: yellow;
+    color: transparent;
+}
+
+.textarea-wrap textarea {
+    position: relative;
+    z-index: 2;
+    background: transparent;
+}
+  .dashboard-header {
+    background: transparent;
+    color: #1a73e8;
+
+    padding: 8px 10px;
+    margin-bottom: 10px;
+
+    border: none;
+
+    border-left: 4px solid #34a853; /* chỉ 1 vạch nhấn nhẹ */
+    padding-left: 12px;
+}
+
+  
+
+      
+   #dashboardBox {
+    border: 3px solid #34a853;
+    border-radius: 14px;
+
+    box-shadow: 
+        0 6px 18px rgba(0,0,0,0.1),
+        0 0 10px rgba(52,168,83,0.2);
+
+    transition: all 0.3s ease;
+} 
+
+/* hiệu ứng hover cho đẹp */
+#dashboardBox:hover {
+    transform: translateY(-2px);
+    box-shadow: 
+        0 10px 25px rgba(0,0,0,0.12),
+        0 0 15px rgba(52,168,83,0.35);
+}
+
+
+        
+
+#dashboardTitle {
+    margin: 0;
+    font-size: 18px;
+    font-weight: bold;
+    color: #0b5ed7;
+}
+
+.dashboard-sub {
+    font-size: 12px;
+    opacity: 0.9;
+    margin-top: 3px;
+}  
+
+.new-row {
+    background: #fff3cd !important; /* vàng nhẹ */
+    animation: fadeHighlight 30s forwards;
+}
+
+/* hiệu ứng mờ dần */
+@keyframes fadeHighlight {
+    0% {
+        background: #ffeeba;
+    }
+    100% {
+        background: transparent;
+    }
+}
+
+
+.textarea-wrap textarea,
+.highlight-layer {
+    font-family: inherit;
+    font-size: 14px;
+    line-height: 1.6;
+
+    padding: 10px;
+
+    white-space: pre-wrap;
+    word-wrap: break-word;
+
+    box-sizing: border-box;
+}
+
+.textarea-wrap {
+    position: relative;
+    width: 100%;
+}
+
+.textarea-wrap textarea,
+.textarea-wrap .highlight-layer {
+    font-family: inherit;
+    font-size: 14px;
+    line-height: 1.5;
+    padding: 8px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+ .textarea-wrap textarea,
+.textarea-wrap .highlight-layer {
+    font-family: monospace;
+}
+.textarea-wrap textarea,
+.textarea-wrap .highlight-layer {
+    line-height: 20px; /* KHÔNG dùng 1.5 */
+}
+
+   textarea {
+    transform: translateZ(0);
+}  
+
+.textarea-wrap textarea,
+.textarea-wrap .highlight-layer {
+    padding: 10px;
+    box-sizing: border-box;
+}
+        .mat-box {
+    font-family: monospace !important;
+    line-height: 20px !important;
+}
+
+.dash-row {
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 6px;
+    transition: 0.2s;
+}
+
+.dash-row:hover {
+    background: #e8f0fe;
+}
+
+.dash-detail {
+    padding-left: 15px;
+    margin-bottom: 6px;
+}
+
+.detail-row {
+    font-size: 13px;
+    padding: 4px 0;
+
+    white-space: normal;       /* cho xuống dòng */
+    word-break: break-word;    /* cắt chữ dài */
+    overflow-wrap: anywhere;   /* chống vỡ layout */
+}
+
+.detail-total {
+    font-weight: bold;
+    margin-top: 5px;
+    color: #1a73e8;
+}
+
+.empty {
+    font-style: italic;
+    color: #888;
+}
+
+
+.highlight-layer {
+    white-space: pre-wrap;
+    line-height: 22px;
+}
+
+  /* ===== NỀN ĐẸP HƠN (khuyến nghị) ===== */
+
+/* ===== BUTTON CHUNG ===== */
+
+
+/* ===== HOVER ===== */
+button:hover {
+    transform: translateY(-2px) scale(1.03);
+
+  /*  background: #0b3d91; /* 🔥 xanh blue đậm */ */
+
+    box-shadow:
+        0 8px 25px rgba(0,0,0,0.35),
+        inset 0 0 10px rgba(46,125,50, 0.25);
+}  
+
+/* ===== CLICK ===== */
+button:active {
+    transform: scale(0.96);
+}
+
+/* ===== ACTIVE (btn-active bạn đang dùng) ===== */
+.btn-active {
+    background: linear-gradient(135deg, rgba(26,115,232,0.6), rgba(0,200,255,0.6));
+
+    box-shadow:
+        0 0 12px rgba(0,150,255,0.7),
+        inset 0 0 8px rgba(255,255,255,0.2);
+}
+
+
+
+/* ===== HIỆU ỨNG ÁNH SÁNG CHẠY ===== */
+button::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -70%;
+    width: 50%;
+    height: 100%;
+
+    background: linear-gradient(
+        120deg,
+        transparent,
+        rgba(255,255,255,0.4),
+        transparent
+    );
+
+    transform: skewX(-25deg);
+}
+
+button:hover::before {
+    animation: shine 0.8s forwards;
+}
+
+@keyframes shine {
+    100% {
+        left: 120%;
+    }
+}
+
+/* cần để hiệu ứng hoạt động */
+button {
+    position: relative;
+    overflow: hidden;
+}
+
+.status-check {
+    padding-bottom: 20px;
+    display: block;
+}
+   .check-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+}
+
+.check-col {
+    border-radius: 8px;
+    padding: 8px;
+    background: #fff;
+    border: 2px solid #eee;
+}
+
+.check-title {
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 5px;
+}
+
+.check-col.green { border-color: #188038; }
+.check-col.orange { border-color: #f9ab00; }
+.check-col.red { border-color: #d93025; }
+
+.check-item {
+    font-size: 13px;
+    padding: 3px 0;
+}     
+ 
+        
+    </style>
+</head>
+<body id="mainBody">
+
+    <div class="header-container">
+       
+        <h2>🚢 E/R CASING</h2>
+        <button id="authBtn" onclick="handleAuth()">🔐 Admin</button>
+    </div>
+    
+     <div id="marqueeBox">
+    <div id="marqueeText"></div>
+    </div>
+    <!-- 📊 DASHBOARD CHÈN Ở ĐÂY -->
+<div class="card" id="dashboardBox">
+    <div class="dashboard-header">
+    <h3 id="dashboardTitle">📊 Dashboard</h3>
+    <div class="dashboard-sub" id="dashboardSub"></div>
+</div>
+
+    <div id="dashboardSummary"></div>
+
+    <hr>
+
+    <h4 style="color:#1a73e8; font-weight:bold;">
+    📋 HẠNG MỤC KIỂM TRA:
+</h4>
+    <div id="dashboardChecklist"></div>
+</div>
+    
+    <div class="card admin-only">
+        <h3>Nhập Dữ Liệu</h3>
+         <div class="date-row">
+    <div class="date-field">
+        <label for="date">Chọn ngày</label>
+        <input type="date" id="date">
+    </div>
+
+    <div class="date-field">
+        <label for="ship">Chọn tàu</label>
+        <select id="ship">
+            <option value="all">-- Chọn Tàu --</option>
+        </select>
+    </div>
+</div>
+        <div class="flex">
+            <input type="number" id="workers" placeholder="Số người thực hiện">
+            <input type="text" id="job" placeholder="Nội dung công việc">
+        </div>
+        <button class="btn-save" onclick="saveLog()">💾 Lưu Thông Tin</button>
+    </div>
+   <div class="card" id="upcomingEventsBox">
+    <h3>📅 Các sự kiện trong 7 ngày tới</h3>
+    <div class="table-wrap">
+        <table id="upcomingEventsTable">
+            <thead>
+                <tr>
+                    <th style="width: 90px;">Ngày</th>
+                    <th style="width: 70px;">Tàu</th>
+                    <th>Nội dung công việc</th>
+                </tr>
+            </thead>
+            <tbody id="upcomingEventsBody">
+                </tbody>
+        </table>
+    </div>
+</div>
+    
+  <div class="card">
+    <div style="margin-bottom: 15px;">
+        <label for="shipFilter" style="font-weight:bold; display:block; margin-bottom:5px;">🚢 Tìm kiếm Dữ liệu:</label>
+        <select id="shipFilter">
+            <option value="all">Tất cả tàu</option>
+        </select>
+    </div>
+
+    <h3 style="cursor:pointer; color:#1a73e8; margin:0; font-size:16px;" onclick="toggleAdvancedSearch()">
+        🔍 Tìm kiếm nâng cao ▾
+    </h3>
+    
+    <div id="advancedSearch" style="display: none; margin-top: 15px;">
+        <div class="date-row">
+            <div class="date-field">
+                <label for="fromDate">Từ ngày</label>
+                <input type="date" id="fromDate">
+            </div>
+            <div class="date-field">
+                <label for="toDate">Đến ngày</label>
+                <input type="date" id="toDate">
+            </div>
+        </div>
+
+        <div class="flex" style="margin-top: 10px;">
+            <input type="text" id="jobFilter" placeholder="Tìm tên công việc...">
+        </div>
+
+        <div class="filter-row" style="margin-top: 10px;">
+    
+    <select id="groupFilter">
+        <option value="all">Tất cả nhóm</option>
+        <option value="EO1">EO1</option>
+        <option value="EO2">EO2</option>
+    </select>
+
+    <select id="sortType">
+        <option value="desc">📅 Mới nhất trước</option>
+        <option value="asc">📅 Cũ nhất trước</option>
+    </select>
+
+</div>
+                
+        </div>
+    </div>
+</div>
+
+   <div class="card">
+
+    <h3 class="table-title">KẾ HOẠCH và NHÂN LỰC THỰC TẾ</h3>
+
+    <div class="table-wrap">
+        <div id="tableContainer"></div>
+        <div id="pagination" class="pagination"></div>
+    </div>
+</div>
+
+    <div class="card">
+       <div class="btn-grid">
+    <button id="btnExport" class="admin-only" onclick="handleButton('export')">📥 Xuất Excel</button>
+    <button id="btnManageShips" class="admin-only" onclick="handleButton('ships')">🚢 Danh Sách Tàu</button>
+
+    <button id="btnWorkHours" class="admin-only" onclick="handleButton('hours')">⏱️ Giờ Công Tàu</button>
+    <button id="btnSummary" onclick="handleButton('summary')">📊 Xem BÁO CÁO</button>
+    <button id="btnProgress" class="admin-only" onclick="handleButton('progress')">📌 Nhập tiến độ tàu</button>
+     <button id="btnChecklist" class="admin-only" onclick="handleButton('checklist')">📋 Mục kiểm tra</button>
+    <button id="btnExtra" onclick="handleButton('extra')">📦 Vật tư & Ghi chú</button>
+</div>
+        
+        <div id="summary" style="display:none; margin-top:15px;"></div>
+        
+        <div id="workHoursBox" style="display:none; margin-top:15px;">
+            <h4>Nhập Giờ Công Theo Định Mức</h4>
+            <div id="workHoursContent"></div>
+            </div>
+        <div id="shipManagerBox" class="card admin-only" style="display:none; margin-top:15px;">
+    <h4>Quản Lý Danh Sách Tàu</h4>
+    <div class="flex">
+       <input type="text" id="newShipName" placeholder="Nhập tên tàu mới (VD: S580)">
+
+<select id="shipGroup">
+    <option value="">-- Không gán nhóm --</option>
+    <option value="EO1">EO1</option>
+    <option value="EO2">EO2</option>
+</select>
+
+<button onclick="addShip()">➕ Thêm Tàu</button>
+    </div>           
+    <div id="shipListContent" style="margin-top:10px; overflow-x:auto;"></div>
+</div>
+               
+<div id="progressBox" class="card admin-only" style="display:none; margin-top:15px;">
+    <h4>📌 Nhập tiến độ thực tế (%)</h4>
+    <div id="progressContent"></div>
+</div>
+   <div id="checklistBox" class="card admin-only" style="display:none; margin-top:15px;">
+    <h4>📋 Nhập hạng mục kiểm tra</h4>
+    <div id="checklistContent"></div>
+</div>    
+<div id="extraBox" class="card" style="display:none; margin-top:15px;">
+    <h4>📦 Vật tư & 📝 Ghi chú</h4>
+
+    <label><b>🚢 Chọn tàu:</b></label>
+    <select id="extraShip" onchange="renderExtraDetail()">
+        <option value="">-- Chọn tàu --</option>
+    </select>
+
+    <div id="extraDetail" style="margin-top:15px;"></div>
+</div>
+        
+    </div>
+
+<script type="module">
+
+    
+    // cài đặt web lên màn hình
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js')
+        .then(reg => console.log('Service Worker registered!'))
+        .catch(err => console.log('Service Worker registration failed: ', err));
+    });
+  }
+
+    let openedShip = null;
+    let logoutTimer = null;
+    // Thay vì valueAsDate, dùng cách thủ công để định dạng chắc chắn là YYYY-MM-DD
+const today = new Date();
+const yyyy = today.getFullYear();
+const mm = String(today.getMonth() + 1).padStart(2, '0');
+const dd = String(today.getDate()).padStart(2, '0');
+document.getElementById("date").value = `${yyyy}-${mm}-${dd}`;
+
+    let currentPage = 1;
+    const rowsPerPage = 50;
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getDatabase, ref, push, onValue, remove, update, set } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+    import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+    const firebaseConfig = {
+  apiKey: "AIzaSyCdBCy8ttrdcfQoSPr3nNmsynmBtnkYv0o",
+  authDomain: "ship-90534.firebaseapp.com",
+  databaseURL: "https://ship-90534-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "ship-90534"
+};
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const auth = getAuth(app);
+
+    let rawData = {};
+    let ppData = {};
+    let editId = null;
+    let isAdmin = false;
+    let currentFiltered = [];
+    let shipsData = {}; // Biến lưu danh sách tàu từ Firebase
+    let progressData = {};
+    let lastDataTime = 0;
+    let isFirstLoad = true;
+
+    function showNotification(message) {
+
+    const box = document.createElement("div");
+    box.innerText = "🔔 " + message;
+
+    box.style.position = "fixed";
+    box.style.top = "20px";
+    box.style.right = "20px";
+    box.style.background = "#1a73e8";
+    box.style.color = "#fff";
+    box.style.padding = "12px 16px";
+    box.style.borderRadius = "8px";
+    box.style.boxShadow = "0 4px 12px rgba(0,0,0,0.2)";
+    box.style.zIndex = "9999";
+    box.style.transition = "all 0.3s ease";
+    box.style.transform = "translateX(100%)";
+
+    document.body.appendChild(box);
+
+    // 👉 Animation trượt vào
+    setTimeout(() => {
+        box.style.transform = "translateX(0)";
+    }, 10);
+
+    // 👉 RUNG (Android)
+    if (navigator.vibrate) {
+        navigator.vibrate([200, 100, 200]);
+    }
+
+    // 👉 ÂM THANH (PC + Mobile)
+    try {
+        const audio = new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg");
+        audio.play();
+    } catch (e) {
+        console.log("Không phát được âm thanh:", e);
+    }
+
+    // 👉 Ẩn + animation trượt ra
+    setTimeout(() => {
+        box.style.transform = "translateX(100%)";
+        setTimeout(() => {
+            box.remove();
+        }, 300);
+    }, 5000);
+}
+
+// 1. Lắng nghe danh sách tàu từ Firebase
+onValue(ref(db, "ships"), snapshot => {
+    shipsData = snapshot.val() || {};
+    renderShipSelects(); // Cập nhật các ô chọn tàu
+    // Nếu đang mở bảng quản lý tàu thì vẽ lại bảng đó luôn
+    if(document.getElementById("shipManagerBox").style.display === "block") {
+        renderShipManagerList();
+        renderDashboard();
+    }
+});
+
+    onValue(ref(db, "progress"), snapshot => {
+    progressData = snapshot.val() || {};
+    if(document.getElementById("summary").style.display === "block") {
+        showSummary();
+        renderDashboard();
+    }
+});
+
+// 2. Hàm tự động điền tên tàu vào các ô Select
+function renderShipSelects() {
+    const shipSelect = document.getElementById("ship");
+    const filterSelect = document.getElementById("shipFilter");
+    
+    let options = `<option value="all">-- Chọn Tàu --</option>`;
+    let filterOptions = `<option value="all">Tất cả tàu</option>`;
+    
+    // Sắp xếp tên tàu theo bảng chữ cái và tạo danh sách option
+    Object.keys(shipsData).sort().forEach(shipId => {
+        options += `<option value="${shipId}">${shipId}</option>`;
+        filterOptions += `<option value="${shipId}">${shipId}</option>`;
+    });
+    
+    shipSelect.innerHTML = options;
+    filterSelect.innerHTML = filterOptions;
+}
+
+// 3. Hàm Đóng/Mở khung quản lý tàu
+window.toggleShipManager = function() {
+    const box = document.getElementById("shipManagerBox");
+    box.style.display = (box.style.display === "none") ? "block" : "none";
+    if(box.style.display === "block") {
+        renderShipManagerList();
+        document.getElementById("summary").style.display = "none";
+        document.getElementById("workHoursBox").style.display = "none";
+    }
+}
+
+// 4. Hàm Thêm tàu mới lên Firebase
+window.addShip = function() {
+    const name = document.getElementById("newShipName").value.trim().toUpperCase();
+    const group = document.getElementById("shipGroup").value; // 👈 thêm dòng này
+
+    if(!name) return alert("Vui lòng nhập tên tàu!");
+    if(shipsData[name]) return alert("Tàu này đã tồn tại!");
+
+    set(ref(db, "ships/" + name), {
+        name: name,
+        group: group || null   // 👈 lưu null nếu không chọn
+    })
+    .then(() => {
+        document.getElementById("newShipName").value = "";
+        document.getElementById("shipGroup").value = "";
+
+        alert("Đã thêm tàu " + name);
+    });
+}
+
+// 5. Hàm Xóa tàu khỏi danh sách
+window.deleteShip = function(shipId) {
+    if(confirm(`Xác nhận xóa tàu ${shipId}?`)) {
+        remove(ref(db, "ships/" + shipId));
+    }
+}
+ window.updateShipGroup = function(shipId, groupVal) {
+
+    // giữ nguyên name cũ
+    const shipName = shipsData[shipId]?.name || shipId;
+
+    set(ref(db, "ships/" + shipId), {
+        name: shipName,
+        group: groupVal || ""
+    })
+    .then(() => {
+        console.log("Đã cập nhật nhóm cho", shipId);
+    });
+}
+
+    
+// 6. Hàm hiển thị danh sách tàu kèm nút Xóa
+function renderShipManagerList() {
+
+    let html = `<table><tr>
+    <th>Tên Tàu</th>
+    <th>Nhóm</th>
+    <th style="width:60px">Xóa</th>
+</tr>`;
+    Object.keys(shipsData).sort().forEach(shipId => {
+
+        let group = shipsData[shipId]?.group || "-";
+
+      html += `
+<tr>
+    <td>${shipId}</td>
+
+    <td>
+        <select onchange="updateShipGroup('${shipId}', this.value)">
+            <option value="">-- Chọn --</option>
+            <option value="EO1" ${shipsData[shipId]?.group === "EO1" ? "selected" : ""}>EO1</option>
+            <option value="EO2" ${shipsData[shipId]?.group === "EO2" ? "selected" : ""}>EO2</option>
+        </select>
+    </td>
+
+    <td>
+        <button class="btn-delete"
+            onclick="deleteShip('${shipId}')"
+            style="margin:0; padding:4px 6px; width:auto; font-size:12px;">
+            🗑️
+        </button>
+    </td>
+</tr>
+`;
+    });
+
+    html += "</table>";
+
+    document.getElementById("shipListContent").innerHTML = html;
+}
+
+    // --- XỬ LÝ ĐĂNG NHẬP ---
+  window.handleAuth = function() {
+    if (isAdmin) {
+        signOut(auth).then(() => {
+            alert("Đã đăng xuất!");
+            location.reload(); // 🔥 reload lại trang
+        });
+    } else {
+        document.getElementById("loginModal").style.display = "block";
+    }
+}
+
+    // Theo dõi trạng thái đăng nhập
+    onAuthStateChanged(auth, (user) => {
+        const body = document.getElementById("mainBody");
+        const btn = document.getElementById("authBtn");
+        if (user) {
+            isAdmin = true;
+            body.classList.add("is-admin");
+            btn.innerText = "🔐 Thoát Admin";
+            btn.classList.add("logout-mode");
+            startAutoLogout();
+        } else {
+            isAdmin = false;
+            body.classList.remove("is-admin");
+            btn.innerText = "🔐 Admin";
+            btn.classList.remove("logout-mode");
+            document.getElementById("workHoursBox").style.display = "none";
+        }
+        applyFilter(); // Vẽ lại bảng để hiện/ẩn cột Sửa/Xóa
+    });
+
+    // --- CÁC HÀM CỦA BẠN (GIỮ NGUYÊN LOGIC) ---
+    window.saveLog = function(){
+        const shipVal = document.getElementById("ship").value;
+        const dateVal = document.getElementById("date").value;
+        const workerVal = document.getElementById("workers").value;
+        const jobVal = document.getElementById("job").value;
+
+        if(shipVal === 'all' || !dateVal || !workerVal) {
+            alert("Vui lòng nhập đầy đủ Tàu, Ngày và Số người!");
+            return;
+        }
+
+        let data = { ship_id: shipVal, date: dateVal, workers: Number(workerVal), job: jobVal,  createdAt: Date.now() };
+
+        if(editId){
+            update(ref(db, "logs/" + editId), data).then(() => {
+                editId = null;
+                alert("Cập nhật thành công!");
+                clearForm();
+            });
+        } else {
+            push(ref(db, "logs"), data).then(() => {
+                alert("Đã lưu!");
+                clearForm();
+            });
+        }
+    }
+
+    onValue(ref(db, "logs"), snapshot => {
+
+    const data = snapshot.val() || {};
+
+    // 🔥 tìm thời gian mới nhất
+    let newest = 0;
+
+    Object.values(data).forEach(x => {
+        if (x.createdAt && x.createdAt > newest) {
+            newest = x.createdAt;
+        }
+    });
+
+    // 🔥 nếu không phải lần đầu → có data mới
+    if (!isFirstLoad && newest > lastDataTime) {
+        showNotification("Có dữ liệu mới vừa được cập nhật!");
+    }
+
+    lastDataTime = newest;
+    isFirstLoad = false;
+
+    rawData = data;
+
+    applyFilter();
+    renderUpcomingEvents();
+    renderDashboard();
+});
+
+    onValue(ref(db, "workHours"), snapshot => {
+        ppData = snapshot.val() || {};
+        if(document.getElementById("summary").style.display === "block") showSummary();
+    });
+
+    let extraData = {};
+
+onValue(ref(db, "shipExtra"), snapshot => {
+    extraData = snapshot.val() || {};
+});
+
+    window.applyFilter = function(){
+        const from = document.getElementById("fromDate").value;
+        const to = document.getElementById("toDate").value;
+        const jobF = document.getElementById("jobFilter").value.toLowerCase();
+        const shipF = document.getElementById("shipFilter").value;
+        const sortType = document.getElementById("sortType").value;
+        const groupF = document.getElementById("groupFilter").value;
+
+        let filteredArray = Object.entries(rawData).filter(([id, x]) => {
+            let ok = true;
+            if(shipF !== 'all') ok = ok && x.ship_id === shipF;
+
+// 👉 lọc theo group
+if(groupF !== 'all') {
+    const group = shipsData[x.ship_id]?.group || "";
+    ok = ok && group === groupF;
+}
+            if(from) ok = ok && x.date >= from;
+            if(to) ok = ok && x.date <= to;
+            if(jobF) ok = ok && (x.job || "").toLowerCase().includes(jobF);
+            return ok;
+        });
+
+        filteredArray.sort((a, b) => {
+            let d1 = new Date(a[1].date);
+            let d2 = new Date(b[1].date);
+            return sortType === "asc" ? d1 - d2 : d2 - d1;
+        });
+       currentFiltered = filteredArray;
+currentPage = 1; // reset về trang 1 khi filter
+renderTableUI();
+renderPagination();
+    }
+
+// --- HÀM RENDER CÔNG VIỆC 7 NGÀY TỚI ---
+function renderUpcomingEvents() {
+    // 1. Lấy mốc thời gian ngày hôm nay (00:00:00)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // 2. Lấy mốc thời gian 7 ngày tới (23:59:59)
+    const sevenDaysLater = new Date(today);
+    sevenDaysLater.setDate(today.getDate() + 7);
+
+    // 3. Lọc dữ liệu
+  const upcomingEvents = Object.entries(rawData)
+    .filter(([id, item]) => {
+        const itemDate = new Date(item.date);
+
+        // điều kiện: trong 7 ngày + có chữ PLAN:
+        return (
+            itemDate >= today &&
+            itemDate <= sevenDaysLater &&
+            (item.job || "").toUpperCase().includes("PLAN:")
+        );
+    })
+        .sort((a, b) => new Date(a[1].date) - new Date(b[1].date));
+
+    const tbody = document.getElementById("upcomingEventsBody");
+    if (!tbody) return;
+
+    let html = "";
+    if (upcomingEvents.length === 0) {
+        html = "<tr><td colspan='3' style='text-align:center;'>Không có lịch trong 7 ngày tới.</td></tr>";
+    } else {
+        upcomingEvents.forEach(([id, item]) => {
+            html += `<tr>
+                <td style="white-space:nowrap; font-size:12px;">${item.date}</td>
+                <td style="font-weight:bold;">${item.ship_id}</td>
+               <td>${(item.job || "").replace(/^PLAN:\s*/i, "")}</td>
+            </tr>`;
+        });
+    }
+    tbody.innerHTML = html;
+}
+
+
+    
+    function renderTableUI() {
+
+    let start = (currentPage - 1) * rowsPerPage;
+    let end = start + rowsPerPage;
+    let dataArray = currentFiltered.slice(start, end);
+
+    let html = `<table>
+        <tr>
+            <th class="stt-col">STT</th>
+           <th class="ship-col">Tàu</th>
+           <th style="width:70px;">Nhóm</th>
+            <th class="date-col">Ngày</th>
+            <th class="worker-col">Người</th>
+            <th>Công việc</th>
+            <th class="action-col admin-inline">Sửa/Xóa</th>
+        </tr>`;
+
+    let totalWorkers = 0;
+
+    dataArray.forEach(([id, x], index) => {
+
+    let isNew = false;
+
+    if (x.createdAt) {
+        isNew = (Date.now() - x.createdAt) < 30000;
+    }
+
+    let rowClass = isNew ? "new-row" : "";
+        
+        totalWorkers += Number(x.workers || 0);
+
+       html += `<tr class="${rowClass}">
+            <td class="stt-col">${start + index + 1}</td>
+            <td class="ship-col">${x.ship_id}</td>
+            <td style="text-align:center;">
+            ${shipsData[x.ship_id]?.group || "-"}
+            </td>
+            <td class="date-col">${x.date}</td>
+            <td class="worker-col">${x.workers}</td>
+            <td>${x.job}</td>
+            <td class="action-col admin-inline">
+                <div class="action-buttons">
+                    <button class="btn-edit" onclick="editItem('${id}')">✏️</button>
+                    <button class="btn-delete" onclick="deleteItem('${id}')">🗑️</button>
+                </div>
+            </td>
+        </tr>`;
+    });
+
+html += `
+<tr class="total-row">
+   <td></td> <!-- STT -->
+<td></td> <!-- Tàu -->
+<td></td> <!-- Nhóm -->
+<td style="text-align:right;"><b>TỔNG:</b></td>
+    
+    <td class="worker-col" style="text-align:center;">
+        <b>${totalWorkers.toLocaleString()}</b>
+    </td> <!-- Người (GIỮ ĐÚNG CỘT) -->
+
+    <td style="text-align:left; padding-left:15px;">
+        <b>người</b>
+    </td> <!-- Công việc -->
+
+    <td class="admin-inline"></td> <!-- Sửa/Xóa -->
+</tr>
+`;
+    html += `</table>`;
+
+    document.getElementById("tableContainer").innerHTML = html;
+}
+
+window.toggleAdvancedSearch = function() {
+    const box = document.getElementById("advancedSearch");
+    // Kiểm tra trạng thái hiện tại để ẩn hoặc hiện
+    if (box.style.display === "none") {
+        box.style.display = "block";
+    } else {
+        box.style.display = "none";
+    }
+};
+
+
+
+    
+    window.editItem = function(id){
+        if(!isAdmin) return;
+        let x = rawData[id];
+        document.getElementById("ship").value = x.ship_id;
+        document.getElementById("date").value = x.date;
+        document.getElementById("workers").value = x.workers;
+        document.getElementById("job").value = x.job;
+        editId = id;
+        window.scrollTo(0,0);
+    }
+
+    window.deleteItem = function(id){
+        if(!isAdmin) return;
+        if(confirm("Bạn chắc chắn muốn xóa dòng này?")){
+            remove(ref(db, "logs/" + id));
+        }
+    }
+
+window.showSummary = function(){
+    const box = document.getElementById("summary");
+    box.style.display = "block";
+
+    let result = {};
+
+    Object.values(rawData).forEach(x => {
+        if(!result[x.ship_id]) result[x.ship_id] = { totalWorkers:0 };
+        result[x.ship_id].totalWorkers += Number(x.workers);
+    });
+
+    // ===== DROPDOWN =====
+    let shipOptions = `
+<option value="">-- Chọn tàu --</option>
+<option value="all">Tất cả tàu</option>
+`;
+    Object.keys(result).sort().forEach(s => {
+        shipOptions += `<option value="${s}">${s}</option>`;
+    });
+
+    let html = `
+        <h4>📊 Báo cáo tổng hợp</h4>
+
+        <label><b>🚢 Chọn tàu:</b></label>
+        <select id="summaryShipFilter" onchange="filterSummary()">
+            ${shipOptions}
+        </select>
+
+        <div id="summaryDetail" style="margin-top:10px;"></div>
+
+        <div style="margin-top:20px;">
+            <canvas id="summaryChart"></canvas>
+        </div>
+    `;
+
+    box.innerHTML = html;
+    document.getElementById("summaryShipFilter").value = "";
+
+    // lưu cache
+    window.summaryDataCache = result;
+
+   // lưu cache
+window.summaryDataCache = result;
+
+// 👉 chưa hiển thị dữ liệu
+document.getElementById("summaryDetail").innerHTML =
+    "<i>👉 Vui lòng chọn tàu để xem báo cáo</i>";
+
+// 👉 tạo chart rỗng (CHỈ TẠO 1 LẦN)
+setTimeout(() => {
+
+    const canvas = document.getElementById('summaryChart');
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+
+    // 🔥 Nếu đã có chart → destroy trước
+    if (window.myChart) {
+        window.myChart.destroy();
+        window.myChart = null;
+    }
+   Chart.register(ChartDataLabels);
+    // 🔥 Tạo chart mới
+    window.myChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: [],
+            datasets: [
+                {
+                    label: 'Giờ thực tế',
+                    data: [],
+                    backgroundColor: '#1a73e8',
+                    borderColor: '#0b57d0',
+                    borderWidth: 2,
+                    borderRadius: 6
+                },
+                {
+                    label: 'Giờ PP',
+                    data: [],
+                    backgroundColor: '#34a853',
+                    borderColor: '#1e7e34',
+                    borderWidth: 2,
+                    borderRadius: 6
+                }
+            ]
+        },
+     options: {
+    responsive: true,
+    maintainAspectRatio: false,
+
+    layout: {
+        padding: {
+            top: 40   // 🔥 tạo khoảng trống phía trên
+        }
+    },
+
+    plugins: {
+        legend: { 
+            position: 'top',
+            labels: {
+                padding: 20   // 🔥 đẩy chữ legend xuống thấp hơn 1 chút
+            }
+        },
+
+        title: {
+            display: true,
+            text: 'So sánh Giờ Công',
+            padding: {
+                top: 10,
+                bottom: 10
+            }
+        },
+
+        datalabels: {
+            anchor: 'end',
+            align: 'top',
+            offset: 2,   // 🔥 đẩy số lên cao hơn cột
+            color: '#000',
+            font: {
+                weight: 'bold',
+                size: 12
+            },
+            formatter: function(value) {
+                return value.toLocaleString();
+            }
+        }
+    },
+
+    scales: {
+        y: {
+            beginAtZero: true,
+             grace: '15%'   // 🔥 thêm khoảng trống phía trên
+        }
+    }
+}
+    });
+
+}, 200);
+}
+    window.toggleWorkHours = function(){
+        const box = document.getElementById("workHoursBox");
+        box.style.display = (box.style.display === "none") ? "block" : "none";
+        if(box.style.display === "block") {
+            renderWorkHoursInputs();
+            document.getElementById("summary").style.display = "none";
+        }
+    }
+
+   function renderWorkHoursInputs(){
+    // Lấy danh sách tàu thực tế từ shipsData thay vì ghi tay
+    let ships = Object.keys(shipsData).sort(); 
+    let html = "<table><tr><th>Tàu</th><th>Giờ PP</th><th>Lưu</th></tr>";
+    ships.forEach(s => {
+        let key = s.replace(/\s/g,'_');
+        let val = ppData[key]?.hours || "";
+        html += `<tr>
+            <td>${s}</td>
+            <td><input type="text" id="pp_${key}" value="${val.toLocaleString()}" oninput="window.formatInput(this)"></td>
+            <td><button onclick="savePP('${s}')" style="width:50px">💾</button></td>
+        </tr>`;
+    });
+    html += "</table>";
+    document.getElementById("workHoursContent").innerHTML = html;
+}
+
+
+    window.filterSummary = function(){
+
+    const ship = document.getElementById("summaryShipFilter").value;
+    const data = window.summaryDataCache;
+
+    // 👉 chưa chọn gì
+    if(!ship){
+        document.getElementById("summaryDetail").innerHTML =
+            "<i>👉 Vui lòng chọn tàu để xem báo cáo</i>";
+
+        // clear chart
+        window.myChart.data.labels = [];
+        window.myChart.data.datasets[0].data = [];
+        window.myChart.data.datasets[1].data = [];
+        window.myChart.update();
+
+        return;
+    }
+
+    // 👉 LUÔN render lại (fix lỗi phải chọn lần 2)
+    renderSummaryDetail(ship);
+
+    // 👉 update chart
+    updateChartData(data, ship);
+}
+
+function renderSummaryDetail(ship){
+    const box = document.getElementById("summaryDetail");
+    const result = window.summaryDataCache;
+
+    let html = "";
+
+    Object.keys(result).forEach(s => {
+
+        if(ship !== "all" && s !== ship) return;
+
+        let key = s.replace(/\s/g,'_');
+        let savedPP = ppData[key]?.hours || 0;
+        let realHours = result[s].totalWorkers * 8;
+
+        let efficiency = 0;
+        if(realHours > 0){
+            efficiency = (savedPP / realHours) * 100;
+        }
+        let progress = progressData[key]?.percent || 0;
+        let checkedItems = progressData[key]?.items || [];
+let checkedText = checkedItems.length > 0 
+    ? checkedItems.join(", ") 
+    : "Chưa có";
+
+        let color = "red";
+        if(efficiency >= 100) color = "green";
+        else if(efficiency >= 70) color = "orange";
+        
+let group = shipsData[s]?.group || "-";
+
+html += `
+<div class="summary-item">
+    <b>🚢 Tàu: ${s} (${group})</b><br>
+    - Tổng nhân công: ${result[s].totalWorkers} lượt người<br>
+    - Tổng giờ thực tế: ${realHours.toLocaleString()} giờ<br>
+    - Giờ định mức PP: <b>${savedPP.toLocaleString()}</b> giờ<br>
+    - Hiệu quả tàu: <b style="color:${color}">${efficiency.toFixed(1)} %</b><br>
+    - Tiến độ thực tế: <b style="color:#1a73e8">${progress} %</b>
+    <br>
+- Các hạng mục đã kiểm tra: <b>${checkedText}</b>
+</div>`;
+    });
+
+    box.innerHTML = html;
+}
+
+    function renderSummaryChart(result){
+        Chart.register(ChartDataLabels);
+
+    let labels = [];
+    let realData = [];
+    let ppDataArr = [];
+
+    for(let s in result){
+        let key = s.replace(/\s/g,'_');
+        let savedPP = ppData[key]?.hours || 0;
+        let realHours = result[s].totalWorkers * 8;
+
+        labels.push(s);
+        realData.push(realHours);
+        ppDataArr.push(savedPP);
+    }
+
+    const ctx = document.getElementById('summaryChart').getContext('2d');
+
+    if(window.myChart) {
+        window.myChart.destroy();
+    }
+
+    window.myChart = new Chart(ctx, {
+        
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+              {
+    label: 'Giờ thực tế',
+    data: realData,
+    backgroundColor: 'rgba(26,115,232,1)',
+    borderColor: '#1a73e8',
+    borderWidth: 2
+},
+{
+    label: 'Giờ PP',
+    data: ppDataArr,
+    backgroundColor: 'rgba(52,168,83,1)',
+    borderColor: '#34a853',
+    borderWidth: 2
+}
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { position: 'top' },
+                title: {
+                    display: true,
+                    text: 'So sánh Giờ Công Thực Tế vs Giờ Công PP'
+                },
+                 // 🔥 THÊM ĐOẠN NÀY
+        datalabels: {
+            anchor: 'end',
+            align: 'top',
+            color: '#000',
+            font: {
+                weight: 'bold',
+                size: 12
+            },
+            formatter: function(value) {
+                return value.toLocaleString(); // format 1,000
+            }
+        }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+}
+    
+
+
+    
+    window.savePP = function(shipName){
+        let key = shipName.replace(/\s/g,'_');
+        let val = document.getElementById("pp_" + key).value.replace(/,/g,'');
+        if(!val) return alert("Nhập số giờ!");
+        set(ref(db, "workHours/" + key), { ship: shipName, hours: Number(val) })
+        .then(() => alert("Đã cập nhật cho " + shipName));
+    }
+
+    window.formatInput = function(input){
+        let val = input.value.replace(/,/g,'');
+        if(!isNaN(val) && val !== "") input.value = Number(val).toLocaleString('en-US');
+    }
+
+    function clearForm(){
+        document.getElementById("workers").value = "";
+        document.getElementById("job").value = "";
+        document.getElementById("ship").value = "all";
+        document.getElementById("date").valueAsDate = new Date();
+    }
+
+    // Listeners
+    document.getElementById("sortType").addEventListener("change", applyFilter);
+    document.getElementById("shipFilter").addEventListener("change", applyFilter);
+    document.getElementById("jobFilter").addEventListener("input", applyFilter);
+    document.getElementById("fromDate").addEventListener("input", applyFilter);
+    document.getElementById("toDate").addEventListener("input", applyFilter);
+    document.getElementById("groupFilter").addEventListener("change", applyFilter);
+
+// xuất Excel
+window.exportExcel = function() {
+
+    if (currentFiltered.length === 0) {
+        alert("Không có dữ liệu để xuất!");
+        return;
+    }
+
+    let data = [];
+
+    // ===== DỮ LIỆU =====
+    currentFiltered.forEach(([id, x], index) => {
+        data.push({
+            "STT": index + 1,
+            "Tàu": x.ship_id,
+            "Ngày": x.date,
+            "Số người": x.workers,
+            "Công việc": x.job || ""
+        });
+    });
+
+    // ===== TÍNH TỔNG =====
+    let total = data.reduce((sum, r) => sum + r["Số người"], 0);
+
+    data.push({
+        "STT": "",
+        "Tàu": "",
+        "Ngày": "TỔNG",
+        "Số người": total,
+        "Công việc": "người"
+    });
+
+    // ===== TẠO SHEET =====
+    let ws = XLSX.utils.json_to_sheet(data);
+
+    const range = XLSX.utils.decode_range(ws['!ref']);
+
+    // ===== STYLE HEADER =====
+    for (let c = range.s.c; c <= range.e.c; c++) {
+        let cell = ws[XLSX.utils.encode_cell({ r: 0, c })];
+        if (cell) {
+            cell.s = {
+                font: { bold: true },
+                alignment: { horizontal: "center" }
+            };
+        }
+    }
+
+    // ===== STYLE DÒNG TỔNG =====
+    let totalRowIndex = data.length - 1;
+    for (let c = range.s.c; c <= range.e.c; c++) {
+        let cell = ws[XLSX.utils.encode_cell({ r: totalRowIndex, c })];
+        if (cell) {
+            cell.s = {
+                font: { bold: true },
+                alignment: { horizontal: "center" }
+            };
+        }
+    }
+
+    // ===== AUTO WIDTH =====
+    ws['!cols'] = [
+        { wch: 6 },   // STT
+        { wch: 10 },  // Tàu
+        { wch: 12 },  // Ngày
+        { wch: 12 },  // Số người
+        { wch: 35 }   // Công việc
+    ];
+
+    // ===== WORKBOOK =====
+    let wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "BaoCao");
+
+    let wbout = XLSX.write(wb, {
+        bookType: "xlsx",
+        type: "array",
+        cellStyles: true
+    });
+
+    let blob = new Blob([wbout], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    });
+
+    let url = URL.createObjectURL(blob);
+
+    let a = document.createElement("a");
+    a.href = url;
+
+    // ===== TÊN FILE (KHÔNG TRÙNG) =====
+    let now = new Date();
+
+    let date = now.toISOString().slice(0, 10); // yyyy-mm-dd
+    let time = now.toTimeString().slice(0, 8).replace(/:/g, "-"); // hh-mm-ss
+
+    a.download = `BaoCao_Casing_${date}_${time}.xlsx`;
+
+    document.body.appendChild(a);
+
+    setTimeout(() => {
+        a.click();
+
+        setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }, 1000);
+
+    }, 100);
+};
+
+
+window.closeLogin = function(){
+    document.getElementById("loginModal").style.display = "none";
+}
+
+window.loginAdmin = function(){
+    const email = document.getElementById("loginEmail").value;
+    const pass = document.getElementById("loginPass").value;
+
+    if(!email || !pass){
+        alert("Vui lòng nhập đầy đủ!");
+        return;
+    }
+
+    signInWithEmailAndPassword(auth, email, pass)
+    .then(() => {
+        closeLogin();
+        document.getElementById("loginEmail").value = "";
+        document.getElementById("loginPass").value = "";
+    })
+    .catch(err => alert("Lỗi: " + err.message));
+}
+
+    /* Đóng modal khi click ra ngoài */
+window.onclick = function(event) {
+    let modal = document.getElementById("loginModal");
+    if (event.target === modal) {
+        modal.style.display = "none";
+    }
+}
+
+
+ /*   // Auto set ngày hôm nay khi mở web
+document.addEventListener("DOMContentLoaded", () => {
+    document.getElementById("date").valueAsDate = new Date();
+});
+*/
+
+function handleInputState(el) {
+    if (el.value.trim() !== "") {
+        el.classList.add("filled");
+        el.classList.remove("error");
+    } else {
+        el.classList.remove("filled");
+    }
+}
+
+// Áp dụng cho toàn bộ input + select
+document.querySelectorAll("input, select").forEach(el => {
+
+    // Khi blur (rời khỏi ô)
+    el.addEventListener("blur", () => {
+        if (el.value.trim() === "") {
+            el.classList.add("error");
+        } else {
+            el.classList.remove("error");
+        }
+    });
+
+    // Khi focus → bỏ lỗi
+    el.addEventListener("focus", () => {
+        el.classList.remove("error");
+    });
+
+});
+
+   window.handleButton = function(type) {
+
+    const summaryBox = document.getElementById("summary");
+    const hoursBox = document.getElementById("workHoursBox");
+    const shipBox = document.getElementById("shipManagerBox");
+
+    const btnSummary = document.getElementById("btnSummary");
+    const btnHours = document.getElementById("btnWorkHours");
+    const btnShips = document.getElementById("btnManageShips");
+
+    const progressBox = document.getElementById("progressBox");
+    const btnProgress = document.getElementById("btnProgress");
+    const checklistBox = document.getElementById("checklistBox");
+    const btnChecklist = document.getElementById("btnChecklist");
+
+   const extraBox = document.getElementById("extraBox");
+   const btnExtra = document.getElementById("btnExtra");
+
+    // ===== EXPORT (không toggle)
+    if(type === "export") {
+        exportExcel();
+        return;
+    }
+
+    // ===== LẤY BOX & BUTTON HIỆN TẠI
+    let currentBox = null;
+    let currentBtn = null;
+
+    if(type === "summary") {
+        currentBox = summaryBox;
+        currentBtn = btnSummary;
+    }
+    if(type === "hours") {
+        currentBox = hoursBox;
+        currentBtn = btnHours;
+    }
+    if(type === "ships") {
+        currentBox = shipBox;
+        currentBtn = btnShips;
+    }
+
+    if(type === "progress") {
+    currentBox = progressBox;
+    currentBtn = btnProgress;
+}
+    if(type === "checklist") {
+    currentBox = checklistBox;
+    currentBtn = btnChecklist;
+}
+    if(type === "extra") {
+    currentBox = extraBox;
+    currentBtn = btnExtra;
+}
+
+    // ===== KIỂM TRA TRẠNG THÁI TRƯỚC
+    let isOpen = currentBox.style.display === "block";
+
+    // ===== ẨN TẤT CẢ
+    summaryBox.style.display = "none";
+    hoursBox.style.display = "none";
+    shipBox.style.display = "none";
+    progressBox.style.display = "none";
+    checklistBox.style.display = "none";
+    extraBox.style.display = "none";
+
+    document.querySelectorAll(".btn-grid button").forEach(btn => {
+        btn.classList.remove("btn-active");
+    });
+
+    // ===== NẾU ĐANG MỞ → TẮT LUÔN
+    if(isOpen) return;
+
+    // ===== NGƯỢC LẠI → MỞ
+    currentBox.style.display = "block";
+    currentBtn.classList.add("btn-active");
+
+    // ===== LOAD DATA
+    if(type === "summary") showSummary();
+    if(type === "hours") renderWorkHoursInputs();
+    if(type === "ships") renderShipManagerList();
+    if(type === "progress") renderProgressInputs();
+    if(type === "checklist") renderChecklistInputs();
+    if(type === "extra") renderExtraSelect();
+}
+
+function renderPagination() {
+    const totalPages = Math.ceil(currentFiltered.length / rowsPerPage);
+    let html = "";
+
+    if (totalPages <= 1) {
+        document.getElementById("pagination").innerHTML = "";
+        return;
+    }
+
+    // Prev
+    html += `<button onclick="changePage(${currentPage - 1})"
+        ${currentPage === 1 ? 'disabled' : ''}>⬅️</button>`;
+
+    // Số trang (giới hạn hiển thị cho đẹp)
+    let start = Math.max(1, currentPage - 2);
+    let end = Math.min(totalPages, currentPage + 2);
+
+    for (let i = start; i <= end; i++) {
+        html += `<button onclick="changePage(${i})"
+            class="${i === currentPage ? 'active' : ''}">
+            ${i}
+        </button>`;
+    }
+
+    // Next
+    html += `<button onclick="changePage(${currentPage + 1})"
+        ${currentPage === totalPages ? 'disabled' : ''}>➡️</button>`;
+
+    document.getElementById("pagination").innerHTML = html;
+}
+
+window.changePage = function(page) {
+    const totalPages = Math.ceil(currentFiltered.length / rowsPerPage);
+
+    if (page < 1 || page > totalPages) return;
+
+    currentPage = page;
+    renderTableUI();
+    renderPagination();
+
+    window.scrollTo(0, 0); // scroll lên đầu
+}
+
+
+
+   // ===== TEXT CHẠY RANDOM =====
+const messages = [
+    "👉 AN TOÀN LÀ TRÊN HẾT!",
+    "👉 ĐỪNG CHỜ ĐỢI SỰ MAY MẮN, HÃY NỔ LỰC ĐỂ AN TOÀN!",
+    "👉 ĐỪNG CHỜ ĐỢI SỰ MAY MẮN, HÃY NỔ LỰC ĐỂ AN TOÀN!",
+    "👉 ĐỪNG CHỜ ĐỢI SỰ MAY MẮN, HÃY NỔ LỰC ĐỂ AN TOÀN!",
+    "👉 ĐỪNG CHỜ ĐỢI SỰ MAY MẮN, HÃY NỔ LỰC ĐỂ AN TOÀN!"
+];
+
+function initMarquee() {
+    const randomText = messages[Math.floor(Math.random() * messages.length)];
+    const el = document.getElementById("marqueeText");
+    if (el) {
+        el.innerText = randomText;
+    }
+}
+
+// chạy khi load
+initMarquee();
+updateDashboardTitle();
+setInterval(updateDashboardTitle, 60000); // mỗi 1 phút
+updateDashboardTitle();
+
+
+function renderProgressInputs(){
+    let ships = Object.keys(shipsData).sort();
+
+    let html = `
+<table style="width:100%; table-layout:fixed;">
+<tr>
+    <th style="width:80px;">Tàu</th>
+    <th style="width:90px;">% Tiến độ</th>
+    <th style="width:60px;">Lưu</th>
+</tr>`;
+
+    ships.forEach(s => {
+        let key = s.replace(/\s/g,'_');
+        let val = progressData[key]?.percent || "";
+
+        html += `<tr>
+            <td style="
+    width:80px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+">
+    ${s}
+</td>
+            <td>
+               <input type="number" min="0" max="100"
+    id="progress_${key}" value="${val}"
+    style="width:80px; text-align:center;">
+            </td>
+            <td>
+                <button onclick="saveProgress('${s}')" style="width:50px">💾</button>
+            </td>
+        </tr>`;
+    });
+
+    html += "</table>";
+    document.getElementById("progressContent").innerHTML = html;
+}
+
+
+   window.saveProgress = function(shipName){
+    let key = shipName.replace(/\s/g,'_');
+
+    let input = document.getElementById("progress_" + key);
+    if(!input) {
+        alert("Không tìm thấy ô nhập!");
+        return;
+    }
+
+    let val = input.value.trim();
+
+    // kiểm tra rỗng
+    if(val === ""){
+        alert("Vui lòng nhập % tiến độ!");
+        return;
+    }
+
+    // chuyển sang số
+    val = Number(val);
+
+    // kiểm tra hợp lệ
+    if(isNaN(val) || val < 0 || val > 100){
+        alert("Giá trị phải từ 0 → 100!");
+        return;
+    }
+
+    // lưu Firebase
+    set(ref(db, "progress/" + key), {
+        ship: shipName,
+        percent: val
+    })
+    .then(() => {
+        alert("✅ Đã lưu tiến độ cho " + shipName);
+    })
+    .catch(err => {
+    console.error("Lỗi Firebase:", err);
+    alert("❌ Lỗi lưu dữ liệu: " + err.message);
+});
+}
+
+    
+function renderChecklistInputs(){
+    let ships = Object.keys(shipsData).sort();
+
+    let html = `
+<div style="overflow-x:auto;">
+<table style="min-width:450px; width:100%; border-collapse:collapse;">
+<tr>
+    <th style="width:80px;">Tàu</th>
+    <th style="min-width:200px;">Hạng mục kiểm tra</th>
+    <th style="width:60px;">Lưu</th>
+</tr>`;
+
+    ships.forEach(s => {
+        let key = s.replace(/\s/g,'_');
+        let val = (progressData[key]?.items || []).join(", ");
+
+        html += `<tr>
+            <td>${s}</td>
+            <td>
+               <input type="text" id="check_${key}" value="${val}" 
+               style="width:100%; min-width:150px; box-sizing:border-box; font-size:13px; padding:6px;">
+            </td>
+            <td>
+                <button onclick="saveChecklist('${s}')">💾</button>
+            </td>
+        </tr>`;
+    });
+
+    html += "</table></div>";
+
+    document.getElementById("checklistContent").innerHTML = html;
+}
+
+    window.saveChecklist = function(shipName){
+    let key = shipName.replace(/\s/g,'_');
+
+    let val = document.getElementById("check_" + key).value.trim();
+
+    let items = val ? val.split(",").map(x => x.trim()) : [];
+
+    set(ref(db, "progress/" + key), {
+        ship: shipName,
+        percent: progressData[key]?.percent || 0,
+        items: items
+    })
+    .then(() => {
+        alert("✅ Đã lưu hạng mục cho " + shipName);
+    });
+}
+
+function updateChartData(result, selectedShip){
+     if (!window.myChart) return;
+    let labels = [];
+    let realData = [];
+    let ppDataArr = [];
+
+    for(let s in result){
+
+        if(selectedShip !== "all" && s !== selectedShip) continue;
+
+        let key = s.replace(/\s/g,'_');
+        let savedPP = ppData[key]?.hours || 0;
+        let realHours = result[s].totalWorkers * 8;
+
+        labels.push(s);
+        realData.push(realHours);
+        ppDataArr.push(savedPP);
+    }
+
+    // 🔥 CHỈ UPDATE DATA — KHÔNG TẠO LẠI CHART
+    window.myChart.data.labels = labels;
+    window.myChart.data.datasets[0].data = realData;
+    window.myChart.data.datasets[1].data = ppDataArr;
+
+    window.myChart.update();
+}
+
+    function startAutoLogout() {
+
+    // Xóa timer cũ nếu có
+    if (logoutTimer) {
+        clearTimeout(logoutTimer);
+    }
+
+    // Set logout sau 1 giờ = 3600000 ms
+    logoutTimer = setTimeout(() => {
+        alert("🔒 Phiên đăng nhập đã hết hạn!");
+        signOut(auth).then(() => {
+            location.reload();
+        });
+    }, 3600000); // 1 tiếng
+}
+
+["click", "keydown", "mousemove"].forEach(event => {
+    document.addEventListener(event, () => {
+        if (isAdmin) {
+            startAutoLogout(); // reset lại 1h
+        }
+    });
+});
+
+function renderExtraSelect(){
+    let ships = Object.keys(shipsData).sort();
+
+    let html = `<option value="">-- Chọn tàu --</option>`;
+    ships.forEach(s => {
+        html += `<option value="${s}">${s}</option>`;
+    });
+
+    document.getElementById("extraShip").innerHTML = html;
+    document.getElementById("extraDetail").innerHTML = "";
+}
+
+    function autoResizeTextarea(el) {
+    el.style.height = "auto"; // reset
+    el.style.height = el.scrollHeight + "px";
+
+    // nếu vượt 500px thì fix lại
+    if (el.scrollHeight > 500) {
+        el.style.height = "500px";
+    }
+         const layer = el.previousElementSibling;
+    if (layer) {
+        layer.style.height = el.style.height;
+    }
+}  
+
+    
+window.renderExtraDetail = function(){
+
+    const ship = document.getElementById("extraShip").value;
+    if(!ship) return;
+
+    let materials = (extraData[ship]?.materials || []).join("\n");
+    let notes = (extraData[ship]?.notes || []).join("\n");
+
+    let readonly = isAdmin ? "" : "readonly";
+
+  let html = `
+<div style="margin-bottom:10px;">
+    <input type="text" id="searchExtra" 
+        placeholder="🔍 Tìm nhanh vật tư / ghi chú..."
+        oninput="highlightSearch()">
+</div>
+
+<div style="margin-bottom:20px;">
+    <h4>📦 Vật tư</h4>
+
+    <div class="textarea-wrap">
+        <div class="highlight-layer" id="matHighlight"></div>
+        <textarea id="matBox" class="auto-textarea mat-box" ${readonly}>${materials}</textarea>
+    </div>
+
+    ${isAdmin ? `<button onclick="saveMaterial()">💾 Lưu vật tư</button>` : ""}
+</div>
+
+<div>
+    <h4>📝 Ghi chú</h4>
+
+    <div class="textarea-wrap">
+        <div class="highlight-layer" id="noteHighlight"></div>
+        <textarea id="noteBox" class="auto-textarea note-box" ${readonly}>${notes}</textarea>
+    </div>
+
+    ${isAdmin ? `<button onclick="saveNote()">💾 Lưu ghi chú</button>` : ""}
+</div>
+`;
+
+    document.getElementById("extraDetail").innerHTML = html;
+    
+  setTimeout(() => {
+    const matBox = document.getElementById("matBox");
+    const noteBox = document.getElementById("noteBox");
+
+    if (matBox) {
+        autoResizeTextarea(matBox);
+        matBox.addEventListener("input", () => autoResizeTextarea(matBox));
+    }
+
+    if (noteBox) {
+        autoResizeTextarea(noteBox);
+        noteBox.addEventListener("input", () => autoResizeTextarea(noteBox));
+    }
+
+    // 🔥 THÊM Ở ĐÂY
+    syncScroll("matBox", "matHighlight");
+    syncScroll("noteBox", "noteHighlight");
+
+    highlightSearch();
+
+}, 0);
+}
+   
+
+
+
+    
+   window.highlightSearch = function() {
+    const keyword = document.getElementById("searchExtra").value.toLowerCase();
+
+    updateHighlight("matBox", "matHighlight", keyword);
+    updateHighlight("noteBox", "noteHighlight", keyword);
+}
+
+function updateHighlight(textId, highlightId, keyword) {
+    const textarea = document.getElementById(textId);
+    const layer = document.getElementById(highlightId);
+
+    if (!textarea || !layer) return;
+
+    let text = textarea.value;
+
+    // 🔥 QUAN TRỌNG: giữ nguyên xuống dòng bằng &nbsp;
+    let html = text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\n/g, "<br>");
+
+    if (keyword) {
+        const safeKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(`(${safeKeyword})`, "gi");
+        html = html.replace(regex, "<mark>$1</mark>");
+    }
+
+    // 🔥 FIX DÒNG TRỐNG
+    html = html.replace(/(<br>\s*){2,}/g, "<br>&nbsp;<br>");
+
+    layer.innerHTML = html;
+}
+
+ window.saveMaterial = function(){
+    const ship = document.getElementById("extraShip").value;
+    let val = document.getElementById("matBox").value;
+
+    let arr = val.split("\n").map(x => x.trim()).filter(x => x);
+
+    set(ref(db, "shipExtra/" + ship), {
+        ...extraData[ship],
+        materials: arr
+    }).then(()=> alert("✅ Đã lưu vật tư"));
+}
+
+window.saveNote = function(){
+    const ship = document.getElementById("extraShip").value;
+    let val = document.getElementById("noteBox").value;
+
+    let arr = val.split("\n").map(x => x.trim()).filter(x => x);
+
+    set(ref(db, "shipExtra/" + ship), {
+        ...extraData[ship],
+        notes: arr
+    }).then(()=> alert("✅ Đã lưu ghi chú"));
+}
+
+   function syncScroll(textId, highlightId) {
+    const textarea = document.getElementById(textId);
+    const layer = document.getElementById(highlightId);
+
+    if (!textarea || !layer) return;
+
+    textarea.addEventListener("scroll", () => {
+        layer.scrollTop = textarea.scrollTop;
+        layer.scrollLeft = textarea.scrollLeft;
+    });
+          layer.scrollTop = textarea.scrollTop;
+    layer.scrollLeft = textarea.scrollLeft;
+}
+    function renderDashboard() {
+    const now = new Date();
+const yyyy = now.getFullYear();
+const mm = String(now.getMonth() + 1).padStart(2, '0');
+const dd = String(now.getDate()).padStart(2, '0');
+
+const today = `${yyyy}-${mm}-${dd}`;
+
+    let shipMap = {}; // { ship: workers }
+
+    // ===== 1. TÍNH NHÂN LỰC HÔM NAY THEO TÀU =====
+   // ===== 1. TÍNH NHÂN LỰC HÔM NAY THEO TÀU =====
+Object.values(rawData).forEach(x => {
+
+    // ❗ CHỈ lấy dữ liệu hôm nay + có người
+    if (x.date === today && Number(x.workers) > 0) {
+
+        if (!shipMap[x.ship_id]) shipMap[x.ship_id] = 0;
+
+        shipMap[x.ship_id] += Number(x.workers);
+    }
+});
+
+let totalWorkers = 0;
+let html = "";
+
+// 👉 kiểm tra trước khi loop
+if (Object.keys(shipMap).length === 0) {
+
+    html = "Không có dữ liệu hôm nay";
+
+} else {
+
+    Object.keys(shipMap).forEach(ship => {
+        totalWorkers += shipMap[ship];
+
+  // 👉 hiện nhóm sau tàu trên bảng Dashboard     
+let group = shipsData[ship]?.group || "-";
+       let key = ship.replace(/\s/g, "_");
+let items = progressData[key]?.items || [];
+
+let textColor = "#999"; // mặc định
+
+if (items.length === 0) {
+    textColor = "#d93025"; // 🔴 đỏ
+} else if (items.length < 3) {
+    textColor = "#f9ab00"; // 🟡 vàng
+} else {
+    textColor = "#188038"; // 🟢 xanh
+}
+
+html += `
+    <div class="dash-row" onclick="toggleShipDetail('${ship}')">
+    🚢 <b style="color:${textColor}">${ship}</b> 
+    <span style="color:${textColor}">(${group})</span> 
+    : ${shipMap[ship]} người
+</div>
+
+    <div id="detail-${ship}" class="dash-detail"></div>
+`;
+    });
+
+    // 👉 chỉ thêm tổng 1 lần (ngoài loop)
+    html += `<hr><b>Tổng nhân lực: ${totalWorkers} người</b>`;
+}
+
+// 👉 render 1 lần duy nhất
+document.getElementById("dashboardSummary").innerHTML = html;
+
+
+    // ===== 2. NHẮC CHECKLIST CHƯA CÓ =====
+ // ===== 2. PHÂN LOẠI CHECKLIST =====
+
+let doneList = [];
+let partialList = [];
+let emptyList = [];
+
+Object.keys(shipsData).forEach(ship => {
+
+    let key = ship.replace(/\s/g, "_");
+
+    let items = progressData?.[key]?.items;
+    if (!Array.isArray(items)) items = [];
+
+    let count = items.length;
+
+    if (count >= 3) {
+        doneList.push({ ship, count });
+    } else if (count > 0) {
+        partialList.push({ ship, count });
+    } else {
+        emptyList.push({ ship, count });
+    }
+});
+
+// ===== RENDER 3 CỘT =====
+
+function renderCol(list, color) {
+    if (list.length === 0) return "<div class='empty'>Không có</div>";
+
+    return list.map(x => `
+        <div class="check-item" style="color:${color}">
+            🚢 ${x.ship} (${x.count}/3)
+        </div>
+    `).join("");
+}
+
+let checkHTML = `
+<div class="check-grid">
+
+    <div class="check-col green">
+        <div class="check-title">ĐỦ HẠNG MỤC</div>
+        ${renderCol(doneList, "#188038")}
+    </div>
+
+    <div class="check-col orange">
+        <div class="check-title">CHƯA ĐỦ</div>
+        ${renderCol(partialList, "#f9ab00")}
+    </div>
+
+    <div class="check-col red">
+        <div class="check-title">CHƯA CÓ</div>
+        ${renderCol(emptyList, "#d93025")}
+    </div>
+
+</div>
+`;
+
+document.getElementById("dashboardChecklist").innerHTML = checkHTML; 
+}
+
+window.toggleShipDetail = function(ship) {
+
+    const box = document.getElementById("detail-" + ship);
+
+    // 👉 nếu đang mở → đóng lại
+    if (box.innerHTML.trim() !== "") {
+        box.innerHTML = "";
+        openedShip = null;
+        return;
+    }
+
+    // 👉 đóng tàu cũ nếu có
+    if (openedShip && openedShip !== ship) {
+        const oldBox = document.getElementById("detail-" + openedShip);
+        if (oldBox) oldBox.innerHTML = "";
+    }
+
+    openedShip = ship;
+
+    // 👉 lấy ngày chuẩn (KHÔNG bị lệch timezone)
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    const today = `${yyyy}-${mm}-${dd}`;
+
+    // 🔥 debug nếu cần
+    console.log("TODAY:", today);
+
+    // 👉 lọc dữ liệu
+   const result = Object.entries(rawData).filter(([id, x]) => {
+    return (
+        x.ship_id === ship &&
+        x.date === today &&
+        Number(x.workers) > 0
+    );
+});
+
+    // 👉 render
+    let html = "";
+
+    if (result.length === 0) {
+        html = `<div class="empty">Không có dữ liệu hôm nay</div>`;
+    } else {
+
+        let total = 0;
+
+        result.forEach(([id, x]) => {
+
+            total += Number(x.workers || 0);
+
+            let jobText = (x.job || "").replace(/PLAN:/gi, "").trim();
+
+            html += `
+                <div class="detail-row">
+                    👷 ${x.workers} người — ${jobText}
+                </div>
+            `;
+        });
+
+        html += `<div class="detail-total">Tổng: ${total} người</div>`;
+    }
+
+    box.innerHTML = html;
+}
+                                 
+
+    function getChecklistWarnings() {
+    let warnings = [];
+
+    Object.keys(shipsData).forEach(ship => {
+        let key = ship.replace(/\s/g, "_");
+        let items = progressData[key]?.items || [];
+
+        if (items.length > 0 && items.length < 3) {
+            warnings.push({
+                ship,
+                count: items.length,
+                items
+            });
+        }
+    });
+
+    return warnings;
+}
+
+function updateDashboardTitle() {
+    const now = new Date();
+
+    const dd = String(now.getDate()).padStart(2, '0');
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const yyyy = now.getFullYear();
+
+    const days = [
+        "Chủ nhật","Thứ 2","Thứ 3","Thứ 4",
+        "Thứ 5","Thứ 6","Thứ 7"
+    ];
+
+    const dayName = days[now.getDay()];
+
+    const title = `📊 HÔM NAY – ${dayName}, ${dd}/${mm}/${yyyy}`;
+
+    document.getElementById("dashboardTitle").innerText = title;
+
+    // 👉 thêm dòng phụ (giờ realtime)
+    const hh = String(now.getHours()).padStart(2, '0');
+    const min = String(now.getMinutes()).padStart(2, '0');
+
+    const sub = `⏱ Cập nhật lúc: ${hh}:${min}`;
+
+    const subEl = document.getElementById("dashboardSub");
+    if (subEl) subEl.innerText = sub;
+}
+
+setInterval(() => {
+    renderTableUI();
+}, 300000); // 🔥 refresh highlight mỗi 1 phút
+    
+</script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+    
+    
+    <div id="loginModal" class="modal">
+  <div class="modal-content">
+    <span class="close" onclick="closeLogin()">&times;</span>
+    <h3>🔐 Đăng nhập Admin</h3>
+    
+    <input type="email" id="loginEmail" placeholder="Email">
+    <input type="password" id="loginPass" placeholder="Mật khẩu">
+    
+    <button onclick="loginAdmin()">Đăng nhập</button>
+  </div>
+</div>
+    <div class="footer">
+   @ 04-2026 Developed by Nguyen Thanh Nhan - E/R Outfitting 1
+</div>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+</body>
+</html>

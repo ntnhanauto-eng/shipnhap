@@ -1704,10 +1704,12 @@ let checkedText = checkedItems.length > 0
         let color = "red";
         if(efficiency >= 100) color = "green";
         else if(efficiency >= 70) color = "orange";
+        
+let group = shipsData[s]?.group || "-";
 
-       html += `
+html += `
 <div class="summary-item">
-    <b>🚢 Tàu: ${s}</b><br>
+    <b>🚢 Tàu: ${s} (${group})</b><br>
     - Tổng nhân công: ${result[s].totalWorkers} lượt người<br>
     - Tổng giờ thực tế: ${realHours.toLocaleString()} giờ<br>
     - Giờ định mức PP: <b>${savedPP.toLocaleString()}</b> giờ<br>

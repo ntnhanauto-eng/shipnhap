@@ -1906,7 +1906,11 @@ setTimeout(() => {
 }
 
 const box = document.getElementById("summaryDetail");
-const result = window.summaryDataCache;
+const result = window.summaryDataCache || {};
+    if (Object.keys(result).length === 0) {
+    box.innerHTML = "<i>Chưa có dữ liệu báo cáo</i>";
+    return;
+}
 
 let activeHTML = "";
 let doneHTML = "";

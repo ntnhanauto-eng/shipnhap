@@ -895,7 +895,19 @@ button {
         </div>
 
         <div class="filter-row" style="margin-top: 10px;">
-            <select id="sortType">
+    
+    <select id="groupFilter">
+        <option value="all">Tất cả nhóm</option>
+        <option value="EO1">EO1</option>
+        <option value="EO2">EO2</option>
+    </select>
+
+    <select id="sortType">
+        <option value="desc">📅 Mới nhất trước</option>
+        <option value="asc">📅 Cũ nhất trước</option>
+    </select>
+
+</div>
                 <option value="desc">📅 Mới nhất trước</option>
                 <option value="asc">📅 Cũ nhất trước</option>
             </select>
@@ -1296,10 +1308,17 @@ onValue(ref(db, "shipExtra"), snapshot => {
         const jobF = document.getElementById("jobFilter").value.toLowerCase();
         const shipF = document.getElementById("shipFilter").value;
         const sortType = document.getElementById("sortType").value;
+        const groupF = document.getElementById("groupFilter").value;
 
         let filteredArray = Object.entries(rawData).filter(([id, x]) => {
             let ok = true;
             if(shipF !== 'all') ok = ok && x.ship_id === shipF;
+
+// 👉 lọc theo group
+if(groupF !== 'all') {
+    const group = shipsData[x.ship_id]?.group || "";
+    ok = ok && group === groupF;
+}
             if(from) ok = ok && x.date >= from;
             if(to) ok = ok && x.date <= to;
             if(jobF) ok = ok && (x.job || "").toLowerCase().includes(jobF);
@@ -1805,6 +1824,7 @@ let checkedText = checkedItems.length > 0
     document.getElementById("jobFilter").addEventListener("input", applyFilter);
     document.getElementById("fromDate").addEventListener("input", applyFilter);
     document.getElementById("toDate").addEventListener("input", applyFilter);
+    document.getElementById("groupFilter").addEventListener("change", applyFilter);
 
 // xuất Excel
 window.exportExcel = function() {

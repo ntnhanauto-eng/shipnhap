@@ -810,12 +810,7 @@ button {
     gap: 10px;
 }
 
-.check-col {
-    border-radius: 8px;
-    padding: 8px;
-    background: #fff;
-    border: 2px solid #eee;
-}
+
 
 .check-title {
     font-weight: bold;
@@ -827,10 +822,47 @@ button {
 .check-col.orange { border-color: #f9ab00; }
 .check-col.red { border-color: #d93025; }
 
+.check-col {
+    border-radius: 10px;
+    overflow: hidden;
+    background: #fff;
+    border: 1px solid #ddd;
+}
+
+/* HEADER */
+.check-header {
+    padding: 6px 8px;
+    font-weight: bold;
+    font-size: 13px;
+    color: #fff;
+    text-align: center;
+}
+
+/* BODY */
+.check-body {
+    padding: 6px 8px;
+    background: #fff;
+}
+
+/* MÀU HEADER */
+.check-col.green .check-header {
+    background: #188038;
+}
+
+.check-col.orange .check-header {
+    background: #f9ab00;
+}
+
+.check-col.red .check-header {
+    background: #d93025;
+}
+
+/* ITEM */
 .check-item {
     font-size: 13px;
     padding: 3px 0;
-}     
+    font-weight: bold; /* 🔥 đậm theo yêu cầu */
+}   
  
         
     </style>
@@ -2637,7 +2669,10 @@ Object.keys(shipsData).forEach(ship => {
 // ===== RENDER 3 CỘT =====
 
 function renderCol(list, color) {
-    if (list.length === 0) return "<div class='empty'>Không có</div>";
+
+    if (list.length === 0) {
+        return `<div class="empty">Không có</div>`;
+    }
 
     return list.map(x => `
         <div class="check-item" style="color:${color}">
@@ -2650,18 +2685,24 @@ let checkHTML = `
 <div class="check-grid">
 
     <div class="check-col green">
-        <div class="check-title">ĐÃ ĐỦ</div>
-        ${renderCol(doneList, "#188038")}
+        <div class="check-header">ĐÃ ĐỦ</div>
+        <div class="check-body">
+            ${renderCol(doneList, "#188038")}
+        </div>
     </div>
 
     <div class="check-col orange">
-        <div class="check-title">CHƯA ĐỦ</div>
-        ${renderCol(partialList, "#f9ab00")}
+        <div class="check-header">CHƯA ĐỦ</div>
+        <div class="check-body">
+            ${renderCol(partialList, "#f9ab00")}
+        </div>
     </div>
 
     <div class="check-col red">
-        <div class="check-title">CHƯA CÓ</div>
-        ${renderCol(emptyList, "#d93025")}
+        <div class="check-header">CHƯA CÓ</div>
+        <div class="check-body">
+            ${renderCol(emptyList, "#d93025")}
+        </div>
     </div>
 
 </div>

@@ -2559,12 +2559,13 @@ if (items.length === 0) {
     textColor = "#188038"; // 🟢 xanh
 }
 
+let color = getShipColor(ship);
+
 html += `
-    <div class="dash-row" onclick="toggleShipDetail('${ship}')">
-    🚢 <b style="color:${textColor}">${ship}</b> 
-    <span style="color:${textColor}">(${group})</span> 
-    : ${shipMap[ship]} người
+<div class="dash-row" onclick="toggleShipDetail('${ship}')">
+    🚢 <b style="color:${color}">${ship}</b>: ${shipMap[ship]} người
 </div>
+`;
 
     <div id="detail-${ship}" class="dash-detail"></div>
 `;
@@ -2610,11 +2611,13 @@ let warnHTML = "";
 if (warn.length === 0) {
     warnHTML = "✔ Tất cả tàu đã đủ 3 hạng mục kiểm tra";
 } else {
-    warn.forEach(w => {
-        warnHTML += `
-        ⚠️ <b>${w.ship}</b>: mới có ${w.count}/3 hạng mục<br>
-        `;
-    });
+   warn.forEach(w => {
+    let color = getShipColor(w.ship);
+
+    warnHTML += `
+    ⚠️ <b style="color:${color}">${w.ship}</b>: mới có ${w.count}/3 hạng mục<br>
+    `;
+});
 }
 
 document.getElementById("dashboardChecklist").innerHTML += `
@@ -2743,6 +2746,22 @@ function updateDashboardTitle() {
 setInterval(() => {
     renderTableUI();
 }, 300000); // 🔥 refresh highlight mỗi 1 phút
+
+function getShipColor(ship) {
+    let key = ship.replace(/\s/g, "_");
+    let items = progressData[key]?.items || [];
+
+    if (items.length === 0) {
+        return "#d93025"; // đỏ
+    } else if (items.length < 3) {
+        return "#f9ab00"; // vàng
+    } else {
+        return "#188038"; // xanh
+    }
+}
+
+
+    
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

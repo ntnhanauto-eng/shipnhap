@@ -896,11 +896,7 @@ button {
 .check-col.red .check-badge {
     background: #d93025;
 }
-   .info-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 10px;
-}
+ 
 
 .info-box {
     border-radius: 10px;
@@ -921,7 +917,43 @@ button {
 .info-body {
     padding: 10px;
     font-size: 18px;
-}     
+}  
+
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.info-card {
+    border: 2px solid #1a73e8;
+    border-radius: 10px;
+    overflow: hidden;
+    text-align: center;
+    background: #1a73e8;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+/* 🔵 Tiêu đề: nền xanh - chữ trắng */
+.info-title {
+    font-size: 13px;
+    font-weight: bold;
+    padding: 6px;
+    color: #ffffff;
+}
+
+/* ⚪ Nội dung: nền trắng - chữ xanh đậm */
+.info-value {
+    font-size: 20px;
+    font-weight: bold;
+    padding: 12px;
+    background: #ffffff;      /* 🔥 nền trắng */
+    color: #1a73e8;           /* 🔥 chữ xanh đậm */
+}
+
+
+        
         
     </style>
 </head>

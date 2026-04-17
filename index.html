@@ -1136,7 +1136,21 @@ window.deleteShip = function(shipId) {
         remove(ref(db, "ships/" + shipId));
     }
 }
+ window.updateShipGroup = function(shipId, groupVal) {
 
+    // giữ nguyên name cũ
+    const shipName = shipsData[shipId]?.name || shipId;
+
+    set(ref(db, "ships/" + shipId), {
+        name: shipName,
+        group: groupVal || ""
+    })
+    .then(() => {
+        console.log("Đã cập nhật nhóm cho", shipId);
+    });
+}
+
+    
 // 6. Hàm hiển thị danh sách tàu kèm nút Xóa
 function renderShipManagerList() {
 
@@ -1155,7 +1169,13 @@ function renderShipManagerList() {
 
         html += `
         <tr>
-            <td><b>${shipId}</b></td>
+            <td>
+    <select onchange="updateShipGroup('${shipId}', this.value)">
+        <option value="">-- Chọn --</option>
+        <option value="EO1" ${shipsData[shipId]?.group === "EO1" ? "selected" : ""}>EO1</option>
+        <option value="EO2" ${shipsData[shipId]?.group === "EO2" ? "selected" : ""}>EO2</option>
+    </select>
+</td>
 
             <td style="text-align:center;">
                 ${group}

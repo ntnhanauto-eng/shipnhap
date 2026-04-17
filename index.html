@@ -2656,9 +2656,13 @@ window.toggleShipDetail = function(ship) {
     console.log("TODAY:", today);
 
     // 👉 lọc dữ liệu
-    const result = Object.entries(rawData).filter(([id, x]) => {
-        return x.ship_id === ship && x.date === today;
-    });
+   const result = Object.entries(rawData).filter(([id, x]) => {
+    return (
+        x.ship_id === ship &&
+        x.date === today &&
+        Number(x.workers) > 0
+    );
+});
 
     // 👉 render
     let html = "";

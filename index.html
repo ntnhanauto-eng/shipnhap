@@ -1002,7 +1002,94 @@ button {
     }
 }
 
-        
+    .dashboard-section {
+    padding: 15px;
+}
+
+/* TITLE */
+.section-title {
+    font-size: 20px;
+    margin: 10px 0;
+    font-weight: bold;
+}
+
+.section-title.green { color: #1e7e34; }
+.section-title.blue { color: #1f5fbf; }
+
+/* ROW */
+.card-row {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 10px;
+}
+
+/* CARD */
+.card {
+    flex: 1;
+    border-radius: 16px;
+    color: white;
+    overflow: hidden;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-3px);
+}
+
+/* COLORS */
+.card.green { background: #1e8e3e; }
+.card.blue { background: #1f5fbf; }
+
+/* HEADER */
+.card-header {
+    padding: 10px;
+    font-weight: bold;
+    text-align: center;
+    border-bottom: 1px solid rgba(255,255,255,0.3);
+}
+
+/* BODY */
+.card-body {
+    text-align: center;
+    padding: 15px;
+}
+
+.big-number {
+    font-size: 40px;
+    font-weight: bold;
+}
+
+.sub-text {
+    font-size: 14px;
+    opacity: 0.9;
+}
+
+.arrow {
+    margin-top: 5px;
+    font-size: 18px;
+}
+
+/* DETAIL BOX */
+.card-detail {
+    display: none;
+    background: #e6f4ea;
+    padding: 10px 15px;
+    border-radius: 10px;
+    margin-bottom: 10px;
+}
+
+.blue-detail {
+    background: #e7f0ff;
+}
+
+/* DIVIDER */
+.divider {
+    margin: 20px 0;
+    border: none;
+    height: 2px;
+    background: #ccc;
+}    
         
     </style>
 </head>
@@ -1029,11 +1116,102 @@ button {
     <hr>
 
     <h4 style="color:#1a73e8; font-weight:bold;">
+
     📋 HẠNG MỤC KIỂM TRA:
 </h4>
     <div id="dashboardChecklist"></div>
     <hr>
 
+ <h3 class="section-title green">👥 THÔNG TIN NHÓM:</h3>
+
+    <div class="card-row">
+        <!-- TỔNG NHÓM -->
+        <div class="card green" onclick="toggleBox('groupDetail')">
+            <div class="card-header">TỔNG NHÓM</div>
+            <div class="card-body">
+                <div class="big-number">2</div>
+                <div class="sub-text">EO1: 5 tàu - EO2: 5 tàu</div>
+                <div class="arrow">⌄</div>
+            </div>
+        </div>
+
+        <!-- EO1 -->
+        <div class="card green">
+            <div class="card-header">EO1</div>
+            <div class="card-body">
+                <div class="big-number">5</div>
+                <div class="sub-text">tàu (đã bàn giao + đang làm)</div>
+            </div>
+        </div>
+
+        <!-- EO2 -->
+        <div class="card green">
+            <div class="card-header">EO2</div>
+            <div class="card-body">
+                <div class="big-number">5</div>
+                <div class="sub-text">tàu (đã bàn giao + đang làm)</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- DETAIL -->
+    <div id="groupDetail" class="card-detail">
+        <ul>
+            <li>Tổng số nhóm: 2</li>
+            <li>EO1: 5 tàu</li>
+            <li>EO2: 5 tàu</li>
+        </ul>
+    </div>
+
+    <!-- ===== LINE NGĂN CÁCH ===== -->
+    <hr class="divider">
+
+    <!-- ===== THÔNG TIN CHUNG ===== -->
+    <h3 class="section-title blue">📊 THÔNG TIN CHUNG:</h3>
+
+    <div class="card-row">
+        <!-- TỔNG TÀU -->
+        <div class="card blue" onclick="toggleBox('generalDetail')">
+            <div class="card-header">🚢 TỔNG TÀU</div>
+            <div class="card-body">
+                <div class="big-number">10</div>
+                <div class="sub-text">tàu trong danh sách</div>
+                <div class="arrow">⌄</div>
+            </div>
+        </div>
+
+        <!-- BÀN GIAO -->
+        <div class="card blue">
+            <div class="card-header">🤝 BÀN GIAO</div>
+            <div class="card-body">
+                <div class="big-number">5</div>
+                <div class="sub-text">tàu đã bàn giao</div>
+            </div>
+        </div>
+
+        <!-- ĐANG LÀM -->
+        <div class="card blue">
+            <div class="card-header">🔧 ĐANG LÀM</div>
+            <div class="card-body">
+                <div class="big-number">5</div>
+                <div class="sub-text">tàu đang thi công</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- DETAIL -->
+    <div id="generalDetail" class="card-detail blue-detail">
+        <ul>
+            <li>Tổng: 10 tàu</li>
+            <li>EO1: 5 tàu</li>
+            <li>EO2: 5 tàu</li>
+        </ul>
+    </div>
+
+</div>
+
+
+    
 <h4 style="color:#1a73e8; font-weight:bold;">
 📊 THÔNG TIN CHUNG:
 </h4>
@@ -3119,6 +3297,17 @@ function updateDashboardTitle() {
 setInterval(() => {
     renderTableUI();
 }, 300000); // 🔥 refresh highlight mỗi 1 phút
+
+function toggleBox(id){
+    const box = document.getElementById(id);
+
+    if(box.style.display === "block"){
+        box.style.display = "none";
+    } else {
+        box.style.display = "block";
+    }
+}
+    
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

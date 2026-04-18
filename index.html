@@ -1285,14 +1285,19 @@ document.getElementById("date").value = `${yyyy}-${mm}-${dd}`;
 }
 
 // 1. Lắng nghe danh sách tàu từ Firebase
+// Lắng nghe danh sách tàu từ Firebase
 onValue(ref(db, "ships"), snapshot => {
     shipsData = snapshot.val() || {};
-    renderShipSelects(); // Cập nhật các ô chọn tàu
-    // Nếu đang mở bảng quản lý tàu thì vẽ lại bảng đó luôn
-    if(document.getElementById("shipManagerBox").style.display === "block") {
+    renderShipSelects(); 
+    
+    // Kiểm tra nếu khung quản lý tàu đang mở thì vẽ lại bảng
+    const shipBox = document.getElementById("shipManagerBox");
+    if(shipBox && shipBox.style.display === "block") {
         renderShipManagerList();
-        renderDashboard();
     }
+    
+    // Cập nhật lại dashboard nếu cần
+    renderDashboard();
 });
 
     onValue(ref(db, "progress"), snapshot => {
@@ -1407,12 +1412,17 @@ function renderShipManagerList() {
         <th>Tên Tàu</th>
         <th>Nhóm</th>
         <th>Trạng thái</th>
-        <th>Ngày bàn giao</th> <th style="width:60px">Xóa</th>
+        <th style="width:100px">Ngày bàn giao</th>
+        <th style="width:60px">Xóa</th>
     </tr>`;
 
     Object.keys(shipsData).sort().forEach(shipId => {
         const ship = shipsData[shipId];
-        const deliveryDate = ship.deliveryDate || "-"; // Lấy ngày từ Firebase hoặc hiện dấu gạch
+        // Nếu trạng thái là done nhưng chưa có ngày (dữ liệu cũ), hiển thị "Chưa cập nhật"
+        let displayDate = "-";
+        if (ship.status === "done") {
+            displayDate = ship.deliveryDate ? ship.deliveryDate : "Cần cập nhật";
+        }
 
         html += `
         <tr>
@@ -1430,14 +1440,15 @@ function renderShipManagerList() {
                     <option value="done" ${ship.status === "done" ? "selected" : ""}>✅ Đã bàn giao</option>
                 </select>
             </td>
-            <td style="font-size: 12px; text-align: center; color: #d93025; font-weight: bold;">
-                ${deliveryDate}
+            <td style="text-align:center; font-size:12px; color: #d93025; font-weight:bold;">
+                ${displayDate}
             </td>
             <td>
                 <button class="btn-delete" onclick="deleteShip('${shipId}')" style="margin:0; padding:4px 6px; width:auto; font-size:12px;">🗑️</button>
             </td>
         </tr>`;
     });
+
     html += "</table>";
     document.getElementById("shipListContent").innerHTML = html;
 }

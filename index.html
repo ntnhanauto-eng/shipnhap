@@ -1890,8 +1890,9 @@ setTimeout(() => {
 
         return;
     }
+ let activeData = getTodayData();       
 activeData = getShipData();
-let doneData = {};
+
 
 // 🔥 tách dữ liệu theo trạng thái
 Object.keys(data).forEach(s => {

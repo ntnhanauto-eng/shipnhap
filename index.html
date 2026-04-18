@@ -1924,7 +1924,8 @@ function renderSummaryDetail(ship){
     const box = document.getElementById("summaryDetail");
     const result = window.summaryDataCache;
 
-    let html = "";
+    let htmlActive = "";
+    let htmlDone = "";
 
     Object.keys(result).forEach(s => {
 
@@ -1938,25 +1939,23 @@ function renderSummaryDetail(ship){
         if(realHours > 0){
             efficiency = (savedPP / realHours) * 100;
         }
+
         let progress = progressData[key]?.percent || 0;
         let checkedItems = progressData[key]?.items || [];
-let checkedText = checkedItems.length > 0 
-    ? checkedItems.join(", ") 
-    : "Chưa có";
+        let checkedText = checkedItems.length > 0 
+            ? checkedItems.join(", ") 
+            : "Chưa có";
 
         let color = "red";
         if(efficiency >= 100) color = "green";
         else if(efficiency >= 70) color = "orange";
         
-let group = shipsData[s]?.group || "-";
+        let group = shipsData[s]?.group || "-";
 
-// 🔥 xác định trạng thái
-let isDone = shipsData[s]?.status === "done";
-let statusText = isDone ? "Đã bàn giao" : "Đang làm";
-let statusColor = isDone ? "#188038" : "#1a73e8"; // xanh lá / xanh dương
+        let isDone = shipsData[s]?.status === "done";
 
-html += `
-<div class="summary-item">
+        let block = `
+       <div class="summary-item">
     <b>
         🚢 Tàu: ${s} (${group}) 
         - <span style="color:${statusColor}">${statusText}</span>
@@ -1969,9 +1968,26 @@ html += `
     <br>
 - Các hạng mục đã kiểm tra: <b>${checkedText}</b>
 </div>`;
+
+        // 🔥 PHÂN NHÓM
+        if(isDone){
+            htmlDone += block;
+        } else {
+            htmlActive += block;
+        }
+
     });
 
-    box.innerHTML = html;
+    // ===== RENDER RA UI =====
+    box.innerHTML = `
+        <h4 style="color:#1a73e8;">  ĐANG LÀM</h4>
+        ${htmlActive || "<i>Không có tàu</i>"}
+
+        <hr>
+
+        <h4 style="color:#188038;">✅ ĐÃ BÀN GIAO</h4>
+        ${htmlDone || "<i>Không có tàu</i>"}
+    `;
 }
 
     function renderSummaryChart(result){

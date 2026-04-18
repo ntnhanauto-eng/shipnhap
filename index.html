@@ -1335,24 +1335,23 @@ window.toggleShipManager = function() {
 // 4. Hàm Thêm tàu mới lên Firebase
 window.addShip = function() {
     const name = document.getElementById("newShipName").value.trim().toUpperCase();
-    const group = document.getElementById("shipGroup").value; // 👈 thêm dòng này
+    const group = document.getElementById("shipGroup").value;
 
     if(!name) return alert("Vui lòng nhập tên tàu!");
     if(shipsData[name]) return alert("Tàu này đã tồn tại!");
 
-   set(ref(db, "ships/" + name), {
-    name: name,
-    group: group || null,
-    status: "active" // 🔥 thêm dòng này
-})
+    set(ref(db, "ships/" + name), {
+        name: name,
+        group: group || null,
+        status: "active",
+        deliveryDate: "" // Khởi tạo rỗng
+    })
     .then(() => {
         document.getElementById("newShipName").value = "";
         document.getElementById("shipGroup").value = "";
-
         alert("Đã thêm tàu " + name);
     });
 }
-
 // 5. Hàm Xóa tàu khỏi danh sách
 window.deleteShip = function(shipId) {
     if(confirm(`Xác nhận xóa tàu ${shipId}?`)) {
@@ -1373,73 +1372,73 @@ window.deleteShip = function(shipId) {
     });
 }
 window.updateShipStatus = function(shipId, statusVal) {
-
     const shipName = shipsData[shipId]?.name || shipId;
     const group = shipsData[shipId]?.group || "";
+    
+    // Tạo biến lưu ngày bàn giao
+    let deliveryDate = shipsData[shipId]?.deliveryDate || "";
+
+    if (statusVal === "done") {
+        // Nếu chuyển sang bàn giao mà chưa có ngày thì gán ngày hôm nay
+        const now = new Date();
+        const yyyy = now.getFullYear();
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const dd = String(now.getDate()).padStart(2, '0');
+        deliveryDate = `${dd}/${mm}/${yyyy}`; 
+    } else {
+        // Nếu chuyển ngược lại "Đang làm", xóa ngày bàn giao
+        deliveryDate = "";
+    }
 
     set(ref(db, "ships/" + shipId), {
         name: shipName,
         group: group,
-        status: statusVal
+        status: statusVal,
+        deliveryDate: deliveryDate // Lưu vào Firebase
     })
     .then(() => {
-        console.log("Đã cập nhật trạng thái", shipId);
+        console.log("Đã cập nhật trạng thái và ngày bàn giao cho", shipId);
     });
 }
     
 // 6. Hàm hiển thị danh sách tàu kèm nút Xóa
 function renderShipManagerList() {
-
     let html = `<table><tr>
-   <th>Tên Tàu</th>
-<th>Nhóm</th>
-<th>Trạng thái</th>
-<th style="width:60px">Xóa</th>
-</tr>`;
+        <th>Tên Tàu</th>
+        <th>Nhóm</th>
+        <th>Trạng thái</th>
+        <th>Ngày bàn giao</th> <th style="width:60px">Xóa</th>
+    </tr>`;
+
     Object.keys(shipsData).sort().forEach(shipId => {
+        const ship = shipsData[shipId];
+        const deliveryDate = ship.deliveryDate || "-"; // Lấy ngày từ Firebase hoặc hiện dấu gạch
 
-        let group = shipsData[shipId]?.group || "-";
-
-     html += `
-<tr>
-    <td>${shipId}</td>
-
-    <td>
-        <select onchange="updateShipGroup('${shipId}', this.value)">
-            <option value="">-- Chọn --</option>
-            <option value="EO1" ${shipsData[shipId]?.group === "EO1" ? "selected" : ""}>EO1</option>
-            <option value="EO2" ${shipsData[shipId]?.group === "EO2" ? "selected" : ""}>EO2</option>
-        </select>
-    </td>
-
-    <!-- 🔥 THÊM CỘT NÀY -->
-    <td>
-        <select onchange="updateShipStatus('${shipId}', this.value)">
-            <option value="active"
-                ${(shipsData[shipId]?.status || "active") === "active" ? "selected" : ""}>
-                Đang làm
-            </option>
-
-            <option value="done"
-                ${shipsData[shipId]?.status === "done" ? "selected" : ""}>
-                ✅ Đã bàn giao
-            </option>
-        </select>
-    </td>
-
-    <td>
-        <button class="btn-delete"
-            onclick="deleteShip('${shipId}')"
-            style="margin:0; padding:4px 6px; width:auto; font-size:12px;">
-            🗑️
-        </button>
-    </td>
-</tr>
-`;
+        html += `
+        <tr>
+            <td>${shipId}</td>
+            <td>
+                <select onchange="updateShipGroup('${shipId}', this.value)">
+                    <option value="">-- Chọn --</option>
+                    <option value="EO1" ${ship.group === "EO1" ? "selected" : ""}>EO1</option>
+                    <option value="EO2" ${ship.group === "EO2" ? "selected" : ""}>EO2</option>
+                </select>
+            </td>
+            <td>
+                <select onchange="updateShipStatus('${shipId}', this.value)">
+                    <option value="active" ${(ship.status || "active") === "active" ? "selected" : ""}>Đang làm</option>
+                    <option value="done" ${ship.status === "done" ? "selected" : ""}>✅ Đã bàn giao</option>
+                </select>
+            </td>
+            <td style="font-size: 12px; text-align: center; color: #d93025; font-weight: bold;">
+                ${deliveryDate}
+            </td>
+            <td>
+                <button class="btn-delete" onclick="deleteShip('${shipId}')" style="margin:0; padding:4px 6px; width:auto; font-size:12px;">🗑️</button>
+            </td>
+        </tr>`;
     });
-
     html += "</table>";
-
     document.getElementById("shipListContent").innerHTML = html;
 }
 

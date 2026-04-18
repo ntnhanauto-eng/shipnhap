@@ -1412,17 +1412,13 @@ function renderShipManagerList() {
         <th>Tên Tàu</th>
         <th>Nhóm</th>
         <th>Trạng thái</th>
-        <th style="width:100px">Ngày bàn giao</th>
+        <th style="width:130px">Ngày bàn giao</th>
         <th style="width:60px">Xóa</th>
     </tr>`;
 
     Object.keys(shipsData).sort().forEach(shipId => {
         const ship = shipsData[shipId];
-        // Nếu trạng thái là done nhưng chưa có ngày (dữ liệu cũ), hiển thị "Chưa cập nhật"
-        let displayDate = "-";
-        if (ship.status === "done") {
-            displayDate = ship.deliveryDate ? ship.deliveryDate : "Cần cập nhật";
-        }
+        const dDate = ship.deliveryDate || ""; // Định dạng YYYY-MM-DD để input date hiểu được
 
         html += `
         <tr>
@@ -1440,8 +1436,11 @@ function renderShipManagerList() {
                     <option value="done" ${ship.status === "done" ? "selected" : ""}>✅ Đã bàn giao</option>
                 </select>
             </td>
-            <td style="text-align:center; font-size:12px; color: #d93025; font-weight:bold;">
-                ${displayDate}
+            <td>
+                <input type="date" 
+                       value="${dDate}" 
+                       onchange="updateShipDeliveryDate('${shipId}', this.value)"
+                       style="padding: 4px; font-size: 12px; border: 1px solid #ccc;">
             </td>
             <td>
                 <button class="btn-delete" onclick="deleteShip('${shipId}')" style="margin:0; padding:4px 6px; width:auto; font-size:12px;">🗑️</button>
@@ -1453,6 +1452,18 @@ function renderShipManagerList() {
     document.getElementById("shipListContent").innerHTML = html;
 }
 
+    window.updateShipDeliveryDate = function(shipId, dateVal) {
+    const ship = shipsData[shipId];
+    
+    // Cập nhật ngày lên Firebase mà không làm thay đổi các thông tin khác
+    update(ref(db, "ships/" + shipId), {
+        deliveryDate: dateVal
+    })
+    .then(() => {
+        console.log("Đã cập nhật ngày bàn giao mới cho", shipId);
+    })
+    .catch(err => alert("Lỗi cập nhật ngày: " + err.message));
+}
     // --- XỬ LÝ ĐĂNG NHẬP ---
   window.handleAuth = function() {
     if (isAdmin) {

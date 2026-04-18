@@ -1147,7 +1147,33 @@ button {
     <button id="btnExtra" onclick="handleButton('extra')">📦 Vật tư - Ghi chú</button>
 </div>
         
-        <div id="summary" style="display:none; margin-top:15px;"></div>
+       <div id="summary" style="display:none; margin-top:15px;">
+    <div id="summaryStats" style="margin-bottom: 20px; padding: 15px; background: #e8f0fe; border-radius: 12px; border-left: 5px solid #1a73e8;">
+    </div>
+
+    <div class="flex" style="grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+        <div class="date-field">
+            <label>1. Loại tàu:</label>
+            <select id="filterStatus" onchange="updateShipSelectByStatus()">
+                <option value="all">-- Tất cả --</option>
+                <option value="done">TÀU BÀN GIAO</option>
+                <option value="active">ĐANG LÀM</option>
+            </select>
+        </div>
+        <div class="date-field">
+            <label>2. Chọn tàu cụ thể:</label>
+            <select id="filterShip" onchange="renderSummaryDetail(this.value)">
+                <option value="all">-- Tất cả tàu --</option>
+            </select>
+        </div>
+    </div>
+
+    <div id="summaryDetail"></div>
+    
+    <div style="margin-top:20px;">
+        <canvas id="summaryChart"></canvas>
+    </div>
+</div>
         
         <div id="workHoursBox" style="display:none; margin-top:15px;">
             <h4>Nhập Giờ Công Theo Định Mức</h4>
@@ -3100,6 +3126,89 @@ function updateDashboardTitle() {
 setInterval(() => {
     renderTableUI();
 }, 300000); // 🔥 refresh highlight mỗi 1 phút
+
+    window.showGeneralSummaryReport = function() {
+    document.getElementById("summaryReportBox").style.display = "block";
+    
+    let total = Object.keys(shipsData).length;
+    let done = 0;
+    let active = 0;
+
+    Object.values(shipsData).forEach(s => {
+        if (s.status === "done") done++;
+        else active++;
+    });
+
+    // 1. Hiển thị 3 dòng thống kê
+    document.getElementById("summaryStats").innerHTML = `
+        <div style="font-weight: bold; line-height: 1.8;">
+            <div style="color: #333;">1. Tổng tàu đã làm: ${total}</div>
+            <div style="color: #188038;">2. Tàu đã bàn giao: ${done}</div>
+            <div style="color: #1a73e8;">3. Tàu đang làm: ${active}</div>
+        </div>
+    `;
+
+    // Reset filter và cập nhật danh sách tàu ban đầu
+    document.getElementById("filterStatus").value = "all";
+    updateShipSelectByStatus();
+    
+    // Mặc định hiện tất cả chi tiết bên dưới
+    renderSummaryDetail("all");
+};
+
+window.updateShipSelectByStatus = function() {
+    const statusFilter = document.getElementById("filterStatus").value;
+    const shipSelect = document.getElementById("filterShip");
+    
+    let html = '<option value="all">-- Tất cả tàu --</option>';
+    
+    Object.keys(shipsData).sort().forEach(shipId => {
+        const ship = shipsData[shipId];
+        // Lọc dựa trên tầng 1
+        if (statusFilter === "all" || ship.status === statusFilter) {
+            html += `<option value="${shipId}">${shipId}</option>`;
+        }
+    });
+    
+    shipSelect.innerHTML = html;
+    
+    // Khi đổi tầng 1, tự động cập nhật nội dung chi tiết theo bộ lọc đó
+    renderSummaryDetail("all_filtered"); 
+};
+
+function renderSummaryDetail(selectedShip) {
+    const box = document.getElementById("summaryDetail");
+    const result = window.summaryDataCache; // Giả định bạn đã có cache dữ liệu tính toán
+    const statusFilter = document.getElementById("filterStatus").value;
+
+    let html = "";
+    Object.keys(result).forEach(s => {
+        const shipInfo = shipsData[s] || {};
+        
+        // Logic lọc:
+        // 1. Nếu chọn 1 tàu cụ thể: chỉ hiện tàu đó
+        if (selectedShip !== "all" && selectedShip !== "all_filtered" && s !== selectedShip) return;
+        
+        // 2. Nếu chọn "Tất cả" nhưng tầng 1 đang lọc trạng thái
+        if (selectedShip === "all_filtered" && statusFilter !== "all" && shipInfo.status !== statusFilter) return;
+
+        // --- Giữ nguyên phần render HTML chi tiết của bạn ở đây ---
+        let group = shipInfo.group || "-";
+        let isDone = shipInfo.status === "done";
+        let statusText = isDone ? "Đã bàn giao" : "Đang làm";
+        let deliveryDateText = (isDone && shipInfo.deliveryDate) ? ` - ${shipInfo.deliveryDate}` : "";
+
+        html += `
+        <div class="summary-item" style="border-left: 4px solid ${isDone ? '#188038' : '#1a73e8'};">
+            <b>🚢 Tàu: ${s} (${group}) - ${statusText}${deliveryDateText}</b>
+            <div style="padding-left: 10px;">
+                ...
+            </div>
+        </div>`;
+    });
+
+    box.innerHTML = html || "<p>Không có tàu nào phù hợp.</p>";
+}
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

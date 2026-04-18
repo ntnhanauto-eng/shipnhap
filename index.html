@@ -1954,75 +1954,7 @@ setTimeout(() => {
     updateChartData(data, ship);
 }
 
-function renderSummaryDetail(ship){
-    const box = document.getElementById("summaryDetail");
-    const result = window.summaryDataCache;
 
-    let htmlActive = "";
-    let htmlDone = "";
-
-    Object.keys(result).forEach(s => {
-
-        if(ship !== "all" && s !== ship) return;
-
-        let key = s.replace(/\s/g,'_');
-        let savedPP = ppData[key]?.hours || 0;
-        let realHours = result[s].totalWorkers * 8;
-
-        let efficiency = 0;
-        if(realHours > 0){
-            efficiency = (savedPP / realHours) * 100;
-        }
-
-        let progress = progressData[key]?.percent || 0;
-        let checkedItems = progressData[key]?.items || [];
-        let checkedText = checkedItems.length > 0 
-            ? checkedItems.join(", ") 
-            : "Chưa có";
-
-        let color = "red";
-        if(efficiency >= 100) color = "green";
-        else if(efficiency >= 70) color = "orange";
-        
-        let group = shipsData[s]?.group || "-";
-
-        let isDone = shipsData[s]?.status === "done";
-
-        let block = `
-       <div class="summary-item">
-    <b>
-        🚢 Tàu: ${s} (${group}) 
-        - <span style="color:${statusColor}">${statusText}</span>
-    </b><br>
-    - Tổng nhân công: ${result[s].totalWorkers} lượt người<br>
-    - Tổng giờ thực tế: ${realHours.toLocaleString()} giờ<br>
-    - Giờ định mức PP: <b>${savedPP.toLocaleString()}</b> giờ<br>
-    - Hiệu quả tàu: <b style="color:${color}">${efficiency.toFixed(1)} %</b><br>
-    - Tiến độ thực tế: <b style="color:#1a73e8">${progress} %</b>
-    <br>
-- Các hạng mục đã kiểm tra: <b>${checkedText}</b>
-</div>`;
-
-        // 🔥 PHÂN NHÓM
-        if(isDone){
-            htmlDone += block;
-        } else {
-            htmlActive += block;
-        }
-
-    });
-
-    // ===== RENDER RA UI =====
-    box.innerHTML = `
-        <h4 style="color:#1a73e8;">  ĐANG LÀM</h4>
-        ${htmlActive || "<i>Không có tàu</i>"}
-
-        <hr>
-
-        <h4 style="color:#188038;">✅ ĐÃ BÀN GIAO</h4>
-        ${htmlDone || "<i>Không có tàu</i>"}
-    `;
-}
 
     function renderSummaryChart(result){
         Chart.register(ChartDataLabels);

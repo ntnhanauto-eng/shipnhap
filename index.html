@@ -1749,6 +1749,25 @@ window.showSummary = function(){
 
     let html = `
         <h4>📊 Báo cáo tổng hợp</h4>
+        <div id="summaryControls" style="padding: 10px; background: #f8f9fa; border-radius: 8px;">
+    <div id="statsInfo" style="display: flex; justify-content: space-around; margin-bottom: 15px; font-weight: bold;">
+        <span id="statTotal">Tổng tàu: 0</span>
+        <span id="statDone" style="color: #188038;">Đã bàn giao: 0</span>
+        <span id="statDoing" style="color: #d93025;">Đang làm: 0</span>
+    </div>
+
+    <div style="display: flex; gap: 10px; flex-direction: column;">
+        <select id="filterStatus" onchange="updateShipDropdown()" style="padding: 8px;">
+            <option value="all">-- Chọn trạng thái (Tất cả) --</option>
+            <option value="done">Đã bàn giao</option>
+            <option value="active">Đang làm</option>
+        </select>
+        
+        <select id="filterShip" onchange="handleShipSelection()" style="padding: 8px;">
+            <option value="">-- Chọn tàu tương ứng --</option>
+        </select>
+    </div>
+</div>
 
         <label><b>🚢 Chọn tàu:</b></label>
         <select id="summaryShipFilter" onchange="filterSummary()">
@@ -3068,6 +3087,52 @@ function updateDashboardTitle() {
 setInterval(() => {
     renderTableUI();
 }, 300000); // 🔥 refresh highlight mỗi 1 phút
+
+// Hàm render thống kê và khởi tạo dropdown
+function initSummaryControls() {
+    let ships = Object.values(shipsData);
+    let total = ships.length;
+    let done = ships.filter(s => s.status === 'done').length;
+    let doing = ships.filter(s => s.status !== 'done').length;
+
+    document.getElementById("statTotal").innerText = `Tổng tàu: ${total}`;
+    document.getElementById("statDone").innerText = `Đã bàn giao: ${done}`;
+    document.getElementById("statDoing").innerText = `Đang làm: ${doing}`;
+
+    // Reset dropdown về mặc định
+    updateShipDropdown();
+}
+
+// Cập nhật danh sách tàu dựa trên trạng thái đã chọn
+window.updateShipDropdown = function() {
+    let statusFilter = document.getElementById("filterStatus").value;
+    let shipSelect = document.getElementById("filterShip");
+    
+    // Xóa list cũ
+    shipSelect.innerHTML = '<option value="">-- Chọn tàu tương ứng --</option>';
+
+    // Lọc tàu
+    Object.keys(shipsData).sort().forEach(shipName => {
+        let ship = shipsData[shipName];
+        if (statusFilter === "all" || ship.status === statusFilter) {
+            let opt = document.createElement("option");
+            opt.value = shipName;
+            opt.innerText = shipName;
+            shipSelect.appendChild(opt);
+        }
+    });
+}
+
+// Xử lý khi chọn tàu (Ví dụ: nhảy đến chi tiết tàu đó)
+window.handleShipSelection = function() {
+    let selectedShip = document.getElementById("filterShip").value;
+    if (!selectedShip) return;
+
+    alert("Boss đã chọn tàu: " + selectedShip);
+    // Tại đây Boss có thể gọi các hàm hiển thị chi tiết tàu hoặc vẽ biểu đồ
+    // Ví dụ: updateChartData(result, selectedShip);
+}
+    
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

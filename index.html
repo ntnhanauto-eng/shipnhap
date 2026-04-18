@@ -3148,5 +3148,25 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
+    <!-- Nút cài app -->
+<button id="installBtn" onclick="installApp()" style="display:none;">
+  Cài app
+</button>
+
+<script>
+let deferredPrompt;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+
+  document.getElementById("installBtn").style.display = "block";
+});
+
+function installApp(){
+  deferredPrompt.prompt();
+}
+</script>
+</body>
 </body>
 </html>

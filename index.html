@@ -1388,61 +1388,74 @@ window.updateShipStatus = function(shipId, statusVal) {
 }
     
 // 6. Hàm hiển thị danh sách tàu kèm nút Xóa
+// Tìm hàm renderShipManagerList và sửa đoạn render bảng như sau:
+
 function renderShipManagerList() {
+    let ships = Object.keys(shipsData).sort();
+    
+    // THÊM CỘT "Ngày bàn giao" VÀO HEADER
+    let html = `
+    <table style="width:100%; border-collapse:collapse;">
+        <tr>
+            <th style="width:30px;">STT</th>
+            <th>Tên Tàu</th>
+            <th style="width:100px;">Trạng thái</th>
+            <th style="width:140px;">Ngày bàn giao</th> <th style="width:60px;">Lưu</th>
+        </tr>`;
 
-    let html = `<table><tr>
-   <th>Tên Tàu</th>
-<th>Nhóm</th>
-<th>Trạng thái</th>
-<th style="width:60px">Xóa</th>
-</tr>`;
-    Object.keys(shipsData).sort().forEach(shipId => {
+    ships.forEach((s, index) => {
+        let key = s.replace(/\s/g, '_');
+        let status = shipsData[s]?.status || "active";
+        // LẤY GIÁ TRỊ CŨ NẾU CÓ
+        let deliveryDate = shipsData[s]?.deliveryDate || ""; 
 
-        let group = shipsData[shipId]?.group || "-";
-
-     html += `
-<tr>
-    <td>${shipId}</td>
-
-    <td>
-        <select onchange="updateShipGroup('${shipId}', this.value)">
-            <option value="">-- Chọn --</option>
-            <option value="EO1" ${shipsData[shipId]?.group === "EO1" ? "selected" : ""}>EO1</option>
-            <option value="EO2" ${shipsData[shipId]?.group === "EO2" ? "selected" : ""}>EO2</option>
-        </select>
-    </td>
-
-    <!-- 🔥 THÊM CỘT NÀY -->
-    <td>
-        <select onchange="updateShipStatus('${shipId}', this.value)">
-            <option value="active"
-                ${(shipsData[shipId]?.status || "active") === "active" ? "selected" : ""}>
-                Đang làm
-            </option>
-
-            <option value="done"
-                ${shipsData[shipId]?.status === "done" ? "selected" : ""}>
-                ✅ Đã bàn giao
-            </option>
-        </select>
-    </td>
-
-    <td>
-        <button class="btn-delete"
-            onclick="deleteShip('${shipId}')"
-            style="margin:0; padding:4px 6px; width:auto; font-size:12px;">
-            🗑️
-        </button>
-    </td>
-</tr>
-`;
+        html += `<tr>
+            <td>${index + 1}</td>
+            <td>${s}</td>
+            <td>
+                <select id="status_${key}">
+                    <option value="active" ${status === 'active' ? 'selected' : ''}>Đang làm</option>
+                    <option value="done" ${status === 'done' ? 'selected' : ''}>Bàn giao</option>
+                </select>
+            </td>
+            <td>
+                <input type="date" id="date_${key}" value="${deliveryDate}" style="width:100%;">
+            </td>
+            <td>
+                <button onclick="saveShip('${s}')">💾</button>
+            </td>
+        </tr>`;
     });
 
     html += "</table>";
-
-    document.getElementById("shipListContent").innerHTML = html;
+    document.getElementById("shipManagerContent").innerHTML = html;
 }
+// Tìm hàm saveShip (hoặc hàm tương tự dùng để lưu thông tin tàu)
+window.saveShip = function(shipName) {
+    let key = shipName.replace(/\s/g, '_');
+    let status = document.getElementById("status_" + key).value;
+    let deliveryDate = document.getElementById("date_" + key).value; // LẤY GIÁ TRỊ NGÀY
 
+    // Kiểm tra nếu chọn bàn giao mà chưa chọn ngày (tùy chọn)
+    if (status === 'done' && !deliveryDate) {
+        if (!confirm("Tàu đã bàn giao nhưng chưa chọn ngày. Bạn có muốn tiếp tục?")) {
+            return;
+        }
+    }
+
+    // CẬP NHẬT VÀO FIREBASE
+    set(ref(db, "ships/" + key), {
+        ship: shipName,
+        status: status,
+        deliveryDate: deliveryDate, // LƯU VÀO DATABASE
+        group: shipsData[key]?.group || "-"
+    })
+    .then(() => {
+        alert("✅ Đã cập nhật thông tin tàu: " + shipName);
+        renderShipManagerList(); // Refresh lại danh sách
+    })
+    .catch(err => alert("❌ Lỗi: " + err.message));
+}
     // --- XỬ LÝ ĐĂNG NHẬP ---
   window.handleAuth = function() {
     if (isAdmin) {

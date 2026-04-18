@@ -3153,20 +3153,31 @@ if ('serviceWorker' in navigator) {
   Cài app
 </button>
 
-<script>
 let deferredPrompt;
 
 window.addEventListener('beforeinstallprompt', (e) => {
-  e.preventDefault();
+  e.preventDefault(); // chặn popup mặc định
+
   deferredPrompt = e;
 
+  // 👉 HIỆN NÚT
   document.getElementById("installBtn").style.display = "block";
 });
 
-function installApp(){
+// 👉 Khi bấm nút
+document.getElementById("installBtn").addEventListener("click", async () => {
+  if (!deferredPrompt) return;
+
   deferredPrompt.prompt();
-}
-</script>
+
+  const choice = await deferredPrompt.userChoice;
+
+  if (choice.outcome === 'accepted') {
+    console.log('User đã cài app');
+  }
+
+  deferredPrompt = null;
+});
 </body>
 </body>
 </html>

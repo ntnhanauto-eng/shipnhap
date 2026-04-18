@@ -1390,10 +1390,11 @@ window.updateShipStatus = function(shipId, statusVal) {
 // 6. Hàm hiển thị danh sách tàu kèm nút Xóa
 function renderShipManagerList() {
 
-    let html = `<table><tr>
-   <th>Tên Tàu</th>
+  let html = `<table><tr>
+<th>Tên Tàu</th>
 <th>Nhóm</th>
 <th>Trạng thái</th>
+<th>Ngày bàn giao</th>
 <th style="width:60px">Xóa</th>
 </tr>`;
     Object.keys(shipsData).sort().forEach(shipId => {

@@ -1377,40 +1377,23 @@ window.updateShipStatus = function(shipId, statusVal) {
     const shipName = shipsData[shipId]?.name || shipId;
     const group = shipsData[shipId]?.group || "";
 
-    // 👉 nếu bàn giao thì set ngày
-    let handoverDate = shipsData[shipId]?.handoverDate || null;
-
-    if (statusVal === "done") {
-        handoverDate = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-    } else {
-        handoverDate = null; // nếu quay lại active thì xoá ngày
-    }
-
     set(ref(db, "ships/" + shipId), {
         name: shipName,
         group: group,
-        status: statusVal,
-        handoverDate: handoverDate
+        status: statusVal
     })
     .then(() => {
-        console.log("Đã cập nhật trạng thái + ngày bàn giao", shipId);
+        console.log("Đã cập nhật trạng thái", shipId);
     });
 }
     
 // 6. Hàm hiển thị danh sách tàu kèm nút Xóa
 function renderShipManagerList() {
 
-  let html = `<table><tr>
-<th>Tên Tàu</th>
+    let html = `<table><tr>
+   <th>Tên Tàu</th>
 <th>Nhóm</th>
 <th>Trạng thái</th>
-<td>
-    ${shipsData[shipId]?.handoverDate || "-"}
-</td>
-<th>Ngày bàn giao</th>
-<td>
-    ${shipsData[shipId]?.handoverDate || "-"}
-</td>
 <th style="width:60px">Xóa</th>
 </tr>`;
     Object.keys(shipsData).sort().forEach(shipId => {
@@ -1968,7 +1951,6 @@ let group = shipsData[s]?.group || "-";
 
 // 🔥 xác định trạng thái
 let isDone = shipsData[s]?.status === "done";
-        let handoverDate = shipsData[s]?.handoverDate || "-";
 let statusText = isDone ? "Đã bàn giao" : "Đang làm";
 let statusColor = isDone ? "#188038" : "#1a73e8"; // xanh lá / xanh dương
 
@@ -1976,7 +1958,7 @@ html += `
 <div class="summary-item">
     <b>
         🚢 Tàu: ${s} (${group}) 
-        - <span style="color:${statusColor}">${statusText}</span> - Ngày bàn giao: <b>${handoverDate}</b><br>
+        - <span style="color:${statusColor}">${statusText}</span>
     </b><br>
     - Tổng nhân công: ${result[s].totalWorkers} lượt người<br>
     - Tổng giờ thực tế: ${realHours.toLocaleString()} giờ<br>

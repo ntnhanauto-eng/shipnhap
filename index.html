@@ -1728,39 +1728,73 @@ window.toggleAdvancedSearch = function() {
         }
     }
 
-window.showSummary = function(){
-    const box = document.getElementById("summary");
-    box.style.display = "block";
+function renderSummaryDetail(ship){
+    const box = document.getElementById("summaryDetail");
+    const result = window.summaryDataCache;
 
-    let result = {};
+    let htmlActive = "";
+    let htmlDone = "";
 
-    Object.values(rawData).forEach(x => {
-        if(!result[x.ship_id]) result[x.ship_id] = { totalWorkers:0 };
-        result[x.ship_id].totalWorkers += Number(x.workers);
+    Object.keys(result).forEach(s => {
+
+        if(ship !== "all" && s !== ship) return;
+
+        let key = s.replace(/\s/g,'_');
+        let savedPP = ppData[key]?.hours || 0;
+        let realHours = result[s].totalWorkers * 8;
+
+        let efficiency = 0;
+        if(realHours > 0){
+            efficiency = (savedPP / realHours) * 100;
+        }
+
+        let progress = progressData[key]?.percent || 0;
+        let checkedItems = progressData[key]?.items || [];
+        let checkedText = checkedItems.length > 0 
+            ? checkedItems.join(", ") 
+            : "Chưa có";
+
+        let color = "red";
+        if(efficiency >= 100) color = "green";
+        else if(efficiency >= 70) color = "orange";
+        
+        let group = shipsData[s]?.group || "-";
+
+        let isDone = shipsData[s]?.status === "done";
+
+        let block = `
+       <div class="summary-item">
+    <b>
+        🚢 Tàu: ${s} (${group}) 
+        - <span style="color:${statusColor}">${statusText}</span>
+    </b><br>
+    - Tổng nhân công: ${result[s].totalWorkers} lượt người<br>
+    - Tổng giờ thực tế: ${realHours.toLocaleString()} giờ<br>
+    - Giờ định mức PP: <b>${savedPP.toLocaleString()}</b> giờ<br>
+    - Hiệu quả tàu: <b style="color:${color}">${efficiency.toFixed(1)} %</b><br>
+    - Tiến độ thực tế: <b style="color:#1a73e8">${progress} %</b>
+    <br>
+- Các hạng mục đã kiểm tra: <b>${checkedText}</b>
+</div>`;
+
+        // 🔥 PHÂN NHÓM
+        if(isDone){
+            htmlDone += block;
+        } else {
+            htmlActive += block;
+        }
+
     });
 
-    // ===== DROPDOWN =====
-    let shipOptions = `
-<option value="">-- Chọn tàu --</option>
-<option value="all">Tất cả tàu</option>
-`;
-    Object.keys(result).sort().forEach(s => {
-        shipOptions += `<option value="${s}">${s}</option>`;
-    });
+    // ===== RENDER RA UI =====
+    box.innerHTML = `
+        <h4 style="color:#1a73e8;">🚧 ĐANG LÀM</h4>
+        ${htmlActive || "<i>Không có tàu</i>"}
 
-    let html = `
-        <h4>📊 Báo cáo tổng hợp</h4>
+        <hr>
 
-        <label><b>🚢 Chọn tàu:</b></label>
-        <select id="summaryShipFilter" onchange="filterSummary()">
-            ${shipOptions}
-        </select>
-
-        <div id="summaryDetail" style="margin-top:10px;"></div>
-
-        <div style="margin-top:20px;">
-            <canvas id="summaryChart"></canvas>
-        </div>
+        <h4 style="color:#188038;">✅ ĐÃ BÀN GIAO</h4>
+        ${htmlDone || "<i>Không có tàu</i>"}
     `;
 
     box.innerHTML = html;

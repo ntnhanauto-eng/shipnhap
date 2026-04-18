@@ -1689,7 +1689,6 @@ window.toggleAdvancedSearch = function() {
     }
 
 window.showSummary = function(){
-
     const box = document.getElementById("summary");
     box.style.display = "block";
 
@@ -1700,37 +1699,24 @@ window.showSummary = function(){
         result[x.ship_id].totalWorkers += Number(x.workers);
     });
 
-    // ===== CHIA 2 NHÓM =====
-    let activeShips = [];
-    let doneShips = [];
-
-    Object.keys(result).forEach(s => {
-        if (shipsData[s]?.status === "done") {
-            doneShips.push(s);
-        } else {
-            activeShips.push(s);
-        }
+    // ===== DROPDOWN =====
+    let shipOptions = `
+<option value="">-- Chọn tàu --</option>
+<option value="all">Tất cả tàu</option>
+`;
+    Object.keys(result).sort().forEach(s => {
+        shipOptions += `<option value="${s}">${s}</option>`;
     });
 
-    // ===== HTML =====
     let html = `
         <h4>📊 Báo cáo tổng hợp</h4>
 
         <label><b>🚢 Chọn tàu:</b></label>
         <select id="summaryShipFilter" onchange="filterSummary()">
-            <option value="">-- Chọn tàu --</option>
-            <option value="all">Tất cả</option>
+            ${shipOptions}
         </select>
 
         <div id="summaryDetail" style="margin-top:10px;"></div>
-
-        <hr>
-        <h4 style="color:#188038;">🚢 TÀU ĐANG LÀM</h4>
-        <div id="summaryActive"></div>
-
-        <hr>
-        <h4 style="color:#d93025;">✅ TÀU ĐÃ BÀN GIAO</h4>
-        <div id="summaryDone"></div>
 
         <div style="margin-top:20px;">
             <canvas id="summaryChart"></canvas>
@@ -1738,67 +1724,109 @@ window.showSummary = function(){
     `;
 
     box.innerHTML = html;
+    document.getElementById("summaryShipFilter").value = "";
 
+    // lưu cache
     window.summaryDataCache = result;
 
-    // 👉 render ngay 2 nhóm
-    renderSummaryGroup(activeShips, "summaryActive");
-    renderSummaryGroup(doneShips, "summaryDone");
+   // lưu cache
+window.summaryDataCache = result;
 
-    // 👉 tạo chart rỗng
-    setTimeout(initSummaryChart, 200);
-}
+// 👉 chưa hiển thị dữ liệu
+document.getElementById("summaryDetail").innerHTML =
+    "<i>👉 Vui lòng chọn tàu để xem báo cáo</i>";
 
-function renderSummaryGroup(shipList, targetId){
+// 👉 tạo chart rỗng (CHỈ TẠO 1 LẦN)
+setTimeout(() => {
 
-    const box = document.getElementById(targetId);
-    const result = window.summaryDataCache;
+    const canvas = document.getElementById('summaryChart');
+    if (!canvas) return;
 
-    let html = "";
+    const ctx = canvas.getContext('2d');
 
-    if(shipList.length === 0){
-        box.innerHTML = "<i>Không có tàu</i>";
-        return;
+    // 🔥 Nếu đã có chart → destroy trước
+    if (window.myChart) {
+        window.myChart.destroy();
+        window.myChart = null;
     }
+   Chart.register(ChartDataLabels);
+    // 🔥 Tạo chart mới
+    window.myChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: [],
+            datasets: [
+                {
+                    label: 'Giờ thực tế',
+                    data: [],
+                    backgroundColor: '#1a73e8',
+                    borderColor: '#0b57d0',
+                    borderWidth: 2,
+                    borderRadius: 6
+                },
+                {
+                    label: 'Giờ PP',
+                    data: [],
+                    backgroundColor: '#34a853',
+                    borderColor: '#1e7e34',
+                    borderWidth: 2,
+                    borderRadius: 6
+                }
+            ]
+        },
+     options: {
+    responsive: true,
+    maintainAspectRatio: false,
 
-    shipList.forEach(s => {
+    layout: {
+        padding: {
+            top: 40   // 🔥 tạo khoảng trống phía trên
+        }
+    },
 
-        let key = s.replace(/\s/g,'_');
-        let savedPP = ppData[key]?.hours || 0;
-        let realHours = result[s].totalWorkers * 8;
+    plugins: {
+        legend: { 
+            position: 'top',
+            labels: {
+                padding: 20   // 🔥 đẩy chữ legend xuống thấp hơn 1 chút
+            }
+        },
 
-        let efficiency = realHours > 0 
-            ? (savedPP / realHours) * 100 
-            : 0;
+        title: {
+            display: true,
+            text: 'So sánh Giờ Công',
+            padding: {
+                top: 10,
+                bottom: 10
+            }
+        },
 
-        let progress = progressData[key]?.percent || 0;
-        let items = progressData[key]?.items || [];
+        datalabels: {
+            anchor: 'end',
+            align: 'top',
+            offset: 2,   // 🔥 đẩy số lên cao hơn cột
+            color: '#000',
+            font: {
+                weight: 'bold',
+                size: 12
+            },
+            formatter: function(value) {
+                return value.toLocaleString();
+            }
+        }
+    },
 
-        let color = "red";
-        if(efficiency >= 100) color = "green";
-        else if(efficiency >= 70) color = "orange";
-
-        let group = shipsData[s]?.group || "-";
-
-        html += `
-        <div class="summary-item">
-            <b>🚢 ${s} (${group})</b><br>
-            - Tổng nhân công: ${result[s].totalWorkers}<br>
-            - Tổng giờ thực tế: ${realHours.toLocaleString()}<br>
-            - Giờ PP: <b>${savedPP.toLocaleString()}</b><br>
-            - Hiệu quả: <b style="color:${color}">
-                ${efficiency.toFixed(1)} %
-            </b><br>
-            - Tiến độ: ${progress}%<br>
-            - Checklist: ${items.join(", ") || "Chưa có"}
-        </div>
-        `;
+    scales: {
+        y: {
+            beginAtZero: true,
+             grace: '15%'   // 🔥 thêm khoảng trống phía trên
+        }
+    }
+}
     });
 
-    box.innerHTML = html;
+}, 200);
 }
-
-    
     window.toggleWorkHours = function(){
         const box = document.getElementById("workHoursBox");
         box.style.display = (box.style.display === "none") ? "block" : "none";
@@ -2474,30 +2502,25 @@ function renderChecklistInputs(){
 }
 
 function updateChartData(result, selectedShip){
-
-    if (!window.myChart) return;
-
+     if (!window.myChart) return;
     let labels = [];
     let realData = [];
     let ppDataArr = [];
 
     for(let s in result){
 
-        if(selectedShip !== "all" && selectedShip && s !== selectedShip) continue;
+        if(selectedShip !== "all" && s !== selectedShip) continue;
 
         let key = s.replace(/\s/g,'_');
-
         let savedPP = ppData[key]?.hours || 0;
         let realHours = result[s].totalWorkers * 8;
 
-        // 👉 thêm trạng thái vào label
-        let status = shipsData[s]?.status === "done" ? "✅" : "🚢";
-
-        labels.push(`${status} ${s}`);
+        labels.push(s);
         realData.push(realHours);
         ppDataArr.push(savedPP);
     }
 
+    // 🔥 CHỈ UPDATE DATA — KHÔNG TẠO LẠI CHART
     window.myChart.data.labels = labels;
     window.myChart.data.datasets[0].data = realData;
     window.myChart.data.datasets[1].data = ppDataArr;

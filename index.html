@@ -1001,7 +1001,19 @@ button {
         transform: translateY(0);
     }
 }
+  .group-box {
+    border: 2px solid #188038;
+}
 
+.group-box .info-header {
+    background: #188038;
+    color: #fff;
+}
+
+.group-box .info-body {
+    color: #188038;
+    font-weight: bold;
+}
         
         
     </style>
@@ -2948,7 +2960,62 @@ let infoHTML = `
 
 </div>
 `;
+// ===== THÔNG TIN NHÓM =====
 
+let groupMap = {}; // { EO1: [ship1, ship2], EO2: [...] }
+
+Object.keys(shipsData).forEach(ship => {
+    let g = shipsData[ship]?.group || "NONE";
+
+    if (!groupMap[g]) groupMap[g] = [];
+    groupMap[g].push(ship);
+});
+
+// 👉 chỉ lấy nhóm có tên (bỏ NONE nếu không muốn)
+let groupNames = Object.keys(groupMap).filter(g => g !== "NONE");
+
+// 👉 số nhóm
+let totalGroups = groupNames.length;
+
+// 👉 số tàu theo nhóm
+let eo1Count = (groupMap["EO1"] || []).length;
+let eo2Count = (groupMap["EO2"] || []).length;
+
+let groupHTML = `
+<div class="info-grid">
+
+    <div class="info-box group-box">
+        <div class="info-header">TỔNG NHÓM</div>
+        <div class="info-body clickable"
+             onclick="toggleGroupList('all')">
+            ${totalGroups}
+        </div>
+        <div id="groupAllList" class="info-detail"></div>
+    </div>
+
+    <div class="info-box group-box">
+        <div class="info-header">EO1</div>
+        <div class="info-body clickable"
+             onclick="toggleGroupList('EO1')">
+            ${eo1Count}
+        </div>
+        <div id="groupEO1List" class="info-detail"></div>
+    </div>
+
+    <div class="info-box group-box">
+        <div class="info-header">EO2</div>
+        <div class="info-body clickable"
+             onclick="toggleGroupList('EO2')">
+            ${eo2Count}
+        </div>
+        <div id="groupEO2List" class="info-detail"></div>
+    </div>
+
+</div>
+`;
+
+// 👉 CHÈN TRƯỚC THÔNG TIN CHUNG
+document.getElementById("dashboardInfo").innerHTML = groupHTML + infoHTML;
 document.getElementById("dashboardInfo").innerHTML = infoHTML;
 }
 
@@ -3000,7 +3067,57 @@ window.toggleShipList = function(type) {
     }
 };
 
-    
+ window.toggleGroupList = function(type) {
+
+    const allBox = document.getElementById("groupAllList");
+    const eo1Box = document.getElementById("groupEO1List");
+    const eo2Box = document.getElementById("groupEO2List");
+
+    // 👉 nếu đang mở → đóng
+    if (
+        (type === "all" && allBox.innerHTML !== "") ||
+        (type === "EO1" && eo1Box.innerHTML !== "") ||
+        (type === "EO2" && eo2Box.innerHTML !== "")
+    ) {
+        allBox.innerHTML = "";
+        eo1Box.innerHTML = "";
+        eo2Box.innerHTML = "";
+        return;
+    }
+
+    // 👉 đóng tất cả trước
+    allBox.innerHTML = "";
+    eo1Box.innerHTML = "";
+    eo2Box.innerHTML = "";
+
+    let html = "";
+
+    if(type === "all") {
+        let groups = {};
+
+        Object.keys(shipsData).forEach(ship => {
+            let g = shipsData[ship]?.group || "NONE";
+            if(!groups[g]) groups[g] = [];
+            groups[g].push(ship);
+        });
+
+        Object.keys(groups).forEach(g => {
+            html += `<div class="info-item"><b>${g}</b>: ${groups[g].length} tàu</div>`;
+        });
+
+        allBox.innerHTML = html;
+        return;
+    }
+
+    Object.keys(shipsData).forEach(ship => {
+        if(shipsData[ship]?.group === type) {
+            html += `<div class="info-item">🚢 ${ship}</div>`;
+        }
+    });
+
+    if(type === "EO1") eo1Box.innerHTML = html || "<div class='empty'>Không có</div>";
+    if(type === "EO2") eo2Box.innerHTML = html || "<div class='empty'>Không có</div>";
+};   
 
 window.toggleShipDetail = function(ship) {
 

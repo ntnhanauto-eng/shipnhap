@@ -2930,20 +2930,16 @@ let infoHTML = `
 
     <div class="info-box">
         <div class="info-header">BÀN GIAO</div>
-        <div class="info-body clickable"
-             onclick="toggleShipList('done')">
+        <div class="info-body">
             ${doneShips}
         </div>
-        <div id="doneList" class="info-detail"></div>
     </div>
 
     <div class="info-box">
         <div class="info-header">ĐANG LÀM</div>
-        <div class="info-body clickable"
-             onclick="toggleShipList('active')">
+        <div class="info-body">
             ${activeShips}
         </div>
-        <div id="activeList" class="info-detail"></div>
     </div>
 
 </div>
@@ -2952,53 +2948,6 @@ let infoHTML = `
 document.getElementById("dashboardInfo").innerHTML = infoHTML;
 }
 
-window.toggleShipList = function(type) {
-
-    const doneBox = document.getElementById("doneList");
-    const activeBox = document.getElementById("activeList");
-
-    // 👉 nếu đang mở → đóng
-    if (
-        (type === "done" && doneBox.innerHTML !== "") ||
-        (type === "active" && activeBox.innerHTML !== "")
-    ) {
-        doneBox.innerHTML = "";
-        activeBox.innerHTML = "";
-        return;
-    }
-
-    // 👉 đóng tất cả trước
-    doneBox.innerHTML = "";
-    activeBox.innerHTML = "";
-
-    let html = "";
-
-    Object.keys(shipsData).sort().forEach(ship => {
-
-        const status = shipsData[ship]?.status || "active";
-
-        if (type === "done" && status !== "done") return;
-        if (type === "active" && status === "done") return;
-
-        const group = shipsData[ship]?.group || "-";
-
-        html += `
-            <div class="info-item">
-                🚢 ${ship} (${group})
-            </div>
-        `;
-    });
-
-    if (html === "") {
-        html = `<div class="empty">Không có tàu</div>`;
-    }
-
-    if (type === "done") {
-        doneBox.innerHTML = html;
-    } else {
-        activeBox.innerHTML = html;
-    }
-};
 
     
 

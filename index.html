@@ -1692,20 +1692,12 @@ window.showSummary = function(){
     const box = document.getElementById("summary");
     box.style.display = "block";
 
-    let activeResult = {};
-    let doneResult = {};
+    let result = {};
 
-   Object.values(rawData).forEach(x => {
-
-    let ship = x.ship_id;
-    let status = shipsData[ship]?.status || "active";
-
-    let target = (status === "done") ? doneResult : activeResult;
-
-    if (!target[ship]) target[ship] = { totalWorkers: 0 };
-
-    target[ship].totalWorkers += Number(x.workers);
-});
+    Object.values(rawData).forEach(x => {
+        if(!result[x.ship_id]) result[x.ship_id] = { totalWorkers:0 };
+        result[x.ship_id].totalWorkers += Number(x.workers);
+    });
 
     // ===== DROPDOWN =====
     let shipOptions = `
@@ -1716,38 +1708,29 @@ window.showSummary = function(){
         shipOptions += `<option value="${s}">${s}</option>`;
     });
 
-   let html = `
-<h4>📊 Báo cáo tổng hợp</h4>
+    let html = `
+        <h4>📊 Báo cáo tổng hợp</h4>
 
-<label><b>🚢 Chọn tàu:</b></label>
-<select id="summaryShipFilter" onchange="filterSummary()">
-    <option value="">-- Chọn tàu --</option>
-    <option value="all">Tất cả tàu</option>
-</select>
+        <label><b>🚢 Chọn tàu:</b></label>
+        <select id="summaryShipFilter" onchange="filterSummary()">
+            ${shipOptions}
+        </select>
 
-<hr>
+        <div id="summaryDetail" style="margin-top:10px;"></div>
 
-<h4 style="color:#1a73e8">🔵 Tàu đang làm</h4>
-<div id="summaryActive"></div>
-
-<hr>
-
-<h4 style="color:#188038">🟢 Tàu đã bàn giao</h4>
-<div id="summaryDone"></div>
-
-<div style="margin-top:20px;">
-    <canvas id="summaryChart"></canvas>
-</div>
-`;
+        <div style="margin-top:20px;">
+            <canvas id="summaryChart"></canvas>
+        </div>
+    `;
 
     box.innerHTML = html;
     document.getElementById("summaryShipFilter").value = "";
 
-
+    // lưu cache
+    window.summaryDataCache = result;
 
    // lưu cache
-window.summaryActiveCache = activeResult;
-window.summaryDoneCache = doneResult;
+window.summaryDataCache = result;
 
 // 👉 chưa hiển thị dữ liệu
 document.getElementById("summaryDetail").innerHTML =
@@ -1874,8 +1857,7 @@ setTimeout(() => {
     window.filterSummary = function(){
 
     const ship = document.getElementById("summaryShipFilter").value;
-    const activeData = window.summaryActiveCache;
-    const doneData = window.summaryDoneCache;
+    const data = window.summaryDataCache;
 
     // 👉 chưa chọn gì
     if(!ship){
@@ -1891,23 +1873,11 @@ setTimeout(() => {
         return;
     }
 
+    // 👉 LUÔN render lại (fix lỗi phải chọn lần 2)
+    renderSummaryDetail(ship);
 
-
-// 🔥 tách dữ liệu theo trạng thái
-Object.keys(data).forEach(s => {
-    if (shipsData[s]?.status === "done") {
-        doneData[s] = data[s];
-    } else {
-        activeData[s] = data[s];
-    }
-});
-
-// 🔥 render 2 bảng riêng
-renderSummaryDetailByGroup(activeData, "summaryActive", ship);
-renderSummaryDetailByGroup(doneData, "summaryDone", ship);
-
-// 🔥 chart vẫn giữ nguyên (gộp lại)
-updateChartData({ ...activeData, ...doneData }, ship);
+    // 👉 update chart
+    updateChartData(data, ship);
 }
 
 function renderSummaryDetail(ship){
@@ -3053,53 +3023,6 @@ function updateDashboardTitle() {
 setInterval(() => {
     renderTableUI();
 }, 300000); // 🔥 refresh highlight mỗi 1 phút
-
-
-function renderSummaryDetailByGroup(data, elementId, selectedShip){
-
-    const box = document.getElementById(elementId);
-
-    let html = "";
-
-    Object.keys(data).forEach(s => {
-
-        if(selectedShip !== "all" && selectedShip && s !== selectedShip) return;
-
-        let key = s.replace(/\s/g,'_');
-        let savedPP = ppData[key]?.hours || 0;
-        let realHours = data[s].totalWorkers * 8;
-
-        let efficiency = realHours > 0 ? (savedPP / realHours) * 100 : 0;
-
-        let progress = progressData[key]?.percent || 0;
-
-        let checkedItems = progressData[key]?.items || [];
-        let checkedText = checkedItems.length > 0 ? checkedItems.join(", ") : "Chưa có";
-
-        let color = efficiency >= 100 ? "green" : (efficiency >= 70 ? "orange" : "red");
-
-        let group = shipsData[s]?.group || "-";
-
-        html += `
-        <div class="summary-item">
-            <b>🚢 ${s} (${group})</b><br>
-            - Tổng nhân công: ${data[s].totalWorkers} lượt người<br>
-            - Tổng giờ thực tế: ${realHours.toLocaleString()} giờ<br>
-            - Giờ PP: <b>${savedPP.toLocaleString()}</b><br>
-            - Hiệu quả: <b style="color:${color}">${efficiency.toFixed(1)}%</b><br>
-            - Tiến độ: <b>${progress}%</b><br>
-            - Checklist: <b>${checkedText}</b>
-        </div>`;
-    });
-
-    if(!html){
-        html = "<i>Không có dữ liệu</i>";
-    }
-
-    box.innerHTML = html;
-}
-
-
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

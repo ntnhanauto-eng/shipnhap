@@ -1749,25 +1749,6 @@ window.showSummary = function(){
 
     let html = `
         <h4>📊 Báo cáo tổng hợp</h4>
-        <div id="summaryControls" style="padding: 10px; background: #f8f9fa; border-radius: 8px;">
-    <div id="statsInfo" style="display: flex; justify-content: space-around; margin-bottom: 15px; font-weight: bold;">
-        <span id="statTotal">Tổng tàu: 0</span>
-        <span id="statDone" style="color: #188038;">Đã bàn giao: 0</span>
-        <span id="statDoing" style="color: #d93025;">Đang làm: 0</span>
-    </div>
-
-    <div style="display: flex; gap: 10px; flex-direction: column;">
-        <select id="filterStatus" onchange="updateShipDropdown()" style="padding: 8px;">
-            <option value="all">-- Chọn trạng thái (Tất cả) --</option>
-            <option value="done">Đã bàn giao</option>
-            <option value="active">Đang làm</option>
-        </select>
-        
-        <select id="filterShip" onchange="handleShipSelection()" style="padding: 8px;">
-            <option value="">-- Chọn tàu tương ứng --</option>
-        </select>
-    </div>
-</div>
 
         <label><b>🚢 Chọn tàu:</b></label>
         <select id="summaryShipFilter" onchange="filterSummary()">
@@ -3087,29 +3068,6 @@ function updateDashboardTitle() {
 setInterval(() => {
     renderTableUI();
 }, 300000); // 🔥 refresh highlight mỗi 1 phút
-
-// Hàm render thống kê và khởi tạo dropdown
-window.initSummaryControls = function() {
-    // Kiểm tra nếu chưa có dữ liệu shipsData thì không làm gì cả
-    if (typeof shipsData === 'undefined' || Object.keys(shipsData).length === 0) {
-        console.log("Đang chờ tải dữ liệu tàu...");
-        return; 
-    }
-
-    let ships = Object.values(shipsData);
-    let total = ships.length;
-    let done = ships.filter(s => s.status === 'done').length;
-    let doing = total - done;
-
-    // Gán giá trị vào HTML
-    document.getElementById("statTotal").innerText = `Tổng tàu: ${total}`;
-    document.getElementById("statDone").innerText = `Đã bàn giao: ${done}`;
-    document.getElementById("statDoing").innerText = `Đang làm: ${doing}`;
-    
-    // Tự động update luôn danh sách dropdown nếu cần
-    updateShipDropdown();
-}
-    
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

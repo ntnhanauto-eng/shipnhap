@@ -1857,19 +1857,7 @@ window.showGeneralSummaryReport = function() {
 };
 
 // 3. Xử lý đồng bộ Dropdown tàu theo trạng thái
-window.updateShipSelectByStatus = function() {
-    const statusFilter = document.getElementById("filterStatus").value;
-    const shipSelect = document.getElementById("filterShip");
-    let html = '<option value="all">-- Tất cả tàu --</option>';
-    
-    Object.keys(shipsData).sort().forEach(id => {
-        if (statusFilter === "all" || shipsData[id].status === statusFilter) {
-            html += `<option value="${id}">${id}</option>`;
-        }
-    });
-    shipSelect.innerHTML = html;
-    renderSummaryDetail("all"); 
-};
+
 
 // 4. TẦNG 2: Hiển thị thẻ chi tiết từng tàu
 window.renderSummaryDetail = function(selectedShip) {
@@ -3148,32 +3136,60 @@ setInterval(() => {
     `;
 };
 
-window.updateShipSelectByFilters = function() {
-    const statusFilter = document.getElementById("filterStatus").value;
-    const groupFilter = document.getElementById("filterGroup").value; // Lấy giá trị tầng 3
+window.handleStatusChange = function() {
+    const statusVal = document.getElementById("filterStatus").value;
     const shipSelect = document.getElementById("filterShip");
-    
-    let html = '<option value="all">-- Tất cả tàu --</option>';
-    
-    // Sắp xếp và lọc danh sách tàu
-    Object.keys(shipsData).sort().forEach(shipId => {
-        const ship = shipsData[shipId];
-        
-        // Điều kiện 1: Lọc theo trạng thái (Đang làm/Bàn giao)
-        const matchStatus = (statusFilter === "all" || ship.status === statusFilter);
-        // Điều kiện 2: Lọc theo nhóm (EO1/EO2)
-        const matchGroup = (groupFilter === "all" || ship.group === groupFilter);
+    const groupSelect = document.getElementById("filterGroup");
+    const container = document.getElementById("summaryDetailContainer");
 
-        if (matchStatus && matchGroup) {
-            html += `<option value="${shipId}">${shipId}</option>`;
+    if (statusVal === "") {
+        shipSelect.disabled = true;
+        groupSelect.disabled = true;
+        container.innerHTML = '<p style="text-align:center; color:#888;">Vui lòng chọn trạng thái.</p>';
+        return;
+    }
+
+    // Mở khóa 2 và 3
+    shipSelect.disabled = false;
+    groupSelect.disabled = false;
+
+    // Lọc lại danh sách tàu cho ô Bước 2
+    let shipHtml = '<option value="all">-- Bước 2: Tất cả tàu --</option>';
+    Object.keys(shipsData).sort().forEach(id => {
+        if (statusVal === "all" || shipsData[id].status === statusVal) {
+            shipHtml += `<option value="${id}">${id}</option>`;
         }
     });
-    
-    shipSelect.innerHTML = html;
-    shipSelect.value = "all"; // Reset về tất cả
-    
-    // Gọi hàm render để cập nhật danh sách thẻ Card bên dưới
-    window.renderSummaryDetail("all"); 
+    shipSelect.innerHTML = shipHtml;
+    renderSummaryDetail();
+};
+
+window.renderSummaryDetail = function() {
+    const statusF = document.getElementById("filterStatus").value;
+    const shipF = document.getElementById("filterShip").value;
+    const groupF = document.getElementById("filterGroup").value;
+    const box = document.getElementById("summaryDetailContainer");
+    const result = window.summaryDataCache || {};
+
+    let html = "";
+    Object.keys(shipsData).sort().forEach(s => {
+        const info = shipsData[s] || {};
+        if (statusF !== "all" && info.status !== statusF) return;
+        if (shipF !== "all" && s !== shipF) return;
+        if (groupF !== "all" && info.group !== groupF) return;
+
+        let key = s.replace(/\s/g, '_');
+        let tw = result[s]?.totalWorkers || 0;
+        let pp = ppData[key]?.hours || 0;
+        let eff = (tw * 8) > 0 ? (pp / (tw * 8)) * 100 : 0;
+
+        html += `
+        <div style="background: #fff; border: 1px solid #eee; border-radius: 12px; padding: 15px; margin-bottom: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+            <b>🚢 ${s}</b> (${info.group || "-"}) <br>
+            <small>Nhân công: ${tw} | Hiệu quả: ${eff.toFixed(1)}% | Tiến độ: ${progressData[key]?.percent || 0}%</small>
+        </div>`;
+    });
+    box.innerHTML = html || "Không có dữ liệu phù hợp.";
 };
 /*
 window.renderSummaryDetail = function(selectedShip) {

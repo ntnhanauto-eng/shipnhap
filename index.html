@@ -3128,7 +3128,7 @@ setInterval(() => {
     renderTableUI();
 }, 300000); // 🔥 refresh highlight mỗi 1 phút
 
-   window.showGeneralSummaryReport = function() {
+  window.showGeneralSummaryReport = function() {
     let total = Object.keys(shipsData).length;
     let done = 0;
     let active = 0;
@@ -3138,18 +3138,22 @@ setInterval(() => {
         else active++;
     });
 
-    // Cập nhật 3 dòng thống kê
     document.getElementById("summaryStats").innerHTML = `
-        <div style="font-size: 15px; line-height: 1.8;">
-            <div style="color: #333;">📊 <b>1. Tổng tàu đã làm:</b> <span style="float:right">${total}</span></div>
-            <div style="color: #188038;">✅ <b>2. Tàu đã bàn giao:</b> <span style="float:right">${done}</span></div>
-            <div style="color: #1a73e8;">🏗️ <b>3. Tàu đang làm:</b> <span style="float:right">${active}</span></div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; text-align: center;">
+            <div style="background: #f8f9fa; padding: 10px; border-radius: 8px; border: 1px solid #ddd;">
+                <div style="font-size: 12px; color: #666;">TỔNG TÀU</div>
+                <div style="font-size: 20px; font-weight: bold; color: #333;">${total}</div>
+            </div>
+            <div style="background: #e6f4ea; padding: 10px; border-radius: 8px; border: 1px solid #1e8e3e;">
+                <div style="font-size: 12px; color: #1e8e3e;">HOÀN THÀNH</div>
+                <div style="font-size: 20px; font-weight: bold; color: #1e8e3e;">${done}</div>
+            </div>
+            <div style="background: #e8f0fe; padding: 10px; border-radius: 8px; border: 1px solid #1a73e8;">
+                <div style="font-size: 12px; color: #1a73e8;">ĐANG LÀM</div>
+                <div style="font-size: 20px; font-weight: bold; color: #1a73e8;">${active}</div>
+            </div>
         </div>
     `;
-
-    // Reset bộ lọc về mặc định
-    document.getElementById("filterStatus").value = "all";
-    window.updateShipSelectByStatus();
 };
 
 window.updateShipSelectByStatus = function() {
@@ -3173,58 +3177,62 @@ window.updateShipSelectByStatus = function() {
 
 window.renderSummaryDetail = function(selectedShip) {
     const box = document.getElementById("summaryDetail");
-    const result = window.summaryDataCache || {}; // Lấy dữ liệu đã tính toán từ logs
+    const result = window.summaryDataCache || {};
     const statusFilter = document.getElementById("filterStatus").value;
 
     let html = "";
-    // Lấy danh sách tàu từ result (những tàu có nhập liệu) hoặc shipsData (tất cả tàu)
-    // Ở đây ta dùng Object.keys(shipsData) để đảm bảo hiện đủ trạng thái
     Object.keys(shipsData).sort().forEach(s => {
         const shipInfo = shipsData[s] || {};
-        
-        // Lọc Tầng 1 (Loại tàu)
         if (statusFilter !== "all" && shipInfo.status !== statusFilter) return;
-        
-        // Lọc Tầng 2 (Tàu cụ thể)
         if (selectedShip !== "all" && s !== selectedShip) return;
 
-        // Tính toán số liệu (Logic cũ của bạn)
         let key = s.replace(/\s/g, '_');
         let totalWorkers = result[s]?.totalWorkers || 0;
         let savedPP = ppData[key]?.hours || 0;
         let realHours = totalWorkers * 8;
+        
+        // Tính hiệu quả (Efficiency)
         let efficiency = realHours > 0 ? (savedPP / realHours) * 100 : 0;
+        let colorClass = efficiency >= 100 ? "#188038" : (efficiency >= 75 ? "#f9ab00" : "#d93025");
+        
         let progress = progressData[key]?.percent || 0;
-        let checkedItems = (progressData[key]?.items || []).join(", ") || "Chưa có";
-        
-        let color = efficiency >= 100 ? "green" : (efficiency >= 70 ? "orange" : "red");
+        let checkedItems = (progressData[key]?.items || []).join(", ") || "Chưa kiểm tra";
         let isDone = shipInfo.status === "done";
-        let statusText = isDone ? "Đã bàn giao" : "Đang làm";
-        
-        let deliveryDateText = "";
-        if (isDone && shipInfo.deliveryDate) {
-            const d = shipInfo.deliveryDate.split("-");
-            deliveryDateText = ` - ${d[2]}/${d[1]}/${d[0]}`;
-        }
 
         html += `
-        <div class="summary-item" style="border-left: 5px solid ${isDone ? '#188038' : '#1a73e8'}; padding-left: 10px; margin-bottom:10px; background:#fff;">
-            <b style="color:#333;">🚢 Tàu: ${s} (${shipInfo.group || "-"})</b><br>
-            <span style="color:${isDone ? '#188038' : '#1a73e8'}; font-weight:bold;">${statusText}${deliveryDateText}</span>
-            <div style="font-size: 13px; color: #555; margin-top:5px;">
-                - Nhân công: ${totalWorkers} lượt | Giờ thực: ${realHours}h<br>
-                - Giờ PP: ${savedPP}h | Hiệu quả: <span style="color:${color}">${efficiency.toFixed(1)}%</span><br>
-                - Tiến độ: ${progress}% | Checklist: ${checkedItems}
+        <div style="background: #fff; border: 1px solid #eee; border-radius: 12px; padding: 15px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+                <div>
+                    <b style="font-size: 18px; color: #1a73e8;">🚢 Tàu: ${s}</b>
+                    <span style="background: #f1f3f4; padding: 2px 8px; border-radius: 4px; font-size: 12px; margin-left: 5px;">${shipInfo.group || "N/A"}</span>
+                </div>
+                <span style="font-size: 12px; font-weight: bold; color: ${isDone ? '#188038' : '#e67e22'}">
+                    ${isDone ? '✅ ĐÃ BÀN GIAO' : '🏗️ ĐANG THI CÔNG'}
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 14px; background: #fafafa; padding: 10px; border-radius: 8px;">
+                <div>👷 Nhân công: <b>${totalWorkers}</b> lượt</div>
+                <div>⏱️ Thực tế: <b>${realHours}h</b></div>
+                <div>🎯 Định mức PP: <b>${savedPP}h</b></div>
+                <div>📈 Hiệu quả: <b style="color: ${colorClass}">${efficiency.toFixed(1)}%</b></div>
+            </div>
+
+            <div style="margin-top: 10px; font-size: 13px;">
+                <div style="margin-bottom: 5px;">
+                    <b>📊 Tiến độ:</b> 
+                    <div style="width: 100%; background: #eee; height: 8px; border-radius: 4px; margin-top: 4px;">
+                        <div style="width: ${progress}%; background: #1a73e8; height: 100%; border-radius: 4px;"></div>
+                    </div>
+                    <span style="font-size: 11px; color: #666;">Đã hoàn thành ${progress}%</span>
+                </div>
+                <div><b>📋 Checklist:</b> <span style="color: #555;">${checkedItems}</span></div>
             </div>
         </div>`;
     });
 
-    box.innerHTML = html || "<p style='text-align:center; color:#888;'>Không có dữ liệu tàu phù hợp.</p>";
-    
-    // Cập nhật biểu đồ nếu cần
-    if (window.updateChartData) {
-        window.updateChartData(result, selectedShip);
-    }
+    box.innerHTML = html || "<p style='text-align:center; padding:20px; color:#888;'>Không tìm thấy dữ liệu tàu.</p>";
+    if (window.updateChartData) window.updateChartData(result, selectedShip);
 }
     
 </script>

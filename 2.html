@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản Lý Casing</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1a73e8">
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 10px; background: #f0f2f5; }
+        .header-container { display: flex; justify-content: space-between; align-items: center; position: relative; margin-bottom: 10px; }
+        #authBtn { position: absolute; right: 0; top: 40px; width: auto; padding: 6px 12px; font-size: 12px; background: rgba(52, 168, 83, 0.5); color: #fff; border-radius: 5px; opacity: 0.7; z-index: 1001; border:none; }
+        #authBtn:hover { opacity: 1; background: rgba(52, 168, 83, 0.9); }
+        .logout-mode { background: #dc3545 !important; }
+        .card { background: #fff; padding: 15px; margin-bottom: 15px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        input, select, button { width: 100%; margin: 8px 0; padding: 12px; font-size: 14px; border-radius: 8px; border: 1px solid #ccc; transition: all 0.25s ease; }
+        button { background: #1a73e8; color: white; border: none; font-weight: bold; cursor: pointer; position: relative; overflow: hidden; }
+        button:hover { transform: translateY(-2px) scale(1.03); box-shadow: 0 8px 25px rgba(0,0,0,0.2); }
+        .flex { display: grid; grid-template-columns: 1fr; gap: 10px; }
+        @media(min-width: 600px){ .flex { grid-template-columns: 1fr 1fr; } }
+        .table-wrap { max-height: 650px; overflow: auto; border: 2px solid #34a853; border-radius: 12px; padding: 5px; background: #fff; animation: fadeSlideIn 0.4s ease; }
+        table { width: 100%; border-collapse: collapse; min-width: 600px; table-layout: fixed; }
+        th, td { border-bottom: 1px solid #eee; padding: 10px; text-align: left; font-size: 14px; word-wrap: break-word; }
+        th { background: #f8f9fa; position: sticky; top: 0; z-index: 10; }
+        .btn-active { background: linear-gradient(135deg, rgba(26,115,232,0.6), rgba(0,200,255,0.6)) !important; }
+        .admin-only { display: none; }
+        body.is-admin .admin-only { display: block; }
+        .date-row { display: flex; gap: 10px; }
+        .date-field { flex: 1; display: flex; flex-direction: column; }
+        .date-field label { font-size: 13px; color: #555; margin-bottom: 3px; }
+        h2 { margin: 0; color: white; background: #28a745; padding: 8px 15px; border-radius: 8px; flex-grow: 1; text-align: center; }
+        .dash-row { font-size: 19px !important; display: flex; justify-content: flex-start; align-items: center; gap: 8px; cursor: pointer; padding: 10px 6px; border-radius: 6px; transition: 0.2s; border-bottom: 1px solid #eee; }
+        .dash-row:hover { background: #e8f0fe; }
+        #dashboardTitle, #dashboardSub { color: #188038; font-weight: bold; }
+        .info-box { border-radius: 10px; overflow: hidden; text-align: center; color: #fff; font-weight: bold; background: #0b57d0; padding: 10px; }
+        .info-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; }
+        .check-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+        .check-col { border-radius: 10px; border: 1px solid #ddd; overflow: hidden; background: #fff; }
+        .check-header { padding: 6px; color: #fff; font-weight: bold; font-size: 12px; text-align: center; }
+        .green .check-header { background: #188038; } .orange .check-header { background: #f9ab00; } .red .check-header { background: #d93025; }
+        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); }
+        .modal-content { background: #fff; margin: 15% auto; padding: 20px; width: 90%; max-width: 350px; border-radius: 12px; text-align: center; }
+        #marqueeText { color: red; font-weight: bold; animation: marqueeMove 12s linear infinite; white-space: nowrap; display: inline-block; }
+        @keyframes marqueeMove { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
+        @keyframes fadeSlideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body id="mainBody">
+
+    <div class="header-container">
+        <h2>🚢 E/R CASING</h2>
+        <button id="authBtn" onclick="handleAuth()">🔐 Admin</button>
+    </div>
+
+    <div id="marqueeBox" style="overflow:hidden; margin-bottom:10px;">
+        <div id="marqueeText">👉 AN TOÀN LÀ TRÊN HẾT!</div>
+    </div>
+
+    <div class="card" id="dashboardBox">
+        <div class="dashboard-header">
+            <h3 id="dashboardTitle">📊 Dashboard</h3>
+            <div id="dashboardSub" style="font-size:12px; font-style:italic;"></div>
+        </div>
+        <h4 style="color:#1a73e8; font-weight:bold; margin-top:15px;">📋 NHÂN LỰC HÔM NAY:</h4>
+        <div id="dashboardSummary"></div>
+        <hr>
+        <h4 style="color:#1a73e8; font-weight:bold;">📋 HẠNG MỤC KIỂM TRA:</h4>
+        <div id="dashboardChecklist"></div>
+        <hr>
+        <h4 style="color:#1a73e8; font-weight:bold;">📊 THÔNG TIN CHUNG:</h4>
+        <div id="dashboardInfo"></div>
+    </div>
+
+    <div class="card admin-only">
+        <h3>Nhập Dữ Liệu</h3>
+        <div class="date-row">
+            <div class="date-field">
+                <label>Chọn ngày</label>
+                <input type="date" id="date">
+            </div>
+            <div class="date-field">
+                <label>Chọn tàu</label>
+                <select id="ship"><option value="all">-- Chọn Tàu --</option></select>
+            </div>
+        </div>
+        <div class="flex">
+            <input type="number" id="workers" placeholder="Số người thực hiện">
+            <input type="text" id="job" placeholder="Nội dung công việc">
+        </div>
+        <button onclick="saveLog()">💾 Lưu Thông Tin</button>
+    </div>
+
+    <div class="card">
+        <h3 style="color:#1a73e8;">🔍 Tìm kiếm & Lọc</h3>
+        <select id="shipFilter"><option value="all">Tất cả tàu</option></select>
+        <div class="date-row">
+            <div class="date-field"><label>Từ ngày</label><input type="date" id="fromDate"></div>
+            <div class="date-field"><label>Đến ngày</label><input type="date" id="toDate"></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3 style="text-align:center;">KẾ HOẠCH và NHÂN LỰC THỰC TẾ</h3>
+        <div class="table-wrap">
+            <div id="tableContainer"></div>
+            <div id="pagination" style="display:flex; justify-content:center; gap:5px; padding:10px;"></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="btn-grid">
+            <button class="admin-only" onclick="handleButton('export')">📥 Xuất Excel</button>
+            <button id="btnSummary" onclick="handleButton('summary')">📊 BÁO CÁO</button>
+            <button id="btnManageShips" class="admin-only" onclick="handleButton('ships')">Q.lý Tàu</button>
+            <button id="btnWorkHours" class="admin-only" onclick="handleButton('hours')">Q.lý giờ công</button>
+            <button id="btnProgress" class="admin-only" onclick="handleButton('progress')">Q.lý tiến độ</button>
+            <button id="btnExtra" onclick="handleButton('extra')">📦 Vật tư - Ghi chú</button>
+        </div>
+
+        <div id="summary" style="display:none; margin-top:15px;">
+            <div id="summaryStats" style="margin-bottom: 20px;"></div>
+            <div class="flex">
+                <div class="date-field">
+                    <label>1. Loại tàu:</label>
+                    <select id="filterStatus" onchange="updateShipSelectByStatus()">
+                        <option value="all">-- Tất cả --</option>
+                        <option value="done">TÀU BÀN GIAO</option>
+                        <option value="active">ĐANG LÀM</option>
+                    </select>
+                </div>
+                <div class="date-field">
+                    <label>2. Chọn tàu:</label>
+                    <select id="filterShip" onchange="renderSummaryDetail(this.value)">
+                        <option value="all">-- Tất cả tàu --</option>
+                    </select>
+                </div>
+            </div>
+            <div id="summaryDetailContainer" style="margin-top:15px;"></div>
+            <canvas id="summaryChart" style="max-height:300px;"></canvas>
+        </div>
+
+        <div id="workHoursBox" style="display:none; margin-top:15px;">
+            <h4>Nhập Giờ Công PP</h4>
+            <div id="workHoursContent"></div>
+        </div>
+
+        <div id="shipManagerBox" style="display:none; margin-top:15px;">
+            <h4>Quản Lý Danh Sách Tàu</h4>
+            <div class="flex">
+                <input type="text" id="newShipName" placeholder="Tên tàu">
+                <select id="shipGroup">
+                    <option value="">-- Nhóm --</option>
+                    <option value="EO1">EO1</option>
+                    <option value="EO2">EO2</option>
+                </select>
+                <button onclick="addShip()">➕ Thêm</button>
+            </div>
+            <div id="shipListContent" style="margin-top:10px; overflow-x:auto;"></div>
+        </div>
+
+        <div id="progressBox" style="display:none; margin-top:15px;">
+            <h4>📌 Nhập tiến độ (%)</h4>
+            <div id="progressContent"></div>
+        </div>
+
+        <div id="extraBox" style="display:none; margin-top:15px;">
+            <h4>📦 Vật tư & Ghi chú</h4>
+            <select id="extraShip" onchange="renderExtraDetail()"></select>
+            <div id="extraDetail"></div>
+        </div>
+    </div>
+
+    <div id="loginModal" class="modal">
+        <div class="modal-content">
+            <span style="float:right; cursor:pointer;" onclick="closeLogin()">&times;</span>
+            <h3>🔐 Đăng nhập Admin</h3>
+            <input type="email" id="loginEmail" placeholder="Email">
+            <input type="password" id="loginPass" placeholder="Mật khẩu">
+            <button onclick="loginAdmin()">Đăng nhập</button>
+        </div>
+    </div>
+
+    <div class="footer" style="text-align:center; padding:20px; font-size:12px; color:#777;">
+        @ 04-2026 Developed by Nguyen Thanh Nhan - E/R Outfitting 1
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getDatabase, ref, push, onValue, remove, update, set } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+        import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCdBCy8ttrdcfQoSPr3nNmsynmBtnkYv0o",
+            authDomain: "ship-90534.firebaseapp.com",
+            databaseURL: "https://ship-90534-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "ship-90534"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const auth = getAuth(app);
+
+        let rawData = {}, ppData = {}, shipsData = {}, progressData = {}, extraData = {};
+        let isAdmin = false, currentFiltered = [], currentPage = 1, rowsPerPage = 50;
+
+        // --- AUTH ---
+        onAuthStateChanged(auth, user => {
+            isAdmin = !!user;
+            document.body.classList.toggle("is-admin", isAdmin);
+            const btn = document.getElementById("authBtn");
+            btn.innerText = isAdmin ? "🔐 Thoát Admin" : "🔐 Admin";
+            btn.classList.toggle("logout-mode", isAdmin);
+            applyFilter();
+        });
+
+        window.handleAuth = () => isAdmin ? signOut(auth) : document.getElementById("loginModal").style.display = "block";
+        window.closeLogin = () => document.getElementById("loginModal").style.display = "none";
+        window.loginAdmin = () => {
+            signInWithEmailAndPassword(auth, document.getElementById("loginEmail").value, document.getElementById("loginPass").value)
+            .then(() => closeLogin()).catch(e => alert(e.message));
+        };
+
+        // --- DATA LOADING ---
+        onValue(ref(db, "ships"), s => { shipsData = s.val() || {}; renderShipSelects(); renderDashboard(); });
+        onValue(ref(db, "logs"), s => { rawData = s.val() || {}; applyFilter(); renderDashboard(); });
+        onValue(ref(db, "workHours"), s => { ppData = s.val() || {}; });
+        onValue(ref(db, "progress"), s => { progressData = s.val() || {}; renderDashboard(); });
+        onValue(ref(db, "shipExtra"), s => { extraData = s.val() || {}; });
+
+        function renderShipSelects() {
+            const shipS = document.getElementById("ship"), filtS = document.getElementById("shipFilter"), extraS = document.getElementById("extraShip");
+            let opt = '<option value="all">-- Chọn Tàu --</option>', fOpt = '<option value="all">Tất cả tàu</option>';
+            Object.keys(shipsData).sort().forEach(id => {
+                if(shipsData[id].status !== "done") opt += `<option value="${id}">${id}</option>`;
+                fOpt += `<option value="${id}">${id}</option>`;
+            });
+            shipS.innerHTML = opt; filtS.innerHTML = fOpt; extraS.innerHTML = fOpt;
+        }
+
+        // --- DASHBOARD ---
+        function renderDashboard() {
+            const today = new Date().toISOString().split('T')[0];
+            let shipMap = {}, totalW = 0;
+            Object.values(rawData).forEach(x => {
+                if(x.date === today && x.workers > 0) {
+                    shipMap[x.ship_id] = (shipMap[x.ship_id] || 0) + Number(x.workers);
+                    totalW += Number(x.workers);
+                }
+            });
+
+            let html = "";
+            Object.keys(shipMap).forEach(ship => {
+                const group = shipsData[ship]?.group || "-";
+                html += `<div class="dash-row" onclick="toggleShipDetail('${ship}')">
+                    🚢 <b>${ship}</b> (${group}) : ${shipMap[ship]} người
+                </div><div id="detail-${ship}"></div>`;
+            });
+            html += `<hr><b>Tổng nhân lực: ${totalW} người</b>`;
+            document.getElementById("dashboardSummary").innerHTML = html || "Không có dữ liệu hôm nay";
+            updateDashboardTitle();
+            renderChecklistStatus();
+            renderGeneralInfo();
+        }
+
+        function updateDashboardTitle() {
+            const now = new Date();
+            const days = ["CHỦ NHẬT","THỨ 2","THỨ 3","THỨ 4","THỨ 5","THỨ 6","THỨ 7"];
+            document.getElementById("dashboardTitle").innerText = `📊 ${days[now.getDay()]}, ${now.toLocaleDateString('vi-VN')}`;
+            document.getElementById("dashboardSub").innerText = `⏱ Cập nhật lúc: ${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}`;
+        }
+
+        function renderChecklistStatus() {
+            let d = [], p = [], e = [];
+            Object.keys(shipsData).forEach(s => {
+                if(shipsData[s].status === "done") return;
+                const items = progressData[s.replace(/\s/g,'_')]?.items || [];
+                const obj = { ship: s, count: items.length };
+                if(items.length >= 3) d.push(obj); else if(items.length > 0) p.push(obj); else e.push(obj);
+            });
+            const fmt = (list, color) => list.map(x => `<div style="color:${color}; font-size:12px;">${x.ship} (${x.count}/3)</div>`).join("");
+            document.getElementById("dashboardChecklist").innerHTML = `
+                <div class="check-grid">
+                    <div class="check-col green"><div class="check-header">ĐÃ ĐỦ</div>${fmt(d, '#188038')}</div>
+                    <div class="check-col orange"><div class="check-header">CHƯA ĐỦ</div>${fmt(p, '#f9ab00')}</div>
+                    <div class="check-col red"><div class="check-header">CHƯA CÓ</div>${fmt(e, '#d93025')}</div>
+                </div>`;
+        }
+
+        function renderGeneralInfo() {
+            const all = Object.keys(shipsData).length;
+            const done = Object.values(shipsData).filter(s => s.status === "done").length;
+            document.getElementById("dashboardInfo").innerHTML = `
+                <div class="info-grid">
+                    <div class="info-box">TỔNG<br>${all}</div>
+                    <div class="info-box" style="background:#188038">XONG<br>${done}</div>
+                    <div class="info-box" style="background:#ea4335">LÀM<br>${all-done}</div>
+                </div>`;
+        }
+
+        // --- REPORT SYSTEM ---
+        window.showGeneralSummaryReport = function() {
+            const all = Object.keys(shipsData).length, done = Object.values(shipsData).filter(s => s.status === "done").length;
+            document.getElementById("summaryStats").innerHTML = `
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; text-align: center;">
+                    <div style="background:#f8f9fa; border:1px solid #ddd; padding:10px; border-radius:8px;">TỔNG<br><b>${all}</b></div>
+                    <div style="background:#e6f4ea; border:1px solid #1e8e3e; padding:10px; border-radius:8px; color:#1e8e3e;">XONG<br><b>${done}</b></div>
+                    <div style="background:#e8f0fe; border:1px solid #1a73e8; padding:10px; border-radius:8px; color:#1a73e8;">LÀM<br><b>${all-done}</b></div>
+                </div>`;
+        };
+
+        window.renderSummaryDetail = function(selectedShip) {
+            const box = document.getElementById("summaryDetailContainer");
+            const statusF = document.getElementById("filterStatus").value;
+            let html = "";
+            Object.keys(shipsData).sort().forEach(s => {
+                if(statusF !== "all" && shipsData[s].status !== statusF) return;
+                if(selectedShip !== "all" && s !== selectedShip) return;
+                
+                const key = s.replace(/\s/g,'_');
+                const workers = window.summaryDataCache?.[s]?.totalWorkers || 0;
+                const pp = ppData[key]?.hours || 0;
+                const real = workers * 8;
+                const eff = real > 0 ? (pp/real*100) : 0;
+                const prog = progressData[key]?.percent || 0;
+
+                html += `
+                <div style="background:#fff; border:1px solid #eee; border-radius:12px; padding:15px; margin-bottom:10px; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
+                    <div style="display:flex; justify-content:space-between;">
+                        <b style="font-size:18px; color:#1a73e8;">🚢 ${s}</b>
+                        <span style="font-weight:bold; color:${shipsData[s].status==='done'?'#188038':'#e67e22'}">${shipsData[s].status==='done'?'XONG':'LÀM'}</span>
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; font-size:13px; background:#fafafa; padding:10px; border-radius:8px; margin-top:10px;">
+                        <div>👷 Công: ${workers}</div><div>⏱️ Thực: ${real}h</div>
+                        <div>🎯 PP: ${pp}h</div><div>📈 Eff: ${eff.toFixed(1)}%</div>
+                    </div>
+                    <div style="margin-top:10px;">
+                        <div style="width:100%; background:#eee; height:8px; border-radius:4px; overflow:hidden;">
+                            <div style="width:${prog}%; background:linear-gradient(90deg,#34a853,#1a73e8); height:100%;"></div>
+                        </div>
+                        <div style="font-size:11px; margin-top:4px;">Tiến độ: ${prog}%</div>
+                    </div>
+                </div>`;
+            });
+            box.innerHTML = html || "Không có dữ liệu";
+        };
+
+        // --- BUTTON HANDLER ---
+        window.handleButton = function(type) {
+            const boxes = ["summary", "workHoursBox", "shipManagerBox", "progressBox", "extraBox"];
+            const currentBox = type === 'summary' ? 'summary' : (type === 'hours' ? 'workHoursBox' : (type === 'ships' ? 'shipManagerBox' : (type === 'progress' ? 'progressBox' : 'extraBox')));
+            
+            const isOpen = document.getElementById(currentBox).style.display === "block";
+            boxes.forEach(id => document.getElementById(id).style.display = "none");
+            document.querySelectorAll(".btn-grid button").forEach(btn => btn.classList.remove("btn-active"));
+
+            if(isOpen) return;
+            document.getElementById(currentBox).style.display = "block";
+            
+            if(type==='summary') { showGeneralSummaryReport(); showSummary(); renderSummaryDetail("all"); }
+            if(type==='ships') renderShipManagerList();
+            if(type==='progress') renderProgressInputs();
+        };
+
+        window.showSummary = function() {
+            let result = {};
+            Object.values(rawData).forEach(x => {
+                result[x.ship_id] = { totalWorkers: (result[x.ship_id]?.totalWorkers || 0) + Number(x.workers) };
+            });
+            window.summaryDataCache = result;
+        };
+
+        // --- OTHERS ---
+        function applyFilter() {
+            const shipF = document.getElementById("shipFilter").value;
+            currentFiltered = Object.entries(rawData).filter(([id, x]) => shipF === 'all' || x.ship_id === shipF);
+            renderTableUI();
+        }
+
+        function renderTableUI() {
+            let html = '<table><tr><th>Tàu</th><th>Ngày</th><th>Người</th><th>Công việc</th></tr>';
+            currentFiltered.slice().reverse().forEach(([id, x]) => {
+                html += `<tr><td>${x.ship_id}</td><td>${x.date}</td><td>${x.workers}</td><td>${x.job}</td></tr>`;
+            });
+            document.getElementById("tableContainer").innerHTML = html + '</table>';
+        }
+
+        window.saveLog = () => {
+            const data = { ship_id: document.getElementById("ship").value, date: document.getElementById("date").value, workers: document.getElementById("workers").value, job: document.getElementById("job").value };
+            if(data.ship_id === 'all' || !data.workers) return alert("Thiếu tin!");
+            push(ref(db, "logs"), data).then(() => alert("Đã lưu"));
+        };
+        
+        // Cần thêm các hàm renderShipManagerList, renderProgressInputs... để hoàn thiện
+    </script>
+</body>
+</html>

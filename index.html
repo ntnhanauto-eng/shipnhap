@@ -1752,8 +1752,9 @@ html += `
 <td></td> <!-- Nhóm -->
 <td style="text-align:right;"><b>TỔNG:</b></td>
     
-    <td class="worker-col" style="text-align:center;">
-        <b>${totalWorkers.toLocaleString()}</b>
+   <td class="worker-col" style="text-align:center;">
+    <b>${totalWorkers.toLocaleString('de-DE')}</b>
+</td>
     </td> <!-- Người (GIỮ ĐÚNG CỘT) -->
 
     <td style="text-align:left; padding-left:15px;">
@@ -1856,6 +1857,7 @@ window.renderSummaryDetail = function(selectedShip) {
     let html = "";
     Object.keys(shipsData).sort().forEach(s => {
         const shipInfo = shipsData[s] || {};
+        
         if (statusFilter !== "all" && shipInfo.status !== statusFilter) return;
         if (selectedShip !== "all" && s !== selectedShip) return;
 
@@ -1866,50 +1868,52 @@ window.renderSummaryDetail = function(selectedShip) {
         
         let efficiency = realHours > 0 ? (savedPP / realHours) * 100 : 0;
         let colorClass = efficiency >= 100 ? "#188038" : (efficiency >= 75 ? "#f9ab00" : "#d93025");
+        
         let progress = progressData[key]?.percent || 0;
-        let checkedItems = (progressData[key]?.items || []).join(", ") || "Chưa có";
+        let checkedItems = (progressData[key]?.items || []).join(", ") || "Chưa có checklist";
+        let isDone = shipInfo.status === "done";
+
+        // Logic xử lý ngày bàn giao
+        let statusText = isDone ? '✅ ĐÃ BÀN GIAO' : '🏗️ ĐANG THI CÔNG';
+        if (isDone && shipInfo.deliveryDate) {
+            const d = shipInfo.deliveryDate.split("-");
+            if (d.length === 3) statusText += ` - ${d[2]}/${d[1]}/${d[0]}`;
+        }
 
         html += `
-        <div style="background:#fff; border:1px solid #eee; border-radius:12px; padding:15px; margin-bottom:12px; box-shadow:0 2px 8px rgba(0,0,0,0.06);">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <b style="font-size:17px; color:#1a73e8;">🚢 Tàu: ${s} (${shipInfo.group || "-"})</b>
-                <span style="font-size:10px; font-weight:bold; padding:3px 8px; border-radius:15px; background:${shipInfo.status==='done'?'#e6f4ea':'#fff4e5'}; color:${shipInfo.status==='done'?'#1e8e3e':'#d97706'}">
-                    ${shipInfo.status==='done'?'XONG':'LÀM'}
+        <div style="background: #fff; border: 1px solid #eee; border-radius: 12px; padding: 15px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+                <div>
+                    <b style="font-size: 18px; color: #1a73e8;">🚢 Tàu: ${s}</b>
+                    <span style="background: #f1f3f4; padding: 2px 8px; border-radius: 4px; font-size: 12px; margin-left: 5px;">${shipInfo.group || "-"}</span>
+                </div>
+                <span style="font-size: 11px; font-weight: bold; color: ${isDone ? '#188038' : '#e67e22'}">
+                    ${statusText}
                 </span>
             </div>
 
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px; font-size:13px; background:#fcfcfc; padding:10px; border-radius:8px;">
-                <div>👷 Nhân công: <b>${totalWorkers} lượt</b></div>
-                <div>⏱️ Thực tế: <b>${realHours}h</b></div>
-                <div>🎯 Định mức PP: <b>${savedPP}h</b></div>
-                <div>📈 Hiệu quả: <b style="color:${colorClass}">${efficiency.toFixed(1)}%</b></div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px; background: #fafafa; padding: 10px; border-radius: 8px;">
+                <div>👷 Tổng nhân công: <b>${totalWorkers.toLocaleString('de-DE')} lượt</b></div>
+                <div>⏱️ Tổng giờ thực tế: <b>${realHours.toLocaleString('de-DE')} giờ</b></div>
+                <div>🎯 Giờ định mức PP: <b>${savedPP.toLocaleString('de-DE')} giờ</b></div>
+                <div>📈 Hiệu quả tàu: <b style="color: ${colorClass}">${efficiency.toFixed(1)}%</b></div>
             </div>
 
-            <div style="margin-top:12px;">
-                <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;">
-                    <b>📊 Tiến độ:</b> <b>${progress}%</b>
+            <div style="margin-top: 10px;">
+                <b style="font-size: 13px;">📊 Tiến độ tàu: ${progress}%</b>
+                <div style="width: 100%; background: #eee; height: 10px; border-radius: 5px; margin-top: 4px; overflow: hidden;">
+                    <div style="width: ${progress}%; background: linear-gradient(90deg, #34a853, #1a73e8); height: 100%;"></div>
                 </div>
-                <div style="width:100%; background:#eee; height:8px; border-radius:10px; overflow:hidden;">
-                    <div style="width:${progress}%; background:linear-gradient(90deg, #34a853, #1a73e8); height:100%;"></div>
-                </div>
-                <div style="font-size:11px; color:#666; margin-top:8px;">
-                    <b>📋 Checklist:</b> ${checkedItems}
+                <div style="font-size: 12px; color: #666; margin-top: 8px;">
+                    <b>📋 Hạng mục kiểm tra:</b> ${checkedItems}
                 </div>
             </div>
         </div>`;
     });
 
-    box.innerHTML = html || "<p style='text-align:center; padding:20px; color:#999;'>Không có dữ liệu tàu phù hợp.</p>";
+    box.innerHTML = html || "<p style='text-align:center; padding:20px; color:#888;'>Không có dữ liệu.</p>";
     if (window.updateChartData) window.updateChartData(result, selectedShip);
 }
-    window.toggleWorkHours = function(){
-        const box = document.getElementById("workHoursBox");
-        box.style.display = (box.style.display === "none") ? "block" : "none";
-        if(box.style.display === "block") {
-            renderWorkHoursInputs();
-            document.getElementById("summary").style.display = "none";
-        }
-    }
 
    function renderWorkHoursInputs(){
     // Lấy danh sách tàu thực tế từ shipsData thay vì ghi tay

@@ -1877,7 +1877,7 @@ window.renderSummaryDetail = function(selectedShip) {
         let colorClass = efficiency >= 100 ? "#188038" : (efficiency >= 75 ? "#f9ab00" : "#d93025");
         
         let progress = progressData[key]?.percent || 0;
-        let checkedItems = (progressData[key]?.items || []).join(", ") || "Chưa có checklist";
+        let checkedItems = (progressData[key]?.items || []).join(", ") || "Chưa có";
         let isDone = shipInfo.status === "done";
 
         // Logic xử lý ngày bàn giao

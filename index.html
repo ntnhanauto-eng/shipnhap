@@ -1168,87 +1168,71 @@ button {
     <button id="btnExtra" onclick="handleButton('extra')">📦 Vật tư - Ghi chú</button>
 </div>
         
-      <div id="summary" style="display:none; margin-top:15px;">
-    <div id="summaryStats" style="margin-bottom: 20px;"></div>
+     <div id="functionContentArea">
 
-    <div class="flex" style="grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
-        <div class="date-field">
-            <label>1. Trạng thái:</label>
-            <select id="filterStatus" onchange="updateShipSelectByStatus()">
-                <option value="all">-- Tất cả --</option>
-                <option value="done">TÀU BÀN GIAO</option>
-                <option value="active">ĐANG LÀM</option>
-            </select>
-        </div>
-        <div class="date-field">
-            <label>2. Chọn tàu:</label>
-            <select id="filterShip" onchange="renderSummaryDetail(this.value)">
-                <option value="all">-- Tất cả tàu --</option>
-            </select>
-        </div>
-    </div>
-
-    <div id="summaryDetailContainer"></div> 
-    
-    <div style="margin-top:20px;">
-        <canvas id="summaryChart"></canvas>
-    </div>
-</div>
-
-    <div id="summaryDetailContainer"></div> 
-    
-    <div style="margin-top:20px;">
-        <canvas id="summaryChart"></canvas>
-    </div>
-</div>
-
-    <div id="summaryDetail"></div>
-    
-    <div style="margin-top:20px;">
-        <canvas id="summaryChart"></canvas>
-    </div>
-</div>
-        
-        <div id="workHoursBox" style="display:none; margin-top:15px;">
-            <h4>Nhập Giờ Công Theo Định Mức</h4>
-            <div id="workHoursContent"></div>
+    <div id="summary" class="card" style="display:none; margin-top:15px;">
+        <div id="summaryStats" style="margin-bottom: 20px;"></div>
+        <div class="flex" style="grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+            <div class="date-field">
+                <label>1. Trạng thái:</label>
+                <select id="filterStatus" onchange="updateShipSelectByStatus()">
+                    <option value="all">-- Tất cả --</option>
+                    <option value="done">TÀU BÀN GIAO</option>
+                    <option value="active">ĐANG LÀM</option>
+                </select>
             </div>
-        <div id="shipManagerBox" class="card admin-only" style="display:none; margin-top:15px;">
-    <h4>Quản Lý Danh Sách Tàu</h4>
-    <div class="flex">
-       <input type="text" id="newShipName" placeholder="Nhập tên tàu mới (VD: S580)">
-
-<select id="shipGroup">
-    <option value="">-- Không gán nhóm --</option>
-    <option value="EO1">EO1</option>
-    <option value="EO2">EO2</option>
-</select>
-
-<button onclick="addShip()">➕ Thêm Tàu</button>
-    </div>           
-    <div id="shipListContent" style="margin-top:10px; overflow-x:auto;"></div>
-</div>
-               
-<div id="progressBox" class="card admin-only" style="display:none; margin-top:15px;">
-    <h4>📌 Nhập tiến độ thực tế (%)</h4>
-    <div id="progressContent"></div>
-</div>
-   <div id="checklistBox" class="card admin-only" style="display:none; margin-top:15px;">
-    <h4>📋 Nhập hạng mục kiểm tra</h4>
-    <div id="checklistContent"></div>
-</div>    
-<div id="extraBox" class="card" style="display:none; margin-top:15px;">
-    <h4>📦 Vật tư & 📝 Ghi chú</h4>
-
-    <label><b>🚢 Chọn tàu:</b></label>
-    <select id="extraShip" onchange="renderExtraDetail()">
-        <option value="">-- Chọn tàu --</option>
-    </select>
-
-    <div id="extraDetail" style="margin-top:15px;"></div>
-</div>
-        
+            <div class="date-field">
+                <label>2. Chọn tàu:</label>
+                <select id="filterShip" onchange="renderSummaryDetail(this.value)">
+                    <option value="all">-- Tất cả tàu --</option>
+                </select>
+            </div>
+        </div>
+        <div id="summaryDetailContainer" style="max-height: 450px; overflow-y: auto;"></div> 
+        <div style="margin-top:20px;">
+            <canvas id="summaryChart"></canvas>
+        </div>
     </div>
+
+    <div id="workHoursBox" class="card" style="display:none; margin-top:15px;">
+        <h4>Nhập Giờ Công Theo Định Mức</h4>
+        <div id="workHoursContent"></div>
+    </div>
+
+    <div id="shipManagerBox" class="card admin-only" style="display:none; margin-top:15px;">
+        <h4>Quản Lý Danh Sách Tàu</h4>
+        <div class="flex">
+            <input type="text" id="newShipName" placeholder="Tên tàu mới">
+            <select id="shipGroup">
+                <option value="">-- Nhóm --</option>
+                <option value="EO1">EO1</option>
+                <option value="EO2">EO2</option>
+            </select>
+            <button onclick="addShip()">➕ Thêm</button>
+        </div>
+        <div id="shipListContent" style="margin-top:10px;"></div>
+    </div>
+
+    <div id="progressBox" class="card admin-only" style="display:none; margin-top:15px;">
+        <h4>📌 Nhập tiến độ thực tế (%)</h4>
+        <div id="progressContent"></div>
+    </div>
+
+    <div id="checklistBox" class="card admin-only" style="display:none; margin-top:15px;">
+        <h4>📋 Nhập hạng mục kiểm tra</h4>
+        <div id="checklistContent"></div>
+    </div>
+
+    <div id="extraBox" class="card" style="display:none; margin-top:15px;">
+        <h4>📦 Vật tư & 📝 Ghi chú</h4>
+        <label><b>🚢 Chọn tàu:</b></label>
+        <select id="extraShip" onchange="renderExtraDetail()">
+            <option value="">-- Chọn tàu --</option>
+        </select>
+        <div id="extraDetail" style="margin-top:15px;"></div>
+    </div>
+
+</div>
 
 <script type="module">
 

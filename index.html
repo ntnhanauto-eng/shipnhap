@@ -696,22 +696,23 @@ input, select {
 }
 
 .dash-row {
-    font-size: 19px !important; /* Độ lớn bạn muốn */
-    display: flex;             /* Kích hoạt Flexbox */
-    justify-content: space-between; /* Đẩy tên tàu sang trái, số người sang phải */
-    align-items: center;       /* Căn giữa theo chiều dọc */
+    font-size: 19px !important;
+    display: flex;
+    justify-content: flex-start; /* 🔥 Đổi từ space-between sang flex-start để canh trái */
+    align-items: center;
+    gap: 8px; /* 🔥 Tạo khoảng cách giữa các thành phần (Tàu, Nhóm, Số người) */
     
     cursor: pointer;
-    padding: 10px 6px;         /* Tăng padding cho thoáng */
+    padding: 10px 6px;
     border-radius: 6px;
     transition: 0.2s;
-    white-space: nowrap;       /* Ngăn chặn việc tự động xuống dòng */
+    white-space: nowrap; /* Ngăn xuống dòng */
 }
 
 #dashboardSummary b {
-    font-size: 20px !important; 
-    display: inline-block;     /* Đổi từ block sang inline-block */
-    margin-top: 0;             /* Bỏ margin-top để không bị lệch hàng */
+    font-size: 19px !important; 
+    display: inline-block; /* Để nằm cùng hàng */
+    margin-top: 0;
     color: #000;
 }
 

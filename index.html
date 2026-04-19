@@ -1363,9 +1363,16 @@ function renderShipSelects() {
     let options = `<option value="all">-- Chọn Tàu --</option>`;
     let filterOptions = `<option value="all">Tất cả tàu</option>`;
     
-    // Sắp xếp tên tàu theo bảng chữ cái và tạo danh sách option
+    // Sắp xếp tên tàu theo bảng chữ cái
     Object.keys(shipsData).sort().forEach(shipId => {
-        options += `<option value="${shipId}">${shipId}</option>`;
+        const ship = shipsData[shipId];
+
+        // 1. Chỉ hiện tàu CHƯA bàn giao (active) ở ô nhập liệu
+        if (ship.status !== "done") {
+            options += `<option value="${shipId}">${shipId}</option>`;
+        }
+
+        // 2. Ô tìm kiếm (Filter) thì vẫn hiện tất cả để xem lại lịch sử
         filterOptions += `<option value="${shipId}">${shipId}</option>`;
     });
     

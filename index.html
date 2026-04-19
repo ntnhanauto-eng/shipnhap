@@ -696,16 +696,22 @@ input, select {
 }
 
 .dash-row {
-    font-size: 18px !important;
+    font-size: 19px !important; /* Độ lớn bạn muốn */
+    display: flex;             /* Kích hoạt Flexbox */
+    justify-content: space-between; /* Đẩy tên tàu sang trái, số người sang phải */
+    align-items: center;       /* Căn giữa theo chiều dọc */
+    
     cursor: pointer;
-    padding: 6px;
+    padding: 10px 6px;         /* Tăng padding cho thoáng */
     border-radius: 6px;
     transition: 0.2s;
+    white-space: nowrap;       /* Ngăn chặn việc tự động xuống dòng */
 }
+
 #dashboardSummary b {
-    font-size: 18px !important; /* Dòng "Tổng nhân lực: 3 người" sẽ to và rõ hơn */
-    display: block;
-    margin-top: 10px;
+    font-size: 20px !important; 
+    display: inline-block;     /* Đổi từ block sang inline-block */
+    margin-top: 0;             /* Bỏ margin-top để không bị lệch hàng */
     color: #000;
 }
 

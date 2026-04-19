@@ -1179,22 +1179,30 @@ button {
 
     <div id="summary" class="card" style="display:none; margin-top:15px;">
         <div id="summaryStats" style="margin-bottom: 20px;"></div>
-        <div class="flex" style="grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
-            <div class="date-field">
-                <label>1. Trạng thái:</label>
-                <select id="filterStatus" onchange="updateShipSelectByStatus()">
-                    <option value="all">-- Tất cả --</option>
-                    <option value="done">TÀU BÀN GIAO</option>
-                    <option value="active">ĐANG LÀM</option>
-                </select>
-            </div>
-            <div class="date-field">
-                <label>2. Chọn tàu:</label>
-                <select id="filterShip" onchange="renderSummaryDetail(this.value)">
-                    <option value="all">-- Tất cả tàu --</option>
-                </select>
-            </div>
-        </div>
+       <div class="flex" style="grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+    <div class="date-field">
+        <label>1. Trạng thái:</label>
+        <select id="filterStatus" onchange="updateShipSelectByFilters()">
+            <option value="all">-- Tất cả --</option>
+            <option value="done">TÀU BÀN GIAO</option>
+            <option value="active">ĐANG LÀM</option>
+        </select>
+    </div>
+    <div class="date-field">
+        <label>2. Nhóm:</label>
+        <select id="filterGroup" onchange="updateShipSelectByFilters()">
+            <option value="all">-- Tất cả nhóm --</option>
+            <option value="EO1">EO1</option>
+            <option value="EO2">EO2</option>
+        </select>
+    </div>
+    <div class="date-field">
+        <label>3. Chọn tàu:</label>
+        <select id="filterShip" onchange="renderSummaryDetail(this.value)">
+            <option value="all">-- Tất cả tàu --</option>
+        </select>
+    </div>
+</div>
         <div id="summaryDetailContainer" style="max-height: 450px; overflow-y: auto;"></div> 
         <div style="margin-top:20px;">
             <canvas id="summaryChart"></canvas>
@@ -2362,6 +2370,7 @@ document.querySelectorAll("input, select").forEach(el => {
     if (type === "summary") {
         showSummary();
         showGeneralSummaryReport();
+        updateShipSelectByFilters();
     }
     if (type === "hours") renderWorkHoursInputs();
     if (type === "ships") renderShipManagerList();
@@ -3128,22 +3137,31 @@ setInterval(() => {
     `;
 };
 
-window.updateShipSelectByStatus = function() {
+window.updateShipSelectByFilters = function() {
     const statusFilter = document.getElementById("filterStatus").value;
+    const groupFilter = document.getElementById("filterGroup").value; // Lấy giá trị tầng 3
     const shipSelect = document.getElementById("filterShip");
     
     let html = '<option value="all">-- Tất cả tàu --</option>';
     
+    // Sắp xếp và lọc danh sách tàu
     Object.keys(shipsData).sort().forEach(shipId => {
         const ship = shipsData[shipId];
-        if (statusFilter === "all" || ship.status === statusFilter) {
+        
+        // Điều kiện 1: Lọc theo trạng thái (Đang làm/Bàn giao)
+        const matchStatus = (statusFilter === "all" || ship.status === statusFilter);
+        // Điều kiện 2: Lọc theo nhóm (EO1/EO2)
+        const matchGroup = (groupFilter === "all" || ship.group === groupFilter);
+
+        if (matchStatus && matchGroup) {
             html += `<option value="${shipId}">${shipId}</option>`;
         }
     });
     
     shipSelect.innerHTML = html;
-    // Khi đổi loại tàu, reset tầng 2 về "Tất cả" và hiện danh sách chi tiết tương ứng
-    shipSelect.value = "all";
+    shipSelect.value = "all"; // Reset về tất cả
+    
+    // Gọi hàm render để cập nhật danh sách thẻ Card bên dưới
     window.renderSummaryDetail("all"); 
 };
 /*

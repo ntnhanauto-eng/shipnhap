@@ -347,13 +347,20 @@ input, select {
     min-width: 250px; /* tránh co quá nhỏ */
     border-collapse: collapse;
 }
-
+#shipListContent th, #shipListContent td {
+    padding: 8px 4px; /* Giảm bớt padding để tiết kiệm không gian */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+ /*       
 #shipListContent th,
 #shipListContent td {
     padding: 8px;
     font-size: 13px;
     word-break: break-word;
 }
+*/        
 
 #shipListContent th {
     background: #f8f9fa;

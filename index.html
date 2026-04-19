@@ -1168,12 +1168,12 @@ button {
     <button id="btnExtra" onclick="handleButton('extra')">📦 Vật tư - Ghi chú</button>
 </div>
         
-       <div id="summary" style="display:none; margin-top:15px;">
+      <div id="summary" style="display:none; margin-top:15px;">
     <div id="summaryStats" style="margin-bottom: 20px;"></div>
 
     <div class="flex" style="grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
         <div class="date-field">
-            <label>1. Loại tàu:</label>
+            <label>1. Trạng thái:</label>
             <select id="filterStatus" onchange="updateShipSelectByStatus()">
                 <option value="all">-- Tất cả --</option>
                 <option value="done">TÀU BÀN GIAO</option>
@@ -1181,12 +1181,19 @@ button {
             </select>
         </div>
         <div class="date-field">
-            <label>2. Chọn tàu cụ thể:</label>
+            <label>2. Chọn tàu:</label>
             <select id="filterShip" onchange="renderSummaryDetail(this.value)">
                 <option value="all">-- Tất cả tàu --</option>
             </select>
         </div>
     </div>
+
+    <div id="summaryDetailContainer"></div> 
+    
+    <div style="margin-top:20px;">
+        <canvas id="summaryChart"></canvas>
+    </div>
+</div>
 
     <div id="summaryDetailContainer"></div> 
     
@@ -1808,153 +1815,108 @@ window.toggleAdvancedSearch = function() {
         }
     }
 
+// 1. Hàm tính toán dữ liệu báo cáo
 window.showSummary = function(){
-    const box = document.getElementById("summary");
-   // box.style.display = "block";
-
     let result = {};
-
     Object.values(rawData).forEach(x => {
-        if(!result[x.ship_id]) result[x.ship_id] = { totalWorkers:0 };
+        if(!result[x.ship_id]) result[x.ship_id] = { totalWorkers: 0 };
         result[x.ship_id].totalWorkers += Number(x.workers);
     });
-    // Lưu kết quả vào bộ nhớ tạm để các hàm khác sử dụng
-    window.summaryDataCache = result;
-
-    // Khởi tạo biểu đồ (giữ nguyên logic Chart cũ của bạn bên dưới)
-    setTimeout(() => {
-        const canvas = document.getElementById('summaryChart');
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        if (window.myChart) { window.myChart.destroy(); window.myChart = null; }
-
-    // ===== DROPDOWN =====
-    let shipOptions = `
-<option value="">-- Chọn tàu --</option>
-<option value="all">Tất cả tàu</option>
-`;
-    Object.keys(result).sort().forEach(s => {
-        shipOptions += `<option value="${s}">${s}</option>`;
-    });
-
-    let html = `
-        <h4>📊 Báo cáo tổng hợp</h4>
-
-        <label><b>🚢 Chọn tàu:</b></label>
-        <select id="summaryShipFilter" onchange="filterSummary()">
-            ${shipOptions}
-        </select>
-
-        <div id="summaryDetail" style="margin-top:10px;"></div>
-
-        <div style="margin-top:20px;">
-            <canvas id="summaryChart"></canvas>
-        </div>
-    `;
-
-    box.innerHTML = html;
-    document.getElementById("summaryShipFilter").value = "";
-
-    // lưu cache
-    window.summaryDataCache = result;
-
-   // lưu cache
-window.summaryDataCache = result;
-
-// 👉 chưa hiển thị dữ liệu
-document.getElementById("summaryDetail").innerHTML =
-    "<i>👉 Vui lòng chọn tàu để xem báo cáo</i>";
-
-// 👉 tạo chart rỗng (CHỈ TẠO 1 LẦN)
-setTimeout(() => {
-
-    const canvas = document.getElementById('summaryChart');
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-
-    // 🔥 Nếu đã có chart → destroy trước
-    if (window.myChart) {
-        window.myChart.destroy();
-        window.myChart = null;
-    }
-   Chart.register(ChartDataLabels);
-    // 🔥 Tạo chart mới
-    window.myChart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: [],
-            datasets: [
-                {
-                    label: 'Giờ thực tế',
-                    data: [],
-                    backgroundColor: '#1a73e8',
-                    borderColor: '#0b57d0',
-                    borderWidth: 2,
-                    borderRadius: 6
-                },
-                {
-                    label: 'Giờ PP',
-                    data: [],
-                    backgroundColor: '#34a853',
-                    borderColor: '#1e7e34',
-                    borderWidth: 2,
-                    borderRadius: 6
-                }
-            ]
-        },
-     options: {
-    responsive: true,
-    maintainAspectRatio: false,
-
-    layout: {
-        padding: {
-            top: 40   // 🔥 tạo khoảng trống phía trên
-        }
-    },
-
-    plugins: {
-        legend: { 
-            position: 'top',
-            labels: {
-                padding: 20   // 🔥 đẩy chữ legend xuống thấp hơn 1 chút
-            }
-        },
-
-        title: {
-            display: true,
-            text: 'So sánh Giờ Công',
-            padding: {
-                top: 10,
-                bottom: 10
-            }
-        },
-
-        datalabels: {
-            anchor: 'end',
-            align: 'top',
-            offset: 2,   // 🔥 đẩy số lên cao hơn cột
-            color: '#000',
-            font: {
-                weight: 'bold',
-                size: 12
-            },
-            formatter: function(value) {
-                return value.toLocaleString();
-            }
-        }
-    },
-
-    scales: {
-        y: {
-            beginAtZero: true,
-             grace: '15%'   // 🔥 thêm khoảng trống phía trên
-        }
-    }
+    window.summaryDataCache = result; // Lưu vào cache để render detail
 }
+
+// 2. TẦNG 1: Hiển thị 3 ô trạng thái
+window.showGeneralSummaryReport = function() {
+    const all = Object.keys(shipsData).length;
+    const done = Object.values(shipsData).filter(s => s.status === "done").length;
+    const active = all - done;
+
+    document.getElementById("summaryStats").innerHTML = `
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; text-align: center;">
+            <div style="background:#f8f9fa; border:1px solid #ddd; padding:10px; border-radius:10px;">
+                <div style="font-size:11px; color:#666;">TỔNG TÀU</div>
+                <b style="font-size:20px; color:#333;">${all}</b>
+            </div>
+            <div style="background:#e6f4ea; border:1px solid #1e8e3e; padding:10px; border-radius:10px; color:#1e8e3e;">
+                <div style="font-size:11px;">BÀN GIAO</div>
+                <b style="font-size:20px;">${done}</b>
+            </div>
+            <div style="background:#e8f0fe; border:1px solid #1a73e8; padding:10px; border-radius:10px; color:#1a73e8;">
+                <div style="font-size:11px;">ĐANG LÀM</div>
+                <b style="font-size:20px;">${active}</b>
+            </div>
+        </div>`;
+};
+
+// 3. Xử lý đồng bộ Dropdown tàu theo trạng thái
+window.updateShipSelectByStatus = function() {
+    const statusFilter = document.getElementById("filterStatus").value;
+    const shipSelect = document.getElementById("filterShip");
+    let html = '<option value="all">-- Tất cả tàu --</option>';
+    
+    Object.keys(shipsData).sort().forEach(id => {
+        if (statusFilter === "all" || shipsData[id].status === statusFilter) {
+            html += `<option value="${id}">${id}</option>`;
+        }
+    });
+    shipSelect.innerHTML = html;
+    renderSummaryDetail("all"); 
+};
+
+// 4. TẦNG 2: Hiển thị thẻ chi tiết từng tàu
+window.renderSummaryDetail = function(selectedShip) {
+    const box = document.getElementById("summaryDetailContainer");
+    const result = window.summaryDataCache || {};
+    const statusFilter = document.getElementById("filterStatus").value;
+
+    let html = "";
+    Object.keys(shipsData).sort().forEach(s => {
+        const shipInfo = shipsData[s] || {};
+        if (statusFilter !== "all" && shipInfo.status !== statusFilter) return;
+        if (selectedShip !== "all" && s !== selectedShip) return;
+
+        let key = s.replace(/\s/g, '_');
+        let totalWorkers = result[s]?.totalWorkers || 0;
+        let savedPP = ppData[key]?.hours || 0;
+        let realHours = totalWorkers * 8;
+        
+        let efficiency = realHours > 0 ? (savedPP / realHours) * 100 : 0;
+        let colorClass = efficiency >= 100 ? "#188038" : (efficiency >= 75 ? "#f9ab00" : "#d93025");
+        let progress = progressData[key]?.percent || 0;
+        let checkedItems = (progressData[key]?.items || []).join(", ") || "Chưa có";
+
+        html += `
+        <div style="background:#fff; border:1px solid #eee; border-radius:12px; padding:15px; margin-bottom:12px; box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <b style="font-size:17px; color:#1a73e8;">🚢 Tàu: ${s} (${shipInfo.group || "-"})</b>
+                <span style="font-size:10px; font-weight:bold; padding:3px 8px; border-radius:15px; background:${shipInfo.status==='done'?'#e6f4ea':'#fff4e5'}; color:${shipInfo.status==='done'?'#1e8e3e':'#d97706'}">
+                    ${shipInfo.status==='done'?'XONG':'LÀM'}
+                </span>
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px; font-size:13px; background:#fcfcfc; padding:10px; border-radius:8px;">
+                <div>👷 Nhân công: <b>${totalWorkers} lượt</b></div>
+                <div>⏱️ Thực tế: <b>${realHours}h</b></div>
+                <div>🎯 Định mức PP: <b>${savedPP}h</b></div>
+                <div>📈 Hiệu quả: <b style="color:${colorClass}">${efficiency.toFixed(1)}%</b></div>
+            </div>
+
+            <div style="margin-top:12px;">
+                <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;">
+                    <b>📊 Tiến độ:</b> <b>${progress}%</b>
+                </div>
+                <div style="width:100%; background:#eee; height:8px; border-radius:10px; overflow:hidden;">
+                    <div style="width:${progress}%; background:linear-gradient(90deg, #34a853, #1a73e8); height:100%;"></div>
+                </div>
+                <div style="font-size:11px; color:#666; margin-top:8px;">
+                    <b>📋 Checklist:</b> ${checkedItems}
+                </div>
+            </div>
+        </div>`;
     });
 
-}, 200);
+    box.innerHTML = html || "<p style='text-align:center; padding:20px; color:#999;'>Không có dữ liệu tàu phù hợp.</p>";
+    if (window.updateChartData) window.updateChartData(result, selectedShip);
 }
     window.toggleWorkHours = function(){
         const box = document.getElementById("workHoursBox");

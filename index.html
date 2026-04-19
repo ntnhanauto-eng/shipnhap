@@ -1177,45 +1177,29 @@ button {
         
      <div id="functionContentArea">
 
- <div id="summary" class="card" style="display:none; margin-top:15px;">
-    <div id="summaryStats" style="margin-bottom: 20px;"></div>
-    
-    <div class="flex" style="grid-template-columns: 1fr; gap: 10px; margin-bottom: 15px;">
-        <div class="date-field">
-            <label><b>1. Trạng thái:</b></label>
-            <select id="filterStatus" onchange="handleStatusChange()">
-                <option value="">-- Bước 1: Chọn trạng thái --</option>
-                <option value="done">TÀU BÀN GIAO</option>
-                <option value="active">ĐANG LÀM</option>
-                <option value="all">TẤT CẢ TRẠNG THÁI</option>
-            </select>
+    <div id="summary" class="card" style="display:none; margin-top:15px;">
+        <div id="summaryStats" style="margin-bottom: 20px;"></div>
+        <div class="flex" style="grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+            <div class="date-field">
+                <label>1. Trạng thái:</label>
+                <select id="filterStatus" onchange="updateShipSelectByStatus()">
+                    <option value="all">-- Tất cả --</option>
+                    <option value="done">TÀU BÀN GIAO</option>
+                    <option value="active">ĐANG LÀM</option>
+                </select>
+            </div>
+            <div class="date-field">
+                <label>2. Chọn tàu:</label>
+                <select id="filterShip" onchange="renderSummaryDetail(this.value)">
+                    <option value="all">-- Tất cả tàu --</option>
+                </select>
+            </div>
         </div>
-
-        <div class="date-field">
-            <label>2. Chọn tàu:</label>
-            <select id="filterShip" disabled onchange="renderSummaryDetail()">
-                <option value="all">-- Bước 2: Tất cả tàu --</option>
-            </select>
-        </div>
-
-        <div class="date-field">
-            <label>3. Chọn nhóm:</label>
-            <select id="filterGroup" disabled onchange="renderSummaryDetail()">
-                <option value="all">-- Bước 3: Tất cả nhóm --</option>
-                <option value="EO1">EO1</option>
-                <option value="EO2">EO2</option>
-            </select>
+        <div id="summaryDetailContainer" style="max-height: 450px; overflow-y: auto;"></div> 
+        <div style="margin-top:20px;">
+            <canvas id="summaryChart"></canvas>
         </div>
     </div>
-
-    <div id="summaryDetailContainer" style="max-height: 65vh; overflow-y: auto; border-top: 2px solid #34a853; padding-top: 15px;">
-        <p style="text-align:center; color:#888; font-style:italic;">Vui lòng chọn trạng thái để xem báo cáo.</p>
-    </div>
-
-    <div style="margin-top:20px;">
-        <canvas id="summaryChart"></canvas>
-    </div>
-</div>
 
     <div id="workHoursBox" class="card" style="display:none; margin-top:15px;">
         <h4>Nhập Giờ Công Theo Định Mức</h4>
@@ -1857,7 +1841,19 @@ window.showGeneralSummaryReport = function() {
 };
 
 // 3. Xử lý đồng bộ Dropdown tàu theo trạng thái
-
+window.updateShipSelectByStatus = function() {
+    const statusFilter = document.getElementById("filterStatus").value;
+    const shipSelect = document.getElementById("filterShip");
+    let html = '<option value="all">-- Tất cả tàu --</option>';
+    
+    Object.keys(shipsData).sort().forEach(id => {
+        if (statusFilter === "all" || shipsData[id].status === statusFilter) {
+            html += `<option value="${id}">${id}</option>`;
+        }
+    });
+    shipSelect.innerHTML = html;
+    renderSummaryDetail("all"); 
+};
 
 // 4. TẦNG 2: Hiển thị thẻ chi tiết từng tàu
 window.renderSummaryDetail = function(selectedShip) {
@@ -2363,20 +2359,16 @@ document.querySelectorAll("input, select").forEach(el => {
     target.btn.classList.add("btn-active");
 
     // Load dữ liệu tương ứng
-   if (type === "summary") {
-    showSummary();
-    showGeneralSummaryReport();
-    // Reset về trạng thái khóa
-    const sStatus = document.getElementById("filterStatus");
-    const sShip = document.getElementById("filterShip");
-    const sGroup = document.getElementById("filterGroup");
-    
-    if(sStatus) sStatus.value = "";
-    if(sShip) { sShip.disabled = true; sShip.value = "all"; }
-    if(sGroup) { sGroup.disabled = true; sGroup.value = "all"; }
-    
-    document.getElementById("summaryDetailContainer").innerHTML = '<p style="text-align:center; color:#888; font-style:italic;">Vui lòng chọn trạng thái để xem báo cáo.</p>';
-}
+    if (type === "summary") {
+        showSummary();
+        showGeneralSummaryReport();
+    }
+    if (type === "hours") renderWorkHoursInputs();
+    if (type === "ships") renderShipManagerList();
+    if (type === "progress") renderProgressInputs();
+    if (type === "checklist") renderChecklistInputs();
+    if (type === "extra") renderExtraSelect();
+};
 
 function renderPagination() {
     const totalPages = Math.ceil(currentFiltered.length / rowsPerPage);
@@ -3136,60 +3128,23 @@ setInterval(() => {
     `;
 };
 
-window.handleStatusChange = function() {
-    const statusVal = document.getElementById("filterStatus").value;
+window.updateShipSelectByStatus = function() {
+    const statusFilter = document.getElementById("filterStatus").value;
     const shipSelect = document.getElementById("filterShip");
-    const groupSelect = document.getElementById("filterGroup");
-    const container = document.getElementById("summaryDetailContainer");
-
-    if (statusVal === "") {
-        shipSelect.disabled = true;
-        groupSelect.disabled = true;
-        container.innerHTML = '<p style="text-align:center; color:#888;">Vui lòng chọn trạng thái.</p>';
-        return;
-    }
-
-    // Mở khóa 2 và 3
-    shipSelect.disabled = false;
-    groupSelect.disabled = false;
-
-    // Lọc lại danh sách tàu cho ô Bước 2
-    let shipHtml = '<option value="all">-- Bước 2: Tất cả tàu --</option>';
-    Object.keys(shipsData).sort().forEach(id => {
-        if (statusVal === "all" || shipsData[id].status === statusVal) {
-            shipHtml += `<option value="${id}">${id}</option>`;
+    
+    let html = '<option value="all">-- Tất cả tàu --</option>';
+    
+    Object.keys(shipsData).sort().forEach(shipId => {
+        const ship = shipsData[shipId];
+        if (statusFilter === "all" || ship.status === statusFilter) {
+            html += `<option value="${shipId}">${shipId}</option>`;
         }
     });
-    shipSelect.innerHTML = shipHtml;
-    renderSummaryDetail();
-};
-
-window.renderSummaryDetail = function() {
-    const statusF = document.getElementById("filterStatus").value;
-    const shipF = document.getElementById("filterShip").value;
-    const groupF = document.getElementById("filterGroup").value;
-    const box = document.getElementById("summaryDetailContainer");
-    const result = window.summaryDataCache || {};
-
-    let html = "";
-    Object.keys(shipsData).sort().forEach(s => {
-        const info = shipsData[s] || {};
-        if (statusF !== "all" && info.status !== statusF) return;
-        if (shipF !== "all" && s !== shipF) return;
-        if (groupF !== "all" && info.group !== groupF) return;
-
-        let key = s.replace(/\s/g, '_');
-        let tw = result[s]?.totalWorkers || 0;
-        let pp = ppData[key]?.hours || 0;
-        let eff = (tw * 8) > 0 ? (pp / (tw * 8)) * 100 : 0;
-
-        html += `
-        <div style="background: #fff; border: 1px solid #eee; border-radius: 12px; padding: 15px; margin-bottom: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
-            <b>🚢 ${s}</b> (${info.group || "-"}) <br>
-            <small>Nhân công: ${tw} | Hiệu quả: ${eff.toFixed(1)}% | Tiến độ: ${progressData[key]?.percent || 0}%</small>
-        </div>`;
-    });
-    box.innerHTML = html || "Không có dữ liệu phù hợp.";
+    
+    shipSelect.innerHTML = html;
+    // Khi đổi loại tàu, reset tầng 2 về "Tất cả" và hiện danh sách chi tiết tương ứng
+    shipSelect.value = "all";
+    window.renderSummaryDetail("all"); 
 };
 /*
 window.renderSummaryDetail = function(selectedShip) {
@@ -3254,96 +3209,6 @@ window.renderSummaryDetail = function(selectedShip) {
     if (window.updateChartData) window.updateChartData(result, selectedShip);
 }
  */   
-
-// Xử lý khi chọn Bước 1
-window.handleStatusChange = function() {
-    const statusVal = document.getElementById("filterStatus").value;
-    const shipSelect = document.getElementById("filterShip");
-    const groupSelect = document.getElementById("filterGroup");
-    const container = document.getElementById("summaryDetailContainer");
-
-    // Nếu người dùng trả về mặc định (chưa chọn)
-    if (statusVal === "") {
-        shipSelect.disabled = true;
-        groupSelect.disabled = true;
-        shipSelect.value = "all";
-        groupSelect.value = "all";
-        container.innerHTML = '<p style="text-align:center; color:#888; font-style:italic;">Vui lòng chọn trạng thái để xem báo cáo.</p>';
-        return;
-    }
-
-    // MỞ KHÓA bước 2 và 3
-    shipSelect.disabled = false;
-    groupSelect.disabled = false;
-
-    // Nạp lại danh sách tàu tương ứng với trạng thái đã chọn
-    let shipHtml = '<option value="all">-- Tất cả tàu --</option>';
-    Object.keys(shipsData).sort().forEach(id => {
-        if (statusVal === "all" || shipsData[id].status === statusVal) {
-            shipHtml += `<option value="${id}">${id}</option>`;
-        }
-    });
-    shipSelect.innerHTML = shipHtml;
-
-    // Chạy báo cáo ngay sau khi mở khóa
-    renderSummaryDetail();
-};
-
-// Hàm Render báo cáo tổng hợp 3 tầng
-window.renderSummaryDetail = function() {
-    const statusFilter = document.getElementById("filterStatus").value;
-    const selectedShip = document.getElementById("filterShip").value;
-    const selectedGroup = document.getElementById("filterGroup").value;
-    const box = document.getElementById("summaryDetailContainer");
-    const result = window.summaryDataCache || {};
-
-    let html = "";
-    Object.keys(shipsData).sort().forEach(s => {
-        const shipInfo = shipsData[s] || {};
-        
-        // Kiểm tra điều kiện lọc 3 tầng
-        if (statusFilter !== "all" && shipInfo.status !== statusFilter) return;
-        if (selectedShip !== "all" && s !== selectedShip) return;
-        if (selectedGroup !== "all" && shipInfo.group !== selectedGroup) return;
-
-        let key = s.replace(/\s/g, '_');
-        let totalWorkers = result[s]?.totalWorkers || 0;
-        let savedPP = ppData[key]?.hours || 0;
-        let realHours = totalWorkers * 8;
-        let efficiency = realHours > 0 ? (savedPP / realHours) * 100 : 0;
-        let colorClass = efficiency >= 100 ? "#188038" : (efficiency >= 75 ? "#f9ab00" : "#d93025");
-        let progress = progressData[key]?.percent || 0;
-        let isDone = shipInfo.status === "done";
-
-        html += `
-        <div style="background: #fff; border: 1px solid #eee; border-radius: 12px; padding: 15px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
-                <div>
-                    <b style="font-size: 17px; color: #1a73e8;">🚢 ${s}</b>
-                    <span style="background: #e8f0fe; padding: 2px 6px; border-radius: 4px; font-size: 11px; margin-left: 5px; color:#1a73e8;">Nhóm ${shipInfo.group || "-"}</span>
-                </div>
-                <span style="font-size: 11px; font-weight: bold; color: ${isDone ? '#188038' : '#e67e22'}">
-                    ${isDone ? '✅ BÀN GIAO' : '🏗️ ĐANG LÀM'}
-                </span>
-            </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px;">
-                <div style="background:#f8f9fa; padding:8px; border-radius:6px;">👷 Nhân công: <b>${totalWorkers.toLocaleString('de-DE')}</b></div>
-                <div style="background:#f8f9fa; padding:8px; border-radius:6px;">📈 Hiệu quả: <b style="color: ${colorClass}">${efficiency.toFixed(1)}%</b></div>
-                <div style="background:#f8f9fa; padding:8px; border-radius:6px;">📊 Tiến độ: <b>${progress}%</b></div>
-                <div style="background:#f8f9fa; padding:8px; border-radius:6px;">🎯 Định mức: <b>${savedPP.toLocaleString('de-DE')}h</b></div>
-            </div>
-        </div>`;
-    });
-
-    box.innerHTML = html || "<p style='text-align:center; padding:20px; color:#888;'>Không có dữ liệu phù hợp.</p>";
-    
-    // Cập nhật biểu đồ đồng bộ
-    if (window.updateChartData) window.updateChartData(result, selectedShip);
-};
-
-
-
-    
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
     

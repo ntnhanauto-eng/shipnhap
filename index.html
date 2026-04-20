@@ -1173,6 +1173,7 @@ button {
     <button id="btnProgress" class="admin-only" onclick="handleButton('progress')">Q.lý tiến độ tàu</button>
     <button id="btnChecklist" class="admin-only" onclick="handleButton('checklist')">Q.lý mục kiểm tra</button>
     <button id="btnExtra" onclick="handleButton('extra')">📦 Vật tư - Ghi chú</button>
+    <button id="btnJobs" onclick="handleButton('jobs')">📋 Quản lý Công việc</button>
 </div>
         
      <div id="functionContentArea">
@@ -1239,6 +1240,44 @@ button {
         <div id="extraDetail" style="margin-top:15px;"></div>
     </div>
 
+<div id="jobManagerBox" class="card" style="display:none; margin-top:15px;">
+    <h4>📋 QUẢN LÝ CÔNG VIỆC TỒN ĐỘNG</h4>
+    
+    <div class="admin-only" style="background: #f9f9f9; padding: 10px; border-radius: 8px; margin-bottom: 15px;">
+        <div class="flex">
+            <select id="jobShip"><option value="">-- Chọn tàu --</option></select>
+            <input type="text" id="jobPor" placeholder="POR">
+            <input type="text" id="jobName" placeholder="Tên công việc">
+            <input type="text" id="jobType" placeholder="Loại công việc">
+        </div>
+        <div class="date-row">
+            <div class="date-field"><label>Vật tư về</label><input type="date" id="jobMatDate"></div>
+            <div class="date-field"><label>Hoàn thành</label><input type="date" id="jobDoneDate"></div>
+        </div>
+        <input type="text" id="jobNote" placeholder="Ghi chú">
+        <button onclick="saveJobData()" id="btnSaveJob" style="background: #28a745;">➕ Lưu công việc</button>
+    </div>
+
+    <div class="table-wrap">
+        <table id="jobTable">
+            <thead>
+                <tr>
+                    <th style="width:40px;">STT</th>
+                    <th>TÀU</th>
+                    <th>POR</th>
+                    <th>TÊN</th>
+                    <th>LOẠI</th>
+                    <th>VẬT TƯ</th>
+                    <th>XONG</th>
+                    <th>GHI CHÚ</th>
+                    <th class="admin-inline">Sửa</th>
+                </tr>
+            </thead>
+            <tbody id="jobListContent"></tbody>
+        </table>
+    </div>
+</div>
+         
 </div>
 
 <script type="module">
@@ -1288,6 +1327,17 @@ document.getElementById("date").value = `${yyyy}-${mm}-${dd}`;
     let progressData = {};
     let lastDataTime = 0;
     let isFirstLoad = true;
+    let jobsData = {}; // Lưu trữ danh sách công việc
+    let editJobId = null; // Dùng khi sửa
+    
+    onValue(ref(db, "jobs"), snapshot => {
+    jobsData = snapshot.val() || {};
+    // Nếu bảng đang mở thì vẽ lại dữ liệu mới nhất
+    const jobBox = document.getElementById("jobManagerBox");
+    if(jobBox && jobBox.style.display === "block") {
+        renderJobList();
+    }
+});
 
     function showNotification(message) {
 
@@ -2321,6 +2371,20 @@ document.querySelectorAll("input, select").forEach(el => {
     const progressBox = document.getElementById("progressBox");
     const checklistBox = document.getElementById("checklistBox");
     const extraBox = document.getElementById("extraBox");
+    const jobBox = document.getElementById("jobManagerBox"); // Thêm dòng này
+
+    const btnMap = {
+        'summary': { box: summaryBox, btn: document.getElementById("btnSummary") },
+        'hours': { box: hoursBox, btn: document.getElementById("btnWorkHours") },
+        'ships': { box: shipBox, btn: document.getElementById("btnManageShips") },
+        'progress': { box: progressBox, btn: document.getElementById("btnProgress") },
+        'checklist': { box: checklistBox, btn: document.getElementById("btnChecklist") },
+        'extra': { box: extraBox, btn: document.getElementById("btnExtra") },
+        'jobs': { box: jobBox, btn: document.getElementById("btnJobs") } // Thêm dòng này
+    };
+    // ... (phần code ẩn hiện bên dưới giữ nguyên) ...
+    if (type === "jobs") renderJobList(); // Thêm dòng này
+};
 
     // Lấy nút hiện tại dựa trên type
     const btnMap = {
@@ -3146,7 +3210,80 @@ window.updateShipSelectByStatus = function() {
     shipSelect.value = "all";
     window.renderSummaryDetail("all"); 
 };
- 
+
+window.saveJobData = function() {
+    if(!isAdmin) return;
+    const data = {
+        ship: document.getElementById("jobShip").value,
+        por: document.getElementById("jobPor").value,
+        name: document.getElementById("jobName").value,
+        type: document.getElementById("jobType").value,
+        matDate: document.getElementById("jobMatDate").value,
+        doneDate: document.getElementById("jobDoneDate").value,
+        note: document.getElementById("jobNote").value
+    };
+
+    if(!data.ship || !data.name) return alert("Vui lòng nhập Tàu và Tên công việc!");
+
+    if(editJobId) {
+        update(ref(db, "jobs/" + editJobId), data).then(() => {
+            editJobId = null;
+            document.getElementById("btnSaveJob").innerText = "➕ Lưu công việc";
+            clearJobForm();
+        });
+    } else {
+        push(ref(db, "jobs"), data).then(() => clearJobForm());
+    }
+};
+
+window.renderJobList = function() {
+    const shipSelect = document.getElementById("jobShip");
+    let options = '<option value="">-- Chọn tàu --</option>';
+    Object.keys(shipsData).sort().forEach(s => options += `<option value="${s}">${s}</option>`);
+    shipSelect.innerHTML = options;
+
+    let html = "";
+    let index = 1;
+    Object.entries(jobsData).forEach(([id, j]) => {
+        html += `<tr>
+            <td>${index++}</td>
+            <td><b>${j.ship}</b></td>
+            <td>${j.por || ""}</td>
+            <td>${j.name}</td>
+            <td>${j.type || ""}</td>
+            <td>${j.matDate || ""}</td>
+            <td>${j.doneDate || ""}</td>
+            <td style="font-size:12px;">${j.note || ""}</td>
+            <td class="admin-inline">
+                <button onclick="editJob('${id}')" style="padding:2px 5px; width:auto;">✏️</button>
+                <button onclick="deleteJob('${id}')" style="padding:2px 5px; width:auto; background:red;">🗑️</button>
+            </td>
+        </tr>`;
+    });
+    document.getElementById("jobListContent").innerHTML = html || "<tr><td colspan='9'>Chưa có công việc tồn đọng</td></tr>";
+};
+
+window.editJob = function(id) {
+    const j = jobsData[id];
+    document.getElementById("jobShip").value = j.ship;
+    document.getElementById("jobPor").value = j.por;
+    document.getElementById("jobName").value = j.name;
+    document.getElementById("jobType").value = j.type;
+    document.getElementById("jobMatDate").value = j.matDate;
+    document.getElementById("jobDoneDate").value = j.doneDate;
+    document.getElementById("jobNote").value = j.note;
+    editJobId = id;
+    document.getElementById("btnSaveJob").innerText = "💾 Cập nhật";
+};
+
+window.deleteJob = function(id) {
+    if(confirm("Xóa công việc này?")) remove(ref(db, "jobs/" + id));
+};
+
+function clearJobForm() {
+    ["jobPor", "jobName", "jobType", "jobMatDate", "jobDoneDate", "jobNote"].forEach(id => document.getElementById(id).value = "");
+}
+    
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
     

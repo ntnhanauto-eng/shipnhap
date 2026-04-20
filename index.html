@@ -3233,6 +3233,7 @@ window.saveJobData = function() {
         block, // LƯU VÀO DATABASE
         name,
         type: document.getElementById("jobType").value,
+        block: document.getElementById("jobBlock").value,
         matDate: document.getElementById("jobMatDate").value,
         doneDate: document.getElementById("jobDoneDate").value,
         note: document.getElementById("jobNote").value,
@@ -3253,13 +3254,13 @@ window.renderJobList = function() {
     // Tạo danh sách Option chỉ bao gồm các tàu CHƯA bàn giao (active)
     let options = '<option value="">-- Chọn tàu --</option>';
     
-    Object.keys(shipsData).sort().forEach(shipId => {
-        const ship = shipsData[shipId];
-        // 🛠️ CHỈ THÊM TÀU NẾU TRẠNG THÁI KHÔNG PHẢI LÀ "done"
-        if (ship.status !== "done") {
-            options += `<option value="${shipId}">${shipId}</option>`;
-        }
-    });
+   Object.keys(shipsData).sort().forEach(shipId => {
+    const ship = shipsData[shipId];
+    // Thêm điều kiện if này để lọc
+    if (ship.status !== "done") {
+        options += `<option value="${shipId}">${shipId}</option>`;
+    }
+});
     
     viewSelect.innerHTML = options;
     inputSelect.innerHTML = options;

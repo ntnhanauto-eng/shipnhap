@@ -3232,37 +3232,6 @@ window.updateShipSelectByStatus = function() {
 // --- QUẢN LÝ CÔNG VIỆC TỒN ĐỘNG (SỬA LỖI & THÊM CỘT) ---
 
 // 1. Lưu hoặc Cập nhật dữ liệu
-window.saveJobData = function() {
-    if(!isAdmin) return;
-    const data = {
-        ship: document.getElementById("jobShip").value,
-        block: document.getElementById("jobBlock").value || "",
-        por: document.getElementById("jobPor").value || "",
-        partNo: document.getElementById("jobPartNo").value || "",
-        name: document.getElementById("jobName").value || "",
-        qty: document.getElementById("jobQty").value || "",
-        type: document.getElementById("jobType").value || "",
-        matDate: document.getElementById("jobMatDate").value || "",
-        doneDate: document.getElementById("jobDoneDate").value || "",
-        note: document.getElementById("jobNote").value || ""
-    };
-
-    if(!data.ship || !data.name) return alert("Vui lòng chọn Tàu và nhập Tên vật tư!");
-
-    if(editJobId) {
-        update(ref(db, "jobs/" + editJobId), data).then(() => {
-            editJobId = null;
-            document.getElementById("btnSaveJob").innerText = "💾 Lưu dữ liệu";
-            clearJobForm();
-            alert("Đã cập nhật công việc!");
-        });
-    } else {
-        push(ref(db, "jobs"), data).then(() => {
-            clearJobForm();
-            alert("Đã thêm công việc mới!");
-        });
-    }
-};
 
 // 2. Hiển thị danh sách bảng công việc
 window.renderJobList = function() {
@@ -3437,6 +3406,122 @@ window.deleteJob = function(id) {
 function clearJobForm() {
     ["jobPor", "jobName", "jobType", "jobMatDate", "jobDoneDate", "jobNote"].forEach(id => document.getElementById(id).value = "");
 }
+
+// ==========================================
+// KHU VỰC QUẢN LÝ CÔNG VIỆC (ĐÃ FIX TRÙNG LẶP)
+// ==========================================
+
+window.saveJobData = function() {
+    if(!isAdmin) return;
+    const data = {
+        ship: document.getElementById("jobShip").value,
+        block: document.getElementById("jobBlock").value || "",
+        por: document.getElementById("jobPor").value || "",
+        partNo: document.getElementById("jobPartNo").value || "",
+        name: document.getElementById("jobName").value || "",
+        qty: document.getElementById("jobQty").value || "",
+        type: document.getElementById("jobType").value || "",
+        matDate: document.getElementById("jobMatDate").value || "",
+        doneDate: document.getElementById("jobDoneDate").value || "",
+        note: document.getElementById("jobNote").value || ""
+    };
+
+    if(!data.ship || !data.name) return alert("Vui lòng chọn Tàu và nhập Tên vật tư!");
+
+    if(editJobId) {
+        update(ref(db, "jobs/" + editJobId), data).then(() => {
+            editJobId = null;
+            document.getElementById("btnSaveJob").innerText = "💾 Lưu dữ liệu";
+            clearJobForm();
+            alert("Cập nhật thành công!");
+        });
+    } else {
+        push(ref(db, "jobs"), data).then(() => {
+            clearJobForm();
+            alert("Đã thêm thành công!");
+        });
+    }
+};
+
+window.renderJobList = function() {
+    const viewSelect = document.getElementById("viewJobByShip");
+    const inputSelect = document.getElementById("jobShip");
+    const currentView = viewSelect.value;
+    
+    let options = '<option value="">-- Chọn tàu --</option>';
+    Object.keys(shipsData).sort().forEach(id => {
+        if (shipsData[id].status !== "done") {
+            options += `<option value="${id}">${id}</option>`;
+        }
+    });
+    viewSelect.innerHTML = options;
+    inputSelect.innerHTML = options;
+    viewSelect.value = currentView;
+
+    let html = "";
+    let index = 1;
+    const selectedShip = viewSelect.value;
+
+    if (!selectedShip) {
+        html = "<tr><td colspan='11' style='text-align:center; padding:20px; color:#888;'>👉 Vui lòng chọn một tàu đang thi công.</td></tr>";
+    } else {
+        const filteredJobs = Object.entries(jobsData).filter(([id, j]) => j.ship === selectedShip);
+        if (filteredJobs.length === 0) {
+            html = `<tr><td colspan='11' style='text-align:center; padding:20px;'>Tàu <b>${selectedShip}</b> không có tồn đọng.</td></tr>`;
+        } else {
+            filteredJobs.forEach(([id, j]) => {
+                html += `<tr>
+                    <td style="text-align:center;">${index++}</td>
+                    <td>${j.block || "-"}</td>
+                    <td>${j.por || "-"}</td>
+                    <td>${j.partNo || "-"}</td>
+                    <td style="font-weight:bold;">${j.name || "-"}</td>
+                    <td style="text-align:center;">${j.qty || "-"}</td>
+                    <td>${j.type || "-"}</td>
+                    <td>${j.matDate || "-"}</td>
+                    <td>${j.doneDate || "-"}</td>
+                    <td style="font-size:12px;">${j.note || ""}</td>
+                    <td class="admin-inline">
+                        <div class="action-buttons">
+                            <button class="btn-edit" onclick="editJob('${id}')">✏️</button>
+                            <button class="btn-delete" onclick="deleteJob('${id}')">🗑️</button>
+                        </div>
+                    </td>
+                </tr>`;
+            });
+        }
+    }
+    document.getElementById("jobListContent").innerHTML = html;
+};
+
+window.editJob = function(id) {
+    const j = jobsData[id];
+    if(!j) return;
+    document.getElementById("jobShip").value = j.ship || "";
+    document.getElementById("jobBlock").value = j.block || "";
+    document.getElementById("jobPor").value = j.por || "";
+    document.getElementById("jobPartNo").value = j.partNo || "";
+    document.getElementById("jobName").value = j.name || "";
+    document.getElementById("jobQty").value = j.qty || "";
+    document.getElementById("jobType").value = j.type || "";
+    document.getElementById("jobMatDate").value = j.matDate || "";
+    document.getElementById("jobDoneDate").value = j.doneDate || "";
+    document.getElementById("jobNote").value = j.note || "";
+    editJobId = id;
+    document.getElementById("btnSaveJob").innerText = "💾 Cập nhật";
+};
+
+window.deleteJob = function(id) {
+    if(confirm("Xác nhận xóa?")) remove(ref(db, "jobs/" + id));
+};
+
+function clearJobForm() {
+    const fields = ["jobBlock", "jobPor", "jobPartNo", "jobName", "jobQty", "jobType", "jobMatDate", "jobDoneDate", "jobNote"];
+    fields.forEach(id => { if(document.getElementById(id)) document.getElementById(id).value = ""; });
+    document.getElementById("btnSaveJob").innerText = "💾 Lưu dữ liệu";
+    editJobId = null;
+}
+
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

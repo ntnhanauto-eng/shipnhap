@@ -1243,7 +1243,15 @@ button {
 <div id="jobManagerBox" class="card" style="display:none; margin-top:15px;">
     <h4>📋 QUẢN LÝ CÔNG VIỆC TỒN ĐỘNG</h4>
     
-    <div class="admin-only" style="background: #f9f9f9; padding: 10px; border-radius: 8px; margin-bottom: 15px;">
+    <div style="margin-bottom: 15px; background: #e8f0fe; padding: 10px; border-radius: 8px;">
+        <label style="font-weight: bold; color: #1a73e8;">🚢 Chọn tàu để xem công việc:</label>
+        <select id="viewJobByShip" onchange="renderJobList()">
+            <option value="">-- Chọn tàu --</option>
+        </select>
+    </div>
+
+    <div class="admin-only" style="background: #f9f9f9; padding: 10px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #ddd;">
+        <p style="margin-top:0; font-weight:bold;">➕ Thêm/Sửa công việc:</p>
         <div class="flex">
             <select id="jobShip"><option value="">-- Chọn tàu --</option></select>
             <input type="text" id="jobPor" placeholder="POR">
@@ -1255,7 +1263,7 @@ button {
             <div class="date-field"><label>Hoàn thành</label><input type="date" id="jobDoneDate"></div>
         </div>
         <input type="text" id="jobNote" placeholder="Ghi chú">
-        <button onclick="saveJobData()" id="btnSaveJob" style="background: #28a745;">➕ Lưu công việc</button>
+        <button onclick="saveJobData()" id="btnSaveJob" style="background: #28a745;">💾 Lưu dữ liệu</button>
     </div>
 
     <div class="table-wrap">
@@ -1263,9 +1271,8 @@ button {
             <thead>
                 <tr>
                     <th style="width:40px;">STT</th>
-                    <th>TÀU</th>
                     <th>POR</th>
-                    <th>TÊN</th>
+                    <th>TÊN CÔNG VIỆC</th>
                     <th>LOẠI</th>
                     <th>VẬT TƯ</th>
                     <th>XONG</th>
@@ -3224,30 +3231,58 @@ window.saveJobData = function() {
 };
 
 window.renderJobList = function() {
-    const shipSelect = document.getElementById("jobShip");
+    // 1. Cập nhật danh sách tàu vào 2 ô Select (Ô xem và ô nhập)
+    const viewSelect = document.getElementById("viewJobByShip");
+    const inputSelect = document.getElementById("jobShip");
+    
+    // Lưu lại giá trị người dùng đang chọn để không bị reset khi render
+    const currentView = viewSelect.value;
+    
     let options = '<option value="">-- Chọn tàu --</option>';
-    Object.keys(shipsData).sort().forEach(s => options += `<option value="${s}">${s}</option>`);
-    shipSelect.innerHTML = options;
+    Object.keys(shipsData).sort().forEach(s => {
+        options += `<option value="${s}">${s}</option>`;
+    });
+    
+    viewSelect.innerHTML = options;
+    inputSelect.innerHTML = options;
+    
+    // Khôi phục lại giá trị đã chọn
+    viewSelect.value = currentView;
 
+    // 2. Logic hiển thị bảng
     let html = "";
     let index = 1;
-    Object.entries(jobsData).forEach(([id, j]) => {
-        html += `<tr>
-            <td>${index++}</td>
-            <td><b>${j.ship}</b></td>
-            <td>${j.por || ""}</td>
-            <td>${j.name}</td>
-            <td>${j.type || ""}</td>
-            <td>${j.matDate || ""}</td>
-            <td>${j.doneDate || ""}</td>
-            <td style="font-size:12px;">${j.note || ""}</td>
-            <td class="admin-inline">
-                <button onclick="editJob('${id}')" style="padding:2px 5px; width:auto;">✏️</button>
-                <button onclick="deleteJob('${id}')" style="padding:2px 5px; width:auto; background:red;">🗑️</button>
-            </td>
-        </tr>`;
-    });
-    document.getElementById("jobListContent").innerHTML = html || "<tr><td colspan='9'>Chưa có công việc tồn đọng</td></tr>";
+    const selectedShip = viewSelect.value;
+
+    if (!selectedShip) {
+        html = "<tr><td colspan='8' style='text-align:center; padding:20px; color:#888;'>👉 Vui lòng chọn một tàu để xem danh sách công việc tồn đọng.</td></tr>";
+    } else {
+        // Lọc dữ liệu: Chỉ lấy công việc của tàu được chọn
+        const filteredJobs = Object.entries(jobsData).filter(([id, j]) => j.ship === selectedShip);
+
+        if (filteredJobs.length === 0) {
+            html = `<tr><td colspan='8' style='text-align:center; padding:20px;'>Tàu <b>${selectedShip}</b> hiện không có công việc tồn đọng.</td></tr>`;
+        } else {
+            filteredJobs.forEach(([id, j]) => {
+                html += `<tr>
+                    <td>${index++}</td>
+                    <td>${j.por || "-"}</td>
+                    <td style="font-weight:bold;">${j.name}</td>
+                    <td>${j.type || "-"}</td>
+                    <td>${j.matDate || "-"}</td>
+                    <td>${j.doneDate || "-"}</td>
+                    <td style="font-size:12px; color:#555;">${j.note || ""}</td>
+                    <td class="admin-inline">
+                        <div class="action-buttons">
+                            <button class="btn-edit" onclick="editJob('${id}')">✏️</button>
+                            <button class="btn-delete" onclick="deleteJob('${id}')">🗑️</button>
+                        </div>
+                    </td>
+                </tr>`;
+            });
+        }
+    }
+    document.getElementById("jobListContent").innerHTML = html;
 };
 
 window.editJob = function(id) {

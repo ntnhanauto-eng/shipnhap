@@ -2364,74 +2364,61 @@ document.querySelectorAll("input, select").forEach(el => {
 });
 
    window.handleButton = function(type) {
-    // Lấy các vùng nội dung
-    const summaryBox = document.getElementById("summary");
-    const hoursBox = document.getElementById("workHoursBox");
-    const shipBox = document.getElementById("shipManagerBox");
-    const progressBox = document.getElementById("progressBox");
-    const checklistBox = document.getElementById("checklistBox");
-    const extraBox = document.getElementById("extraBox");
-    const jobBox = document.getElementById("jobManagerBox"); // Thêm dòng này
-
-    const btnMap = {
-        'summary': { box: summaryBox, btn: document.getElementById("btnSummary") },
-        'hours': { box: hoursBox, btn: document.getElementById("btnWorkHours") },
-        'ships': { box: shipBox, btn: document.getElementById("btnManageShips") },
-        'progress': { box: progressBox, btn: document.getElementById("btnProgress") },
-        'checklist': { box: checklistBox, btn: document.getElementById("btnChecklist") },
-        'extra': { box: extraBox, btn: document.getElementById("btnExtra") },
-        'jobs': { box: jobBox, btn: document.getElementById("btnJobs") } // Thêm dòng này
-    };
-    // ... (phần code ẩn hiện bên dưới giữ nguyên) ...
-    if (type === "jobs") renderJobList(); // Thêm dòng này
-};
-
-    // Lấy nút hiện tại dựa trên type
-    const btnMap = {
-        'summary': { box: summaryBox, btn: document.getElementById("btnSummary") },
-        'hours': { box: hoursBox, btn: document.getElementById("btnWorkHours") },
-        'ships': { box: shipBox, btn: document.getElementById("btnManageShips") },
-        'progress': { box: progressBox, btn: document.getElementById("btnProgress") },
-        'checklist': { box: checklistBox, btn: document.getElementById("btnChecklist") },
-        'extra': { box: extraBox, btn: document.getElementById("btnExtra") }
+    // 1. Lấy tất cả các vùng nội dung (Boxes)
+    const boxes = {
+        summary: document.getElementById("summary"),
+        hours: document.getElementById("workHoursBox"),
+        ships: document.getElementById("shipManagerBox"),
+        progress: document.getElementById("progressBox"),
+        checklist: document.getElementById("checklistBox"),
+        extra: document.getElementById("extraBox"),
+        jobs: document.getElementById("jobManagerBox") // Box mới thêm
     };
 
+    // 2. Lấy tất cả các nút bấm tương ứng
+    const btns = {
+        summary: document.getElementById("btnSummary"),
+        hours: document.getElementById("btnWorkHours"),
+        ships: document.getElementById("btnManageShips"),
+        progress: document.getElementById("btnProgress"),
+        checklist: document.getElementById("btnChecklist"),
+        extra: document.getElementById("btnExtra"),
+        jobs: document.getElementById("btnJobs") // Nút mới thêm
+    };
+
+    // Xử lý riêng cho nút Xuất Excel
     if (type === 'export') {
         exportExcel();
         return;
     }
 
-    const target = btnMap[type];
-    if (!target) return;
+    const targetBox = boxes[type];
+    const targetBtn = btns[type];
 
-    // Kiểm tra xem cái đang bấm có đang MỞ hay không
-    const isAlreadyOpen = target.box.style.display === "block";
+    if (!targetBox) return;
 
-    // BƯỚC 1: ẨN TẤT CẢ các box và xóa class active của tất cả nút
-    [summaryBox, hoursBox, shipBox, progressBox, checklistBox, extraBox].forEach(b => {
-        if (b) b.style.display = "none";
-    });
-    document.querySelectorAll(".btn-grid button").forEach(btn => {
-        btn.classList.remove("btn-active");
-    });
+    // Kiểm tra trạng thái: Nếu đang mở thì bấm lần nữa sẽ đóng
+    const isAlreadyOpen = targetBox.style.display === "block";
 
-    // BƯỚC 2: Nếu cái vừa bấm đang mở -> dừng lại (vì đã ẩn ở bước 1 rồi)
+    // BƯỚC 1: ẨN TẤT CẢ các box và xóa màu xanh (active) của các nút
+    Object.values(boxes).forEach(box => { if(box) box.style.display = "none"; });
+    Object.values(btns).forEach(btn => { if(btn) btn.classList.remove("btn-active"); });
+
+    // BƯỚC 2: Nếu cái vừa bấm đang mở -> Thoát (vì đã ẩn ở bước 1 rồi)
     if (isAlreadyOpen) return;
 
-    // BƯỚC 3: Nếu nó đang tắt -> Mở nó lên và load dữ liệu
-    target.box.style.display = "block";
-    target.btn.classList.add("btn-active");
+    // BƯỚC 3: Nếu nó đang tắt -> Mở lên và load dữ liệu
+    targetBox.style.display = "block";
+    targetBtn.classList.add("btn-active");
 
-    // Load dữ liệu tương ứng
-    if (type === "summary") {
-        showSummary();
-        showGeneralSummaryReport();
-    }
+    // BƯỚC 4: Load dữ liệu đặc thù cho từng loại
+    if (type === "summary") { showSummary(); showGeneralSummaryReport(); }
     if (type === "hours") renderWorkHoursInputs();
     if (type === "ships") renderShipManagerList();
     if (type === "progress") renderProgressInputs();
     if (type === "checklist") renderChecklistInputs();
     if (type === "extra") renderExtraSelect();
+    if (type === "jobs") renderJobList(); // Load bảng công việc tồn đọng
 };
 
 function renderPagination() {

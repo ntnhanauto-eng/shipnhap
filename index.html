@@ -3231,33 +3231,38 @@ window.saveJobData = function() {
 };
 
 window.renderJobList = function() {
-    // 1. Cập nhật danh sách tàu vào 2 ô Select (Ô xem và ô nhập)
     const viewSelect = document.getElementById("viewJobByShip");
     const inputSelect = document.getElementById("jobShip");
     
-    // Lưu lại giá trị người dùng đang chọn để không bị reset khi render
+    // Lưu lại giá trị người dùng đang chọn để không bị reset khi render lại dữ liệu từ Firebase
     const currentView = viewSelect.value;
     
+    // Tạo danh sách Option chỉ bao gồm các tàu CHƯA bàn giao (active)
     let options = '<option value="">-- Chọn tàu --</option>';
-    Object.keys(shipsData).sort().forEach(s => {
-        options += `<option value="${s}">${s}</option>`;
+    
+    Object.keys(shipsData).sort().forEach(shipId => {
+        const ship = shipsData[shipId];
+        // 🛠️ CHỈ THÊM TÀU NẾU TRẠNG THÁI KHÔNG PHẢI LÀ "done"
+        if (ship.status !== "done") {
+            options += `<option value="${shipId}">${shipId}</option>`;
+        }
     });
     
     viewSelect.innerHTML = options;
     inputSelect.innerHTML = options;
     
-    // Khôi phục lại giá trị đã chọn
+    // Khôi phục lại giá trị đã chọn nếu tàu đó vẫn còn trong danh sách active
     viewSelect.value = currentView;
 
-    // 2. Logic hiển thị bảng
+    // Logic hiển thị bảng dữ liệu
     let html = "";
     let index = 1;
     const selectedShip = viewSelect.value;
 
     if (!selectedShip) {
-        html = "<tr><td colspan='8' style='text-align:center; padding:20px; color:#888;'>👉 Vui lòng chọn một tàu để xem danh sách công việc tồn đọng.</td></tr>";
+        html = "<tr><td colspan='8' style='text-align:center; padding:20px; color:#888;'>👉 Vui lòng chọn một tàu đang thi công để xem công việc tồn đọng.</td></tr>";
     } else {
-        // Lọc dữ liệu: Chỉ lấy công việc của tàu được chọn
+        // Lọc dữ liệu công việc của tàu được chọn
         const filteredJobs = Object.entries(jobsData).filter(([id, j]) => j.ship === selectedShip);
 
         if (filteredJobs.length === 0) {

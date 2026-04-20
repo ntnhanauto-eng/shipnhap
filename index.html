@@ -1025,22 +1025,7 @@ button {
     }
 }
 
-   /* Tùy chỉnh riêng cho bảng công việc tồn đọng */
-#jobTable {
-    min-width: 1050px; /* Tăng thêm một chút để chứa cột Block */
-    table-layout: fixed;
-}
-
-#jobTable td {
-    vertical-align: top; /* Chữ bắt đầu từ đỉnh ô nếu nội dung dài xuống dòng */
-    padding: 12px 8px;   /* Tăng khoảng cách đệm cho thoáng */
-    line-height: 1.4;
-}
-
-#jobTable th {
-    background: #e8f0fe; /* Màu nền tiêu đề nhẹ nhàng hơn */
-    color: #1a73e8;
-}     
+        
         
     </style>
 </head>
@@ -1269,8 +1254,8 @@ button {
         <p style="margin-top:0; font-weight:bold;">➕ Thêm/Sửa công việc:</p>
         <div class="flex">
             <select id="jobShip"><option value="">-- Chọn tàu --</option></select>
-            <input type="text" id="jobPor" placeholder="POR" style="width: 80px;">
-            <input type="text" id="jobBlock" placeholder="Block" style="width: 80px;"> <input type="text" id="jobName" placeholder="Tên công việc" style="flex: 2;">
+            <input type="text" id="jobPor" placeholder="POR">
+            <input type="text" id="jobName" placeholder="Tên công việc">
             <input type="text" id="jobType" placeholder="Loại công việc">
         </div>
         <div class="date-row">
@@ -1285,14 +1270,14 @@ button {
         <table id="jobTable">
             <thead>
                 <tr>
-                    <th style="width: 45px; text-align: center;">STT</th>
-                    <th style="width: 90px;">POR</th>
-                    <th style="width: 90px;">BLOCK</th> <th style="width: 250px;">TÊN CÔNG VIỆC</th>
-                    <th style="width: 120px;">LOẠI</th>
-                    <th style="width: 100px; text-align: center;">VẬT TƯ</th>
-                    <th style="width: 100px; text-align: center;">XONG</th>
-                    <th style="width: 200px;">GHI CHÚ</th>
-                    <th class="admin-inline" style="width: 80px; text-align: center;">Sửa</th>
+                    <th style="width:40px;">STT</th>
+                    <th>POR</th>
+                    <th>TÊN CÔNG VIỆC</th>
+                    <th>LOẠI</th>
+                    <th>VẬT TƯ</th>
+                    <th>XONG</th>
+                    <th>GHI CHÚ</th>
+                    <th class="admin-inline">Sửa</th>
                 </tr>
             </thead>
             <tbody id="jobListContent"></tbody>
@@ -3221,27 +3206,28 @@ window.updateShipSelectByStatus = function() {
 };
 
 window.saveJobData = function() {
-    const ship = document.getElementById("jobShip").value;
-    const por = document.getElementById("jobPor").value;
-    const block = document.getElementById("jobBlock").value; // LẤY GIÁ TRỊ BLOCK
-    const name = document.getElementById("jobName").value;
-    // ... (các trường khác giữ nguyên)
-
-    const jobData = {
-        ship,
-        por,
-        block, // LƯU VÀO DATABASE
-        name,
+    if(!isAdmin) return;
+    const data = {
+        ship: document.getElementById("jobShip").value,
+        por: document.getElementById("jobPor").value,
+        name: document.getElementById("jobName").value,
         type: document.getElementById("jobType").value,
-        block: document.getElementById("jobBlock").value,
         matDate: document.getElementById("jobMatDate").value,
         doneDate: document.getElementById("jobDoneDate").value,
-        note: document.getElementById("jobNote").value,
-        timestamp: Date.now()
+        note: document.getElementById("jobNote").value
     };
-    // ... (logic Firebase set/push giữ nguyên)
-    // Sau khi lưu xong, nhớ xóa trống ô block:
-    document.getElementById("jobBlock").value = "";
+
+    if(!data.ship || !data.name) return alert("Vui lòng nhập Tàu và Tên công việc!");
+
+    if(editJobId) {
+        update(ref(db, "jobs/" + editJobId), data).then(() => {
+            editJobId = null;
+            document.getElementById("btnSaveJob").innerText = "➕ Lưu công việc";
+            clearJobForm();
+        });
+    } else {
+        push(ref(db, "jobs"), data).then(() => clearJobForm());
+    }
 };
 
 window.renderJobList = function() {
@@ -3254,13 +3240,13 @@ window.renderJobList = function() {
     // Tạo danh sách Option chỉ bao gồm các tàu CHƯA bàn giao (active)
     let options = '<option value="">-- Chọn tàu --</option>';
     
-   Object.keys(shipsData).sort().forEach(shipId => {
-    const ship = shipsData[shipId];
-    // Thêm điều kiện if này để lọc
-    if (ship.status !== "done") {
-        options += `<option value="${shipId}">${shipId}</option>`;
-    }
-});
+    Object.keys(shipsData).sort().forEach(shipId => {
+        const ship = shipsData[shipId];
+        // 🛠️ CHỈ THÊM TÀU NẾU TRẠNG THÁI KHÔNG PHẢI LÀ "done"
+        if (ship.status !== "done") {
+            options += `<option value="${shipId}">${shipId}</option>`;
+        }
+    });
     
     viewSelect.innerHTML = options;
     inputSelect.innerHTML = options;
@@ -3282,34 +3268,39 @@ window.renderJobList = function() {
         if (filteredJobs.length === 0) {
             html = `<tr><td colspan='8' style='text-align:center; padding:20px;'>Tàu <b>${selectedShip}</b> hiện không có công việc tồn đọng.</td></tr>`;
         } else {
-            // Tìm đoạn vòng lặp hiển thị dữ liệu và thêm cột Block vào giữa POR và Name
-filteredJobs.forEach(([id, j]) => {
-    html += `<tr>
-        <td>${index++}</td>
-        <td>${j.por || "-"}</td>
-        <td style="font-weight:bold; color: #d93025;">${j.block || "-"}</td> 
-        <td style="font-weight:bold;">${j.name}</td>
-        <td>${j.type || "-"}</td>
-        <td>${j.matDate || "-"}</td>
-        <td>${j.doneDate || "-"}</td>
-        <td style="font-size:12px; color:#555;">${j.note || ""}</td>
-        <td class="admin-inline">
-            <div class="action-buttons">
-                <button class="btn-edit" onclick="editJob('${id}')">✏️</button>
-                <button class="btn-delete" onclick="deleteJob('${id}')">🗑️</button>
-            </div>
-        </td>
-    </tr>`;
-});
+            filteredJobs.forEach(([id, j]) => {
+                html += `<tr>
+                    <td>${index++}</td>
+                    <td>${j.por || "-"}</td>
+                    <td style="font-weight:bold;">${j.name}</td>
+                    <td>${j.type || "-"}</td>
+                    <td>${j.matDate || "-"}</td>
+                    <td>${j.doneDate || "-"}</td>
+                    <td style="font-size:12px; color:#555;">${j.note || ""}</td>
+                    <td class="admin-inline">
+                        <div class="action-buttons">
+                            <button class="btn-edit" onclick="editJob('${id}')">✏️</button>
+                            <button class="btn-delete" onclick="deleteJob('${id}')">🗑️</button>
+                        </div>
+                    </td>
+                </tr>`;
+            });
+        }
+    }
+    document.getElementById("jobListContent").innerHTML = html;
+};
 
 window.editJob = function(id) {
     const j = jobsData[id];
-    editingJobId = id;
     document.getElementById("jobShip").value = j.ship;
-    document.getElementById("jobPor").value = j.por || "";
-    document.getElementById("jobBlock").value = j.block || ""; // ĐỔ DỮ LIỆU BLOCK LÊN Ô NHẬP
+    document.getElementById("jobPor").value = j.por;
     document.getElementById("jobName").value = j.name;
-    // ... (các trường còn lại)
+    document.getElementById("jobType").value = j.type;
+    document.getElementById("jobMatDate").value = j.matDate;
+    document.getElementById("jobDoneDate").value = j.doneDate;
+    document.getElementById("jobNote").value = j.note;
+    editJobId = id;
+    document.getElementById("btnSaveJob").innerText = "💾 Cập nhật";
 };
 
 window.deleteJob = function(id) {

@@ -1025,7 +1025,23 @@ button {
     }
 }
 
-        
+      /* Tùy chỉnh riêng cho bảng công việc tồn đọng */
+#jobTable {
+    min-width: 950px; /* Ép bảng rộng ra để các cột không bị chồng chéo */
+    table-layout: fixed; /* Giữ cố định độ rộng đã chia ở trên */
+}
+
+#jobTable td {
+    vertical-align: top; /* Chữ bắt đầu từ đỉnh ô nếu nội dung dài xuống dòng */
+    padding: 12px 8px;   /* Tăng khoảng cách đệm cho thoáng */
+    line-height: 1.4;
+}
+
+#jobTable th {
+    background: #e8f0fe; /* Màu nền tiêu đề nhẹ nhàng hơn */
+    color: #1a73e8;
+}
+  
         
     </style>
 </head>
@@ -1267,22 +1283,23 @@ button {
     </div>
 
     <div class="table-wrap">
-        <table id="jobTable">
-            <thead>
-                <tr>
-                    <th style="width:40px;">STT</th>
-                    <th>POR</th>
-                    <th>TÊN CÔNG VIỆC</th>
-                    <th>LOẠI</th>
-                    <th>VẬT TƯ</th>
-                    <th>XONG</th>
-                    <th>GHI CHÚ</th>
-                    <th class="admin-inline">Sửa</th>
-                </tr>
-            </thead>
-            <tbody id="jobListContent"></tbody>
-        </table>
-    </div>
+    <div class="table-wrap">
+    <table id="jobTable">
+        <thead>
+            <tr>
+                <th style="width: 45px; text-align: center;">STT</th>
+                <th style="width: 100px;">POR</th>
+                <th style="width: 250px;">TÊN CÔNG VIỆC</th> <th style="width: 120px;">LOẠI</th>
+                <th style="width: 100px; text-align: center;">VẬT TƯ</th>
+                <th style="width: 100px; text-align: center;">XONG</th>
+                <th style="width: 200px;">GHI CHÚ</th>
+                <th class="admin-inline" style="width: 80px; text-align: center;">Sửa</th>
+            </tr>
+        </thead>
+        <tbody id="jobListContent"></tbody>
+    </table>
+</div>
+
 </div>
          
 </div>

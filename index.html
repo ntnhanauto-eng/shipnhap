@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Quản Lý Casing</title>
-    <script src="main.js" defer></script>
      <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1a73e8">
 
@@ -1856,36 +1855,6 @@ window.updateShipSelectByStatus = function() {
     renderSummaryDetail("all"); 
 };
 
-function getShipEvents(ship) {
-    const now = new Date();
-    const yyyy = now.getFullYear();
-    const mm = String(now.getMonth() + 1).padStart(2, '0');
-    const dd = String(now.getDate()).padStart(2, '0');
-    const today = `${yyyy}-${mm}-${dd}`;
-
-    let events = [];
-
-    Object.values(rawData).forEach(x => {
-        if (
-            x.ship_id === ship &&
-            x.date < today &&
-            x.job &&
-            x.job.toUpperCase().includes("(EVENT)")
-        ) {
-            events.push({
-                date: x.date,
-                job: x.job.replace(/PLAN:/gi, "").trim()
-            });
-        }
-    });
-
-    // mới → cũ
-    events.sort((a, b) => b.date.localeCompare(a.date));
-
-    return events;
-}
-
-    
 // 4. TẦNG 2: Hiển thị thẻ chi tiết từng tàu
 window.renderSummaryDetail = function(selectedShip) {
     const box = document.getElementById("summaryDetailContainer");
@@ -1945,34 +1914,6 @@ window.renderSummaryDetail = function(selectedShip) {
                 <div style="font-size: 12px; color: #666; margin-top: 8px;">
                     <b>📋 Hạng mục đã kiểm tra:</b> ${checkedItems}
                 </div>
-
-               ${(() => {
-    let events = getShipEvents(s);
-
-    if (events.length === 0) return "";
-
-    let html = `
-    <div style="margin-top:10px; border-top:1px dashed #ddd; padding-top:8px;">
-        <b>📅 SỰ KIỆN QUAN TRỌNG:</b>
-    `;
-
-    events.slice(0, 5).forEach(e => {
-        const d = e.date.split("-");
-        const showDate = `${d[2]}/${d[1]}`;
-
-        html += `
-        <div style="font-size:13px; margin-top:4px;">
-            📌 ${showDate} — ${e.job}
-        </div>
-        `;
-    });
-
-    html += `</div>`;
-
-    return html;
-})()}
-
-                
             </div>
         </div>`;
     });
@@ -3227,8 +3168,5 @@ window.updateShipSelectByStatus = function() {
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-
-
-        
 </body>
 </html>

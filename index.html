@@ -3316,15 +3316,7 @@ window.deleteJob = function(id) {
 };
 
 // 5. Làm sạch form nhập
-function clearJobForm() {
-    const fields = ["jobBlock", "jobPor", "jobPartNo", "jobName", "jobQty", "jobType", "jobMatDate", "jobDoneDate", "jobNote"];
-    fields.forEach(id => {
-        const el = document.getElementById(id);
-        if(el) el.value = "";
-    });
-    document.getElementById("btnSaveJob").innerText = "💾 Lưu dữ liệu";
-    editJobId = null;
-}
+
 
 window.renderJobList = function() {
     const viewSelect = document.getElementById("viewJobByShip");

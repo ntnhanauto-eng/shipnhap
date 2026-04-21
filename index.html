@@ -3347,7 +3347,17 @@ window.deleteJob = function(id) {
 };
 
 function clearJobForm() {
-    ["jobPor", "jobName", "jobType", "jobMatDate", "jobDoneDate", "jobNote"].forEach(id => document.getElementById(id).value = "");
+    [
+        "jobBlock",
+        "jobPor",
+        "jobPartNo",
+        "jobName",
+        "jobQty",
+        "jobType",
+        "jobMatDate",
+        "jobDoneDate",
+        "jobNote"
+    ].forEach(id => document.getElementById(id).value = "");
 }
     
 </script>

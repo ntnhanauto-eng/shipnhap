@@ -1270,11 +1270,8 @@ button {
         <p style="margin-top:0; font-weight:bold;">➕ Thêm/Sửa công việc:</p>
         <div class="flex">
             <select id="jobShip"><option value="">-- Chọn tàu --</option></select>
-            <input type="text" id="jobBlock" placeholder="BLOCK">
             <input type="text" id="jobPor" placeholder="POR">
-            <input type="text" id="jobPartNo" placeholder="PART NO">
             <input type="text" id="jobName" placeholder="Tên vật tư">
-            <input type="number" id="jobQty" placeholder="QUANTITY">
             <input type="text" id="jobType" placeholder="Loại mistake">
         </div>
         <div class="date-row">
@@ -3229,22 +3226,17 @@ window.updateShipSelectByStatus = function() {
 
 window.saveJobData = function() {
     if(!isAdmin) return;
-
     const data = {
         ship: document.getElementById("jobShip").value,
-        block: document.getElementById("jobBlock").value,   // ✅ NEW
         por: document.getElementById("jobPor").value,
-        partNo: document.getElementById("jobPartNo").value, // ✅ NEW
         name: document.getElementById("jobName").value,
-        qty: document.getElementById("jobQty").value,       // ✅ NEW
         type: document.getElementById("jobType").value,
         matDate: document.getElementById("jobMatDate").value,
         doneDate: document.getElementById("jobDoneDate").value,
         note: document.getElementById("jobNote").value
     };
 
-    if(!data.ship || !data.name) 
-        return alert("Vui lòng nhập Tàu và Tên công việc!");
+    if(!data.ship || !data.name) return alert("Vui lòng nhập Tàu và Tên công việc!");
 
     if(editJobId) {
         update(ref(db, "jobs/" + editJobId), data).then(() => {
@@ -3283,27 +3275,6 @@ window.renderJobList = function() {
 
     // Logic hiển thị bảng dữ liệu
     let html = "";
-    let html = "";
-
-// 🔥 THÊM NGAY DƯỚI ĐÂY
-html = `
-<tr>
-    <th>STT</th>
-    <th>BLOCK</th>
-    <th>POR</th>
-    <th>PART NO</th>
-    <th>TÊN</th>
-    <th>QUANTITY</th>
-    <th>LOẠI</th>
-    <th>NGÀY VẬT TƯ</th>
-    <th>NGÀY HOÀN THÀNH</th>
-    <th>GHI CHÚ</th>
-    <th></th>
-</tr>
-`;
-
-let index = 1;
-const selectedShip = viewSelect.value;
     let index = 1;
     const selectedShip = viewSelect.value;
 
@@ -3316,7 +3287,7 @@ const selectedShip = viewSelect.value;
         if (filteredJobs.length === 0) {
             html = `<tr><td colspan='8' style='text-align:center; padding:20px;'>Tàu <b>${selectedShip}</b> hiện không có công việc tồn đọng.</td></tr>`;
         } else {
-           filteredJobs.forEach(([id, j]) => {
+            filteredJobs.forEach(([id, j]) => {
                 html += `<tr>
                     <td>${index++}</td>
                     <td>${j.por || "-"}</td>

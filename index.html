@@ -1286,6 +1286,17 @@ button {
             <div class="date-field"><label>Ngày hoàn thành</label><input type="date" id="jobDoneDate"></div>
         </div>
         <input type="text" id="jobNote" placeholder="Ghi chú">
+
+        
+        <textarea id="jobNote"></textarea>
+        <select id="jobStatus">
+    <option value="pending">⚪ Chưa làm</option>
+    <option value="doing">🔴 Đang làm</option>
+    <option value="done">🟢 Đã xong</option>
+</select>
+
+
+        
         <button onclick="saveJobData()" id="btnSaveJob" style="background: #28a745;">💾 Lưu dữ liệu</button>
     </div>
 
@@ -1306,6 +1317,7 @@ button {
                 <th style="width: 100px; text-align: center;">VẬT TƯ VỀ</th>
                 <th style="width: 100px; text-align: center;">NGÀY XONG</th>
                 <th style="width: 200px;">GHI CHÚ</th>
+                <th style="width: 200px;">TRẠNG THÁI</th>
                 <th class="admin-inline" style="width: 80px; text-align: center;">Sửa</th>
             </tr>
         </thead>
@@ -3248,7 +3260,8 @@ window.saveJobData = function() {
         type: document.getElementById("jobType").value,
         matDate: document.getElementById("jobMatDate").value,
         doneDate: document.getElementById("jobDoneDate").value,
-        note: document.getElementById("jobNote").value
+        note: document.getElementById("jobNote").value,
+        status: document.getElementById("jobStatus").value || "pending"
     };
 
     if(!data.ship || !data.name) 
@@ -3304,24 +3317,42 @@ window.renderJobList = function() {
             html = `<tr><td colspan='8' style='text-align:center; padding:20px;'>Tàu <b>${selectedShip}</b> hiện không có công việc tồn đọng.</td></tr>`;
         } else {
             filteredJobs.forEach(([id, j]) => {
-    html += `<tr>
-        <td>${index++}</td>
-        <td>${j.block || "-"}</td>        <!-- NEW -->
-        <td>${j.por || "-"}</td>
-        <td>${j.partNo || "-"}</td>      <!-- NEW -->
-        <td style="font-weight:bold;">${j.name}</td>
-        <td>${j.qty || "-"}</td>         <!-- NEW -->
-        <td>${j.type || "-"}</td>
-        <td>${j.matDate || "-"}</td>
-        <td>${j.doneDate || "-"}</td>
-        <td style="font-size:12px; color:#555;">${j.note || ""}</td>
-        <td class="admin-inline">
-            <div class="action-buttons">
-                <button class="btn-edit" onclick="editJob('${id}')">✏️</button>
-                <button class="btn-delete" onclick="deleteJob('${id}')">🗑️</button>
-            </div>
-        </td>
-    </tr>`;
+    html += `let status = j.status || "pending";
+
+// 🎨 màu dòng
+let bgColor = "";
+if (status === "pending") bgColor = "#f1f3f4";   // xám
+if (status === "doing") bgColor = "#fdecea";     // đỏ nhạt
+if (status === "done") bgColor = "#e6f4ea";      // xanh nhạt
+
+html += `<tr style="background:${bgColor}">
+    <td>${index++}</td>
+    <td>${j.block || "-"}</td>
+    <td>${j.por || "-"}</td>
+    <td>${j.partNo || "-"}</td>
+    <td style="font-weight:bold;">${j.name}</td>
+    <td>${j.qty || "-"}</td>
+    <td>${j.type || "-"}</td>
+    <td>${j.matDate || "-"}</td>
+    <td>${j.doneDate || "-"}</td>
+    <td>${j.note || ""}</td>
+
+    <!-- 🔥 CỘT TRẠNG THÁI -->
+    <td>
+        <select onchange="updateJobStatus('${id}', this.value)">
+            <option value="pending" ${status==="pending"?"selected":""}>⚪</option>
+            <option value="doing" ${status==="doing"?"selected":""}>🔴</option>
+            <option value="done" ${status==="done"?"selected":""}>🟢</option>
+        </select>
+    </td>
+
+    <td class="admin-inline">
+        <div class="action-buttons">
+            <button onclick="editJob('${id}')">✏️</button>
+            <button onclick="deleteJob('${id}')">🗑️</button>
+        </div>
+    </td>
+</tr>`;
 });
         }
     }
@@ -3341,6 +3372,7 @@ window.editJob = function(id) {
     document.getElementById("jobMatDate").value = j.matDate;
     document.getElementById("jobDoneDate").value = j.doneDate;
     document.getElementById("jobNote").value = j.note;
+    document.getElementById("jobStatus").value = j.status || "pending";
 
     editJobId = id;
     document.getElementById("btnSaveJob").innerText = "💾 Cập nhật";
@@ -3363,6 +3395,15 @@ function clearJobForm() {
         "jobNote"
     ].forEach(id => document.getElementById(id).value = "");
 }
+
+window.updateJobStatus = function(id, status) {
+    update(ref(db, "jobs/" + id), {
+        ...jobsData[id],
+        status: status
+    });
+};
+
+
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

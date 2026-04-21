@@ -3310,23 +3310,26 @@ window.renderJobList = function() {
         if (filteredJobs.length === 0) {
             html = `<tr><td colspan='8' style='text-align:center; padding:20px;'>Tàu <b>${selectedShip}</b> hiện không có công việc tồn đọng.</td></tr>`;
         } else {
-           filteredJobs.forEach(([id, j]) => {
-                html += `<tr>
-                    <td>${index++}</td>
-                    <td>${j.por || "-"}</td>
-                    <td style="font-weight:bold;">${j.name}</td>
-                    <td>${j.type || "-"}</td>
-                    <td>${j.matDate || "-"}</td>
-                    <td>${j.doneDate || "-"}</td>
-                    <td style="font-size:12px; color:#555;">${j.note || ""}</td>
-                    <td class="admin-inline">
-                        <div class="action-buttons">
-                            <button class="btn-edit" onclick="editJob('${id}')">✏️</button>
-                            <button class="btn-delete" onclick="deleteJob('${id}')">🗑️</button>
-                        </div>
-                    </td>
-                </tr>`;
-            });
+          filteredJobs.forEach(([id, j]) => {
+    html += `<tr>
+        <td>${index++}</td>
+        <td>${j.block || "-"}</td>        <!-- NEW -->
+        <td>${j.por || "-"}</td>
+        <td>${j.partNo || "-"}</td>      <!-- NEW -->
+        <td style="font-weight:bold;">${j.name}</td>
+        <td>${j.qty || "-"}</td>         <!-- NEW -->
+        <td>${j.type || "-"}</td>
+        <td>${j.matDate || "-"}</td>
+        <td>${j.doneDate || "-"}</td>
+        <td style="font-size:12px; color:#555;">${j.note || ""}</td>
+        <td class="admin-inline">
+            <div class="action-buttons">
+                <button class="btn-edit" onclick="editJob('${id}')">✏️</button>
+                <button class="btn-delete" onclick="deleteJob('${id}')">🗑️</button>
+            </div>
+        </td>
+    </tr>`;
+});
         }
     }
     document.getElementById("jobListContent").innerHTML = html;

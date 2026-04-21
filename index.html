@@ -3317,15 +3317,18 @@ window.renderJobList = function() {
             html = `<tr><td colspan='8' style='text-align:center; padding:20px;'>Tàu <b>${selectedShip}</b> hiện không có công việc tồn đọng.</td></tr>`;
         } else {
             filteredJobs.forEach(([id, j]) => {
-    html += `let status = j.status || "pending";
+   filteredJobs.forEach(([id, j]) => {
 
-// 🎨 màu dòng
-let bgColor = "";
-if (status === "pending") bgColor = "#f1f3f4";   // xám
-if (status === "doing") bgColor = "#fdecea";     // đỏ nhạt
-if (status === "done") bgColor = "#e6f4ea";      // xanh nhạt
+    let status = j.status || "pending";
 
-html += `<tr style="background:${bgColor}">
+    // 🎨 màu dòng
+    let bgColor = "";
+    if (status === "pending") bgColor = "#f1f3f4";   // xám
+    if (status === "doing") bgColor = "#fdecea";     // đỏ
+    if (status === "done") bgColor = "#e6f4ea";      // xanh
+
+    html += `
+<tr style="background:${bgColor}">
     <td>${index++}</td>
     <td>${j.block || "-"}</td>
     <td>${j.por || "-"}</td>
@@ -3337,12 +3340,12 @@ html += `<tr style="background:${bgColor}">
     <td>${j.doneDate || "-"}</td>
     <td>${j.note || ""}</td>
 
-    <!-- 🔥 CỘT TRẠNG THÁI -->
+    <!-- 🔥 TRẠNG THÁI -->
     <td>
         <select onchange="updateJobStatus('${id}', this.value)">
-            <option value="pending" ${status==="pending"?"selected":""}>⚪</option>
-            <option value="doing" ${status==="doing"?"selected":""}>🔴</option>
-            <option value="done" ${status==="done"?"selected":""}>🟢</option>
+            <option value="pending" ${status==="pending"?"selected":""}>⚪ Chưa làm</option>
+            <option value="doing" ${status==="doing"?"selected":""}>🔴 Đang làm</option>
+            <option value="done" ${status==="done"?"selected":""}>🟢 Đã xong</option>
         </select>
     </td>
 
@@ -3382,6 +3385,19 @@ window.deleteJob = function(id) {
     if(confirm("Xóa công việc này?")) remove(ref(db, "jobs/" + id));
 };
 
+window.updateJobStatus = function(id, status){
+    update(ref(db, "jobs/" + id), { status: status })
+    .then(() => {
+        renderJobList(); // refresh bảng
+    })
+    .catch(err => {
+        alert("Lỗi cập nhật: " + err.message);
+    });
+};
+
+
+    
+
 function clearJobForm() {
     [
         "jobBlock",
@@ -3396,12 +3412,6 @@ function clearJobForm() {
     ].forEach(id => document.getElementById(id).value = "");
 }
 
-window.updateJobStatus = function(id, status) {
-    update(ref(db, "jobs/" + id), {
-        ...jobsData[id],
-        status: status
-    });
-};
 
 
     

@@ -3316,7 +3316,7 @@ window.renderJobList = function() {
         if (filteredJobs.length === 0) {
             html = `<tr><td colspan='8' style='text-align:center; padding:20px;'>Tàu <b>${selectedShip}</b> hiện không có công việc tồn đọng.</td></tr>`;
         } else {
-            filteredJobs.forEach(([id, j]) => {
+            
    filteredJobs.forEach(([id, j]) => {
 
     let status = j.status || "pending";
@@ -3327,7 +3327,7 @@ window.renderJobList = function() {
     if (status === "doing") bgColor = "#fdecea";     // đỏ
     if (status === "done") bgColor = "#e6f4ea";      // xanh
 
-    html += `
+   html += `
 <tr style="background:${bgColor}">
     <td>${index++}</td>
     <td>${j.block || "-"}</td>
@@ -3357,7 +3357,7 @@ window.renderJobList = function() {
     </td>
 </tr>`;
 });
-        }
+      }   
     }
     document.getElementById("jobListContent").innerHTML = html;
 };

@@ -1301,19 +1301,6 @@ button {
     </div>
 
     
-
-<label>Loại mistake</label>
-
-<select id="mistakeType">
-    <option value="">-- Chọn loại mistake --</option>
-    <option value="MATERIAL MISTAKE">MATERIAL MISTAKE</option>
-    <option value="DESIGN MISTAKE">DESIGN MISTAKE</option>
-    <option value="MAKER MISTAKE">MAKER MISTAKE</option>
-    <option value="PRE MISTAKE">PRE MISTAKE</option>
-</select>
-
-
-    
     <div class="table-wrap">
     <table id="jobTable">
         <thead>
@@ -3425,21 +3412,7 @@ function clearJobForm() {
     ].forEach(id => document.getElementById(id).value = "");
 }
 
-function filterMistake() {
-    const input = document.getElementById("mistakeSearch").value.toUpperCase();
-    const select = document.getElementById("mistakeType");
-    const options = select.getElementsByTagName("option");
 
-    for (let i = 0; i < options.length; i++) {
-        let txt = options[i].textContent || options[i].innerText;
-
-        if (txt.toUpperCase().indexOf(input) > -1) {
-            options[i].style.display = "";
-        } else {
-            options[i].style.display = "none";
-        }
-    }
-}
 
     
 </script>

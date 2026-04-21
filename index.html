@@ -1279,7 +1279,16 @@ button {
             <input type="text" id="jobPartNo" placeholder="PART NO">
             <input type="text" id="jobName" placeholder="Tên vật tư">
             <input type="number" id="jobQty" placeholder="QUANTITY">
-            <input type="text" id="jobType" placeholder="Loại mistake">
+            <select id="jobType">
+    <option value="">-- Chọn loại --</option>
+    <option value="DESIGN MISTAKE">DESIGN MISTAKE</option>
+    <option value="MATERIAL MISTAKE">MATERIAL MISTAKE</option>
+    <option value="MATERIAL DELAY">MATERIAL DELAY</option>
+    <option value="MAKER MISTAKE">MAKER MISTAKE</option>
+    <option value="PRE MISTAKE">PRE MISTAKE</option>
+    <option value="PRODUCTION MISTAKE">PRODUCTION MISTAKE</option>
+    <option value="KHÁC">KHÁC</option>
+</select>
         </div>
         <div class="date-row">
             <div class="date-field"><label>Ngày vật tư về</label><input type="date" id="jobMatDate"></div>

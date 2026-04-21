@@ -1303,7 +1303,6 @@ button {
     
 
 <label>Loại mistake</label>
-<input type="text" id="mistakeSearch" placeholder="🔍 Tìm loại mistake..." onkeyup="filterMistake()" />
 
 <select id="mistakeType">
     <option value="">-- Chọn loại mistake --</option>
@@ -3426,7 +3425,21 @@ function clearJobForm() {
     ].forEach(id => document.getElementById(id).value = "");
 }
 
+function filterMistake() {
+    const input = document.getElementById("mistakeSearch").value.toUpperCase();
+    const select = document.getElementById("mistakeType");
+    const options = select.getElementsByTagName("option");
 
+    for (let i = 0; i < options.length; i++) {
+        let txt = options[i].textContent || options[i].innerText;
+
+        if (txt.toUpperCase().indexOf(input) > -1) {
+            options[i].style.display = "";
+        } else {
+            options[i].style.display = "none";
+        }
+    }
+}
 
     
 </script>

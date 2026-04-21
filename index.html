@@ -3326,13 +3326,18 @@ window.renderJobList = function() {
 
 window.editJob = function(id) {
     const j = jobsData[id];
+
     document.getElementById("jobShip").value = j.ship;
+    document.getElementById("jobBlock").value = j.block || "";
     document.getElementById("jobPor").value = j.por;
+    document.getElementById("jobPartNo").value = j.partNo || "";
     document.getElementById("jobName").value = j.name;
+    document.getElementById("jobQty").value = j.qty || "";
     document.getElementById("jobType").value = j.type;
     document.getElementById("jobMatDate").value = j.matDate;
     document.getElementById("jobDoneDate").value = j.doneDate;
     document.getElementById("jobNote").value = j.note;
+
     editJobId = id;
     document.getElementById("btnSaveJob").innerText = "💾 Cập nhật";
 };

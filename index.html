@@ -1270,8 +1270,11 @@ button {
         <p style="margin-top:0; font-weight:bold;">➕ Thêm/Sửa công việc:</p>
         <div class="flex">
             <select id="jobShip"><option value="">-- Chọn tàu --</option></select>
+            <input type="text" id="jobBlock" placeholder="BLOCK">
             <input type="text" id="jobPor" placeholder="POR">
+            <input type="text" id="jobPartNo" placeholder="PART NO">
             <input type="text" id="jobName" placeholder="Tên vật tư">
+            <input type="number" id="jobQty" placeholder="QUANTITY">
             <input type="text" id="jobType" placeholder="Loại mistake">
         </div>
         <div class="date-row">
@@ -3226,17 +3229,22 @@ window.updateShipSelectByStatus = function() {
 
 window.saveJobData = function() {
     if(!isAdmin) return;
+
     const data = {
         ship: document.getElementById("jobShip").value,
+        block: document.getElementById("jobBlock").value,   // ✅ NEW
         por: document.getElementById("jobPor").value,
+        partNo: document.getElementById("jobPartNo").value, // ✅ NEW
         name: document.getElementById("jobName").value,
+        qty: document.getElementById("jobQty").value,       // ✅ NEW
         type: document.getElementById("jobType").value,
         matDate: document.getElementById("jobMatDate").value,
         doneDate: document.getElementById("jobDoneDate").value,
         note: document.getElementById("jobNote").value
     };
 
-    if(!data.ship || !data.name) return alert("Vui lòng nhập Tàu và Tên công việc!");
+    if(!data.ship || !data.name) 
+        return alert("Vui lòng nhập Tàu và Tên công việc!");
 
     if(editJobId) {
         update(ref(db, "jobs/" + editJobId), data).then(() => {

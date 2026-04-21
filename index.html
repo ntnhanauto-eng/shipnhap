@@ -1214,16 +1214,6 @@ button {
                 <select id="filterShip" onchange="renderSummaryDetail(this.value)">
                     <option value="all">-- Tất cả tàu --</option>
                 </select>
-
-
-                
-                <select id="groupFilter">
-    <option value="all">-- Tất cả nhóm --</option>
-    <option value="EO1">EO1</option>
-    <option value="EO2">EO2</option>
-</select>
-
-                
             </div>
         </div>
         <div id="summaryDetailContainer" style="max-height: 700px; overflow-y: auto;"></div> 
@@ -1951,24 +1941,17 @@ window.showGeneralSummaryReport = function() {
 
 // 3. Xử lý đồng bộ Dropdown tàu theo trạng thái
 window.updateShipSelectByStatus = function() {
-
-    const status = document.getElementById("filterStatus").value;
-    const shipSelect = document.getElementById("shipFilter");
-
+    const statusFilter = document.getElementById("filterStatus").value;
+    const shipSelect = document.getElementById("filterShip");
     let html = '<option value="all">-- Tất cả tàu --</option>';
-
-    Object.keys(shipsData).sort().forEach(shipId => {
-        const ship = shipsData[shipId];
-
-        if (status === "all" || ship.status === status) {
-            html += `<option value="${shipId}">${shipId}</option>`;
+    
+    Object.keys(shipsData).sort().forEach(id => {
+        if (statusFilter === "all" || shipsData[id].status === statusFilter) {
+            html += `<option value="${id}">${id}</option>`;
         }
     });
-
     shipSelect.innerHTML = html;
-    shipSelect.value = "all";
-
-    applyFilter(); // 🔥 reload data
+    renderSummaryDetail("all"); 
 };
 
 // 4. TẦNG 2: Hiển thị thẻ chi tiết từng tàu
@@ -2253,7 +2236,6 @@ function renderSummaryDetail(ship) {
     document.getElementById("fromDate").addEventListener("input", applyFilter);
     document.getElementById("toDate").addEventListener("input", applyFilter);
     document.getElementById("groupFilter").addEventListener("change", applyFilter);
-    
 
 // xuất Excel
 window.exportExcel = function() {
@@ -3430,33 +3412,7 @@ function clearJobForm() {
     ].forEach(id => document.getElementById(id).value = "");
 }
 
-function applyFilter() {
 
-    const status = document.getElementById("filterStatus").value;
-    const ship = document.getElementById("shipFilter").value;
-    const group = document.getElementById("groupFilter").value;
-
-    currentFiltered = Object.entries(rawData).filter(([id, x]) => {
-
-        // ===== 1. FILTER THEO TRẠNG THÁI TÀU =====
-        const shipInfo = shipsData[x.ship_id];
-        if (!shipInfo) return false;
-
-        if (status !== "all" && shipInfo.status !== status) return false;
-
-        // ===== 2. FILTER THEO TÀU (ĐỘC LẬP) =====
-        if (ship !== "all" && x.ship_id !== ship) return false;
-
-        // ===== 3. FILTER THEO NHÓM (ĐỘC LẬP) =====
-        if (group !== "all" && shipInfo.group !== group) return false;
-
-        return true;
-    });
-
-    currentPage = 1;
-    renderTableUI();
-    renderPagination();
-}
 
     
 </script>

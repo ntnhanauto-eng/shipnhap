@@ -3111,7 +3111,7 @@ window.toggleChecklistEvent = function(ship){
         events.slice(0,7).forEach(e => {
             let jobText = (e.job || "")
     .replace(/PLAN:/gi, "")
-    .replace(/EVENT:?/gi, "")   // ✅ BỎ EVENT
+    .replace(/(EVENT):?/gi, "")   // ✅ BỎ EVENT
     .trim();
 
             html += `

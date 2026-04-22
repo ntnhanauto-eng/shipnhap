@@ -1093,6 +1093,13 @@ button {
     📋 HẠNG MỤC KIỂM TRA:
 </h4>
     <div id="dashboardChecklist"></div>
+    <div id="eventChecklistPanel" style="
+    margin-top:15px;
+    padding:10px;
+    border:1px solid #ddd;
+    border-radius:8px;
+    background:#fafafa;
+"></div>
     <hr>
 
 <h4 style="color:#1a73e8; font-weight:bold;">
@@ -2993,7 +3000,11 @@ function renderCol(list, color) {
 
     html += list.map(x => `
         <div class="check-item" style="color:${color}">
-            ${x.ship} (${x.count}/3)
+           <div class="check-item" 
+     style="color:${color}; cursor:pointer;"
+     onclick="toggleChecklistEvent('${x.ship}')">
+    ${x.ship} (${x.count}/3)
+</div>
         </div>
     `).join("");
 
@@ -3066,7 +3077,50 @@ let infoHTML = `
 document.getElementById("dashboardInfo").innerHTML = infoHTML;
 }
 
+let openedChecklistShip = null;
 
+window.toggleChecklistEvent = function(ship){
+
+    const box = document.getElementById("eventChecklistPanel");
+    if(!box) return;
+
+    // 👉 nếu click lại cùng tàu → ẩn
+    if (openedChecklistShip === ship) {
+        box.innerHTML = "";
+        openedChecklistShip = null;
+        return;
+    }
+
+    openedChecklistShip = ship;
+
+    const events = Object.values(rawData)
+        .filter(x =>
+            x.ship_id === ship &&
+            x.job &&
+            x.job.toUpperCase().includes("EVENT")
+        )
+        .sort((a,b)=> b.date.localeCompare(a.date));
+
+    let html = `<div style="margin-bottom:8px;">
+        <b>📌 SỰ KIỆN: ${ship}</b>
+    </div>`;
+
+    if(events.length === 0){
+        html += `<div class="empty">Không có EVENT</div>`;
+    } else {
+        events.slice(0,7).forEach(e => {
+            let jobText = (e.job || "").replace(/PLAN:/gi,"").trim();
+
+            html += `
+                <div style="padding:4px 0; border-bottom:1px dashed #eee;">
+                    📅 ${e.date} — ${jobText}
+                </div>
+            `;
+        });
+    }
+
+    box.innerHTML = html;
+};
     
 
 window.toggleShipDetail = function(ship) {

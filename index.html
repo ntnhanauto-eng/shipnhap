@@ -3576,13 +3576,15 @@ window.toggleEvent = function(ship) {
     }
 
     // 👉 lọc dữ liệu EVENT
-    const events = Object.values(rawData).filter(x => {
-        return (
-            x.ship_id === ship &&
-            x.job &&
-            x.job.toUpperCase().includes("(EVENT)")
-        );
-    });
+   const events = Object.values(rawData).filter(x => {
+    const shipMatch =
+        (x.ship_id || "").trim().toUpperCase() === ship.trim().toUpperCase();
+
+    const eventMatch =
+        (x.job || "").toUpperCase().includes("EVENT");
+
+    return shipMatch && eventMatch;
+});
 
     if (events.length === 0) {
         box.innerHTML = `<div class="empty">Không có sự kiện</div>`;

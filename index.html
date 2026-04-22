@@ -2064,13 +2064,14 @@ window.renderSummaryDetail = function(selectedShip) {
                 <div style="font-size: 12px; color: #666; margin-top: 8px;">
                     <b>📋 Hạng mục đã kiểm tra:</b> ${checkedItems}
                 </div>
-            </div>
-        </div>`;
-
-       html += `
+                  html += `
 <div class="event-toggle" onclick="toggleEvent('${ship}')">
     📌 CÁC SỰ KIỆN CHÍNH
 </div>
+            </div>
+        </div>`;
+
+     
 
 <div id="event-${ship}" class="event-box"></div>
 `;

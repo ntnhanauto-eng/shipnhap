@@ -2063,6 +2063,28 @@ window.renderSummaryDetail = function(selectedShip) {
                 </div>
                 <div style="font-size: 12px; color: #666; margin-top: 8px;">
                     <b>📋 Hạng mục đã kiểm tra:</b> ${checkedItems}
+
+
+                         
+    html += `
+<div class="ship-report">
+  <div 
+        onclick="toggleShipEvents('${ship}')"
+        style="
+            margin-top:10px;
+            cursor:pointer;
+            font-weight:bold;
+            color:#1a73e8;
+        ">
+        📌 CÁC SỰ KIỆN CHÍNH
+    </div>
+
+    <div id="event-${ship}" style="margin-top:5px;"></div>
+
+</div>
+`;
+
+                    
                 </div>
             </div>
         </div>`;

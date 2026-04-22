@@ -2066,8 +2066,41 @@ window.renderSummaryDetail = function(selectedShip) {
                 </div>
             </div>
         </div>`;
+        
     });
 
+
+
+
+
+    
+    html += `
+<div class="ship-report">
+
+    <!-- Nội dung báo cáo tàu -->
+    ...
+    
+    <!-- 🔥 CÁC SỰ KIỆN CHÍNH -->
+    <div 
+        onclick="toggleShipEvents('${ship}')"
+        style="
+            margin-top:10px;
+            cursor:pointer;
+            font-weight:bold;
+            color:#1a73e8;
+        ">
+        📌 CÁC SỰ KIỆN CHÍNH
+    </div>
+
+    <div id="event-${ship}" style="margin-top:5px;"></div>
+
+</div>
+`;
+
+    
+
+
+    
     box.innerHTML = html || "<p style='text-align:center; padding:20px; color:#888;'>Không có dữ liệu.</p>";
     if (window.updateChartData) window.updateChartData(result, selectedShip);
 }
@@ -3509,6 +3542,61 @@ window.exportFilteredJobs = function() {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
     }, 500);
+};
+
+    
+function getShipEvents(ship) {
+    return Object.values(rawData).filter(x => {
+
+        const shipMatch =
+            (x.ship_id || "").trim().toUpperCase() === ship.trim().toUpperCase();
+
+        const eventMatch =
+            (x.job || "").toUpperCase().includes("EVENT");
+
+        return shipMatch && eventMatch;
+    });
+}
+
+window.toggleShipEvents = function(ship) {
+
+    const box = document.getElementById("event-" + ship);
+
+    // 👉 Nếu đang mở → đóng
+    if (box.innerHTML.trim() !== "") {
+        box.innerHTML = "";
+        return;
+    }
+
+    const events = getShipEvents(ship);
+
+    let html = "";
+
+    if (events.length === 0) {
+        html = `<div class="empty">Không có sự kiện</div>`;
+    } else {
+
+        html += `
+        <table style="width:100%; border-collapse:collapse; margin-top:5px;">
+            <tr style="background:#f1f3f4;">
+                <th style="width:120px;">Ngày</th>
+                <th>Các sự kiện</th>
+            </tr>
+        `;
+
+        events.forEach(e => {
+            html += `
+            <tr>
+                <td style="text-align:center;">${e.date || "-"}</td>
+                <td>${(e.job || "").replace(/.*EVENT[:\-]*/i, "").trim()}</td>
+            </tr>
+            `;
+        });
+
+        html += "</table>";
+    }
+
+    box.innerHTML = html;
 };
 
     

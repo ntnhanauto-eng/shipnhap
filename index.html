@@ -2070,20 +2070,21 @@ window.renderSummaryDetail = function(selectedShip) {
 
 
          
-    html += `
+   let safeShip = ship.replace(/\s/g, "_");
+
+html += `
 <div class="ship-report">
-  <div 
-        onclick="toggleShipEvents('${ship}')"
-        style="
-            margin-top:10px;
-            cursor:pointer;
-            font-weight:bold;
-            color:#1a73e8;
-        ">
+
+    <!-- nội dung cũ của bạn -->
+    ...
+
+    <!-- 🔥 EVENT -->
+    <div onclick="toggleShipEvents('${ship}')"
+         style="margin-top:10px; cursor:pointer; font-weight:bold; color:#1a73e8;">
         📌 CÁC SỰ KIỆN CHÍNH
     </div>
 
-    <div id="event-${ship}" style="margin-top:5px;"></div>
+    <div id="event-${safeShip}"></div>
 
 </div>
 `;
@@ -3540,25 +3541,28 @@ window.exportFilteredJobs = function() {
 };
 
     
+// ===== EVENT SYSTEM =====
+
+// 🔹 Lấy EVENT theo tàu
 function getShipEvents(ship) {
     return Object.values(rawData).filter(x => {
-
-        const shipMatch =
-            (x.ship_id || "").trim().toUpperCase() === ship.trim().toUpperCase();
-
-        const eventMatch =
-            (x.job || "").toUpperCase().includes("EVENT");
-
-        return shipMatch && eventMatch;
+        return (
+            (x.ship_id || "").trim().toUpperCase() === ship.trim().toUpperCase() &&
+            (x.job || "").toUpperCase().includes("EVENT")
+        );
     });
 }
 
+// 🔹 Toggle hiển thị EVENT
 window.toggleShipEvents = function(ship) {
 
-    const box = document.getElementById("event-" + ship);
+    const safeShip = ship.replace(/\s/g, "_");
+    const box = document.getElementById("event-" + safeShip);
 
-    // 👉 Nếu đang mở → đóng
-    if (box.innerHTML.trim() !== "") {
+    if (!box) return;
+
+    // 👉 nếu đang mở → đóng
+    if (box.innerHTML !== "") {
         box.innerHTML = "";
         return;
     }
@@ -3568,8 +3572,11 @@ window.toggleShipEvents = function(ship) {
     let html = "";
 
     if (events.length === 0) {
-        html = `<div class="empty">Không có sự kiện</div>`;
+        html = `<div style="color:#999;">Không có sự kiện</div>`;
     } else {
+
+        // 🔥 sort mới nhất lên trên
+        events.sort((a,b) => new Date(b.date) - new Date(a.date));
 
         html += `
         <table style="width:100%; border-collapse:collapse; margin-top:5px;">
@@ -3593,7 +3600,6 @@ window.toggleShipEvents = function(ship) {
 
     box.innerHTML = html;
 };
-
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

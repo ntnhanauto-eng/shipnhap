@@ -1059,50 +1059,6 @@ button {
 .job-filter-bar button:hover {
     background: #1558b0;
 }    
-
- .event-toggle {
-    margin-top: 5px;
-    padding: 6px 10px;
-    background: #f1f3f4;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 13px;
-    color: #1a73e8;
-    font-weight: 500;
-}
-
-.event-toggle:hover {
-    background: #e8f0fe;
-}
-
-.event-box {
-    margin-top: 5px;
-    margin-bottom: 10px;
-}
-
-.event-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 13px;
-}
-
-.event-table th {
-    background: #1a73e8;
-    color: white;
-    padding: 6px;
-    text-align: center;
-}
-
-.event-table td {
-    border: 1px solid #ddd;
-    padding: 6px;
-}
-
-.event-table tr:nth-child(even) {
-    background: #f9f9f9;
-}
-
-
         
     </style>
 </head>
@@ -2108,18 +2064,8 @@ window.renderSummaryDetail = function(selectedShip) {
                 <div style="font-size: 12px; color: #666; margin-top: 8px;">
                     <b>📋 Hạng mục đã kiểm tra:</b> ${checkedItems}
                 </div>
-                 
             </div>
-
         </div>`;
-
-       html += `
-          <div class="event-toggle" onclick="toggleEvent('${ship}')">
-         📌 CÁC SỰ KIỆN CHÍNH
-        </div>
-       <div id="event-${ship}" class="event-box"></div>
-       `;
-
     });
 
     box.innerHTML = html || "<p style='text-align:center; padding:20px; color:#888;'>Không có dữ liệu.</p>";
@@ -3565,61 +3511,6 @@ window.exportFilteredJobs = function() {
     }, 500);
 };
 
-window.toggleEvent = function(ship) {
-
-    const box = document.getElementById("event-" + ship);
-
-    // 👉 nếu đang mở → đóng
-    if (box.innerHTML.trim() !== "") {
-        box.innerHTML = "";
-        return;
-    }
-
-    // 👉 lọc dữ liệu EVENT
-   const events = Object.values(rawData).filter(x => {
-    const shipMatch =
-        (x.ship_id || "").trim().toUpperCase() === ship.trim().toUpperCase();
-
-    const eventMatch =
-        (x.job || "").toUpperCase().includes("EVENT");
-
-    return shipMatch && eventMatch;
-});
-
-    if (events.length === 0) {
-        box.innerHTML = `<div class="empty">Không có sự kiện</div>`;
-        return;
-    }
-
-    // 👉 sắp xếp theo ngày mới nhất
-    events.sort((a, b) => new Date(b.date) - new Date(a.date));
-
-    let html = `
-<table class="event-table">
-<tr>
-    <th>Ngày</th>
-    <th>Sự kiện</th>
-</tr>
-`;
-
-    events.forEach(x => {
-
-        let jobText = x.job.replace(/\(EVENT\)/gi, "").trim();
-
-        html += `
-<tr>
-    <td>${x.date}</td>
-    <td>${jobText}</td>
-</tr>
-`;
-    });
-
-    html += `</table>`;
-
-    box.innerHTML = html;
-};
-
-    
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

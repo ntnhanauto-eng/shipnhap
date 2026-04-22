@@ -1283,7 +1283,6 @@ button {
         </select>
     </div>
 
-       
     <div class="admin-only" style="background: #f9f9f9; padding: 10px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #ddd;">
         <p style="margin-top:0; font-weight:bold;">➕ Thêm/Sửa công việc:</p>
         <div class="flex">
@@ -1323,7 +1322,7 @@ button {
         <button onclick="saveJobData()" id="btnSaveJob" style="background: #28a745;">💾 Lưu dữ liệu</button>
     </div>
 
-   
+    
     <div class="table-wrap">
 
    <div style="display:flex; gap:10px; margin-bottom:10px; flex-wrap:wrap;">
@@ -2038,8 +2037,6 @@ window.renderSummaryDetail = function(selectedShip) {
             if (d.length === 3) statusText += ` - ${d[2]}/${d[1]}/${d[0]}`;
         }
 
-         let safeShip = ship.replace(/\s/g, "_");
-           
         html += `
         <div style="background: #fff; border: 1px solid #eee; border-radius: 12px; padding: 15px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
@@ -2068,15 +2065,6 @@ window.renderSummaryDetail = function(selectedShip) {
                     <b>📋 Hạng mục đã kiểm tra:</b> ${checkedItems}
                 </div>
             </div>
-
-            
-            <div onclick="toggleShipEvents('${ship}')"
-         style="margin-top:10px; cursor:pointer; font-weight:bold; color:#1a73e8;">
-        📌 CÁC SỰ KIỆN CHÍNH
-    </div>
-    <div id="event-${safeShip}"></div>
-
-    
         </div>`;
     });
 
@@ -3522,72 +3510,7 @@ window.exportFilteredJobs = function() {
         URL.revokeObjectURL(url);
     }, 500);
 };
-function getShipEvents(ship) {
 
-    return Object.values(rawData).filter(x => {
-
-        // lọc đúng tàu
-        const shipMatch =
-            (x.ship_id || "").trim().toUpperCase() === ship.trim().toUpperCase();
-
-        // lọc có chữ EVENT
-        const eventMatch =
-            (x.job || "").toUpperCase().includes("EVENT");
-
-        return shipMatch && eventMatch;
-    });
-}
-    window.toggleShipEvents = function(ship) {
-
-    const safeShip = ship.replace(/\s/g, "_");
-    const box = document.getElementById("event-" + safeShip);
-
-    if (!box) return;
-
-    // 👉 nếu đang mở → đóng
-    if (box.innerHTML !== "") {
-        box.innerHTML = "";
-        return;
-    }
-
-    const events = getShipEvents(ship);
-
-    let html = "";
-
-    if (events.length === 0) {
-        html = `<div style="color:#999;">Không có sự kiện</div>`;
-    } else {
-
-        // 🔥 sắp xếp mới nhất trước
-        events.sort((a,b) => new Date(b.date) - new Date(a.date));
-
-        html += `
-        <table style="width:100%; border-collapse:collapse; margin-top:5px;">
-            <tr style="background:#f1f3f4;">
-                <th style="width:120px;">Ngày</th>
-                <th>Các sự kiện</th>
-            </tr>
-        `;
-
-        events.forEach(e => {
-
-            let content = (e.job || "")
-                .replace(/.*EVENT[:\-]*/i, "")
-                .trim();
-
-            html += `
-            <tr>
-                <td style="text-align:center;">${e.date || "-"}</td>
-                <td>${content}</td>
-            </tr>
-            `;
-        });
-
-        html += "</table>";
-    }
-
-    box.innerHTML = html;
-};
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

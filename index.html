@@ -2038,15 +2038,16 @@ window.renderSummaryDetail = function(selectedShip) {
         }
 
         html += `
-    <div class="ship-row"
-         onclick="toggleSummaryShip('${ship}')"
-         style="cursor:pointer; font-weight:bold; margin-top:10px;">
-        🚢 ${ship}
-    </div>
-
-    <div id="summary-${ship}"
-         style="display:none; padding:10px 0 15px 10px;"></div>
-    
+        <div style="background: #fff; border: 1px solid #eee; border-radius: 12px; padding: 15px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+                <div>
+                    <b style="font-size: 18px; color: #1a73e8;">🚢 Tàu: ${s}</b>
+                    <span style="background: #f1f3f4; padding: 2px 8px; border-radius: 4px; font-size: 12px; margin-left: 5px;">${shipInfo.group || "-"}</span>
+                </div>
+                <span style="font-size: 11px; font-weight: bold; color: ${isDone ? '#188038' : '#e67e22'}">
+                    ${statusText}
+                </span>
+            </div>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px; background: #fafafa; padding: 10px; border-radius: 8px;">
                 <div>👷 Tổng nhân công: <b>${totalWorkers.toLocaleString('de-DE')} lượt</b></div>
@@ -3107,122 +3108,33 @@ window.toggleShipDetail = function(ship) {
 });
 
     // 👉 render
-   let html = "";
-
-// ===== 1. NHÂN CÔNG =====
-if (result.length === 0) {
-    html += `<div class="empty">Không có dữ liệu hôm nay</div>`;
-} else {
-
-    let total = 0;
-
-    result.forEach(([id, x]) => {
-
-        total += Number(x.workers || 0);
-
-        let jobText = (x.job || "").replace(/PLAN:/gi, "").trim();
-
-        html += `
-            <div class="detail-row">
-                👷 ${x.workers} người — ${jobText}
-            </div>
-        `;
-    });
-
-    html += `<div class="detail-total">Tổng: ${total} người</div>`;
-}
-
-box.innerHTML = html;
-
-// ===== 2. EVENT =====
-const events = Object.values(rawData).filter(x => {
-
-    const shipMatch =
-        (x.ship_id || "").trim().toUpperCase() === ship.trim().toUpperCase();
-
-    const eventMatch =
-        (x.job || "").toUpperCase().includes("EVENT");
-
-    return shipMatch && eventMatch;
-});
-
-html += `
-<div style="margin-top:10px;">
-    <div onclick="toggleEvent('${ship}')"
-        style="cursor:pointer; font-weight:bold; color:#1a73e8;">
-        📌 CÁC SỰ KIỆN CHÍNH (${events.length})
-    </div>
-
-    <div id="event-${ship}" style="display:none; margin-top:8px;"></div>
-</div>
-`;
-
-box.innerHTML = html;
-}
-
-
-window.toggleEvent = function(ship){
-
-    const box = document.getElementById("event-" + ship);
-
-    // đóng nếu đang mở
-    if (box.style.display === "block") {
-        box.style.display = "none";
-        return;
-    }
-
-    // lọc event
-    const events = Object.values(rawData).filter(x => {
-
-        const shipMatch =
-            (x.ship_id || "").trim().toUpperCase() === ship.trim().toUpperCase();
-
-        const eventMatch =
-            (x.job || "").toUpperCase().includes("EVENT");
-
-        return shipMatch && eventMatch;
-    });
-
-    // render bảng
     let html = "";
 
-    if(events.length === 0){
-        html = `<div class="empty">Không có sự kiện</div>`;
+    if (result.length === 0) {
+        html = `<div class="empty">Không có dữ liệu hôm nay</div>`;
     } else {
 
-        html = `
-        <table style="width:100%; border-collapse:collapse; font-size:13px;">
-            <tr style="background:#f1f3f4;">
-                <th style="padding:6px; border:1px solid #ddd;">Ngày</th>
-                <th style="padding:6px; border:1px solid #ddd;">Sự kiện</th>
-            </tr>
-        `;
+        let total = 0;
 
-        events.forEach(x => {
+        result.forEach(([id, x]) => {
 
-            let job = (x.job || "").replace(/\(EVENT\)/gi, "").trim();
+            total += Number(x.workers || 0);
+
+            let jobText = (x.job || "").replace(/PLAN:/gi, "").trim();
 
             html += `
-            <tr>
-                <td style="padding:6px; border:1px solid #ddd; text-align:center;">
-                    ${x.date || "-"}
-                </td>
-                <td style="padding:6px; border:1px solid #ddd;">
-                    ${job}
-                </td>
-            </tr>
+                <div class="detail-row">
+                    👷 ${x.workers} người — ${jobText}
+                </div>
             `;
         });
 
-        html += "</table>";
+        html += `<div class="detail-total">Tổng: ${total} người</div>`;
     }
 
     box.innerHTML = html;
-    box.style.display = "block";
 }
-
-
-    
+                                 
 
     function getChecklistWarnings() {
     let warnings = [];
@@ -3370,7 +3282,7 @@ window.renderJobList = function() {
             options += `<option value="${shipId}">${shipId}</option>`;
         }
     });
-};
+
    window.filterJobList = function() {
     renderJobList();
 };
@@ -3453,7 +3365,7 @@ const filteredJobs = Object.entries(jobsData).filter(([id, j]) => {
 </tr>`;
 });
       }   
-   
+    }
     document.getElementById("jobListContent").innerHTML = html;
 };
 

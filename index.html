@@ -3109,7 +3109,10 @@ window.toggleChecklistEvent = function(ship){
         html += `<div class="empty">Không có EVENT</div>`;
     } else {
         events.slice(0,7).forEach(e => {
-            let jobText = (e.job || "").replace(/PLAN:/gi,"").trim();
+            let jobText = (e.job || "")
+    .replace(/PLAN:/gi, "")
+    .replace(/EVENT:?/gi, "")   // ✅ BỎ EVENT
+    .trim();
 
             html += `
                 <div style="padding:4px 0; border-bottom:1px dashed #eee;">

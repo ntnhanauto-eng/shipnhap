@@ -2037,30 +2037,35 @@ window.renderSummaryDetail = function(selectedShip) {
             if (d.length === 3) statusText += ` - ${d[2]}/${d[1]}/${d[0]}`;
         }
 
-      html += `
-<div style="border-bottom:1px solid #ddd; padding:8px 0;">
+        html += `
+        <div style="background: #fff; border: 1px solid #eee; border-radius: 12px; padding: 15px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+                <div>
+                    <b style="font-size: 18px; color: #1a73e8;">🚢 Tàu: ${s}</b>
+                    <span style="background: #f1f3f4; padding: 2px 8px; border-radius: 4px; font-size: 12px; margin-left: 5px;">${shipInfo.group || "-"}</span>
+                </div>
+                <span style="font-size: 11px; font-weight: bold; color: ${isDone ? '#188038' : '#e67e22'}">
+                    ${statusText}
+                </span>
+            </div>
 
-    <div style="display:flex; justify-content:space-between; align-items:center;">
-        
-        <!-- TÊN TÀU -->
-        <div onclick="toggleSummaryDetail('${ship}')" style="cursor:pointer;">
-            🚢 <b>${ship}</b> (${shipsData[ship]?.group || "-"})
-        </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px; background: #fafafa; padding: 10px; border-radius: 8px;">
+                <div>👷 Tổng nhân công: <b>${totalWorkers.toLocaleString('de-DE')} lượt</b></div>
+                <div>⏱️ Tổng giờ thực tế: <b>${realHours.toLocaleString('de-DE')} giờ</b></div>
+                <div>🎯 Giờ định mức PP: <b>${savedPP.toLocaleString('de-DE')} giờ</b></div>
+                <div>📈 Hiệu quả tàu: <b style="color: ${colorClass}">${efficiency.toFixed(1)}%</b></div>
+            </div>
 
-        <!-- ICON EVENT -->
-        <div onclick="toggleEventSummary('${ship}')" style="cursor:pointer; font-size:18px;">
-            📌
-        </div>
-    </div>
-
-    <!-- DETAIL CHÍNH -->
-    <div id="detail-${ship}"></div>
-
-    <!-- EVENT -->
-    <div id="event-${ship}" style="padding-left:10px;"></div>
-
-</div>
-`;
+            <div style="margin-top: 10px;">
+                <b style="font-size: 13px;">📊 Tiến độ tàu: ${progress}%</b>
+                <div style="width: 100%; background: #eee; height: 10px; border-radius: 5px; margin-top: 4px; overflow: hidden;">
+                    <div style="width: ${progress}%; background: linear-gradient(90deg, #34a853, #1a73e8); height: 100%;"></div>
+                </div>
+                <div style="font-size: 12px; color: #666; margin-top: 8px;">
+                    <b>📋 Hạng mục đã kiểm tra:</b> ${checkedItems}
+                </div>
+            </div>
+        </div>`;
     });
 
     box.innerHTML = html || "<p style='text-align:center; padding:20px; color:#888;'>Không có dữ liệu.</p>";
@@ -3505,77 +3510,7 @@ window.exportFilteredJobs = function() {
         URL.revokeObjectURL(url);
     }, 500);
 };
-let openedEventShip = null;
 
-window.toggleEventSummary = function(ship){
-
-    const box = document.getElementById("event-" + ship);
-    if(!box) return;
-
-    // 👉 đóng nếu đang mở
-    if (box.innerHTML.trim() !== "") {
-        box.innerHTML = "";
-        openedEventShip = null;
-        return;
-    }
-
-    // 👉 đóng tàu khác
-    if (openedEventShip && openedEventShip !== ship) {
-        const old = document.getElementById("event-" + openedEventShip);
-        if (old) old.innerHTML = "";
-    }
-
-    openedEventShip = ship;
-
-    const events = Object.values(rawData)
-        .filter(x =>
-            x.ship_id === ship &&
-            x.job &&
-            x.job.toUpperCase().includes("EVENT")
-        )
-        .sort((a, b) => b.date.localeCompare(a.date)); // mới nhất lên trên
-
-    let html = `<div style="margin-top:8px;"><b>📌 SỰ KIỆN CHÍNH</b></div>`;
-
-    if(events.length === 0){
-        html += `<div class="empty">Không có EVENT</div>`;
-    } else {
-        events.slice(0,5).forEach(e => { // chỉ lấy 5 cái mới nhất
-            let jobText = (e.job || "").replace(/PLAN:/gi,"").trim();
-
-            html += `
-                <div style="padding:4px 0; color:#d93025;">
-                    📅 ${e.date} — ${jobText}
-                </div>
-            `;
-        });
-    }
-
-    box.innerHTML = html;
-};
-
-    let openedDetailShip = null;
-
-window.toggleSummaryDetail = function(ship){
-
-    const box = document.getElementById("detail-" + ship);
-    if(!box) return;
-
-    if (box.innerHTML.trim() !== "") {
-        box.innerHTML = "";
-        openedDetailShip = null;
-        return;
-    }
-
-    if (openedDetailShip && openedDetailShip !== ship) {
-        const old = document.getElementById("detail-" + openedDetailShip);
-        if (old) old.innerHTML = "";
-    }
-
-    openedDetailShip = ship;
-
-    box.innerHTML = `<div style="color:#666;">(Chi tiết tàu ở đây)</div>`;
-};
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

@@ -2066,6 +2066,17 @@ window.renderSummaryDetail = function(selectedShip) {
                 </div>
             </div>
         </div>`;
+
+       html += `
+<div class="event-toggle" onclick="toggleEvent('${ship}')">
+    📌 CÁC SỰ KIỆN CHÍNH
+</div>
+
+<div id="event-${ship}" class="event-box"></div>
+`;
+
+        
+        
     });
 
     box.innerHTML = html || "<p style='text-align:center; padding:20px; color:#888;'>Không có dữ liệu.</p>";

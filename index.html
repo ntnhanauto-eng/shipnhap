@@ -3108,33 +3108,122 @@ window.toggleShipDetail = function(ship) {
 });
 
     // 👉 render
+   let html = "";
+
+// ===== 1. NHÂN CÔNG =====
+if (result.length === 0) {
+    html += `<div class="empty">Không có dữ liệu hôm nay</div>`;
+} else {
+
+    let total = 0;
+
+    result.forEach(([id, x]) => {
+
+        total += Number(x.workers || 0);
+
+        let jobText = (x.job || "").replace(/PLAN:/gi, "").trim();
+
+        html += `
+            <div class="detail-row">
+                👷 ${x.workers} người — ${jobText}
+            </div>
+        `;
+    });
+
+    html += `<div class="detail-total">Tổng: ${total} người</div>`;
+}
+
+---
+
+// ===== 2. EVENT =====
+const events = Object.values(rawData).filter(x => {
+
+    const shipMatch =
+        (x.ship_id || "").trim().toUpperCase() === ship.trim().toUpperCase();
+
+    const eventMatch =
+        (x.job || "").toUpperCase().includes("EVENT");
+
+    return shipMatch && eventMatch;
+});
+
+html += `
+<div style="margin-top:10px;">
+    <div onclick="toggleEvent('${ship}')"
+        style="cursor:pointer; font-weight:bold; color:#1a73e8;">
+        📌 CÁC SỰ KIỆN CHÍNH (${events.length})
+    </div>
+
+    <div id="event-${ship}" style="display:none; margin-top:8px;"></div>
+</div>
+`;
+
+box.innerHTML = html;
+}
+
+
+window.toggleEvent = function(ship){
+
+    const box = document.getElementById("event-" + ship);
+
+    // đóng nếu đang mở
+    if (box.style.display === "block") {
+        box.style.display = "none";
+        return;
+    }
+
+    // lọc event
+    const events = Object.values(rawData).filter(x => {
+
+        const shipMatch =
+            (x.ship_id || "").trim().toUpperCase() === ship.trim().toUpperCase();
+
+        const eventMatch =
+            (x.job || "").toUpperCase().includes("EVENT");
+
+        return shipMatch && eventMatch;
+    });
+
+    // render bảng
     let html = "";
 
-    if (result.length === 0) {
-        html = `<div class="empty">Không có dữ liệu hôm nay</div>`;
+    if(events.length === 0){
+        html = `<div class="empty">Không có sự kiện</div>`;
     } else {
 
-        let total = 0;
+        html = `
+        <table style="width:100%; border-collapse:collapse; font-size:13px;">
+            <tr style="background:#f1f3f4;">
+                <th style="padding:6px; border:1px solid #ddd;">Ngày</th>
+                <th style="padding:6px; border:1px solid #ddd;">Sự kiện</th>
+            </tr>
+        `;
 
-        result.forEach(([id, x]) => {
+        events.forEach(x => {
 
-            total += Number(x.workers || 0);
-
-            let jobText = (x.job || "").replace(/PLAN:/gi, "").trim();
+            let job = (x.job || "").replace(/\(EVENT\)/gi, "").trim();
 
             html += `
-                <div class="detail-row">
-                    👷 ${x.workers} người — ${jobText}
-                </div>
+            <tr>
+                <td style="padding:6px; border:1px solid #ddd; text-align:center;">
+                    ${x.date || "-"}
+                </td>
+                <td style="padding:6px; border:1px solid #ddd;">
+                    ${job}
+                </td>
+            </tr>
             `;
         });
 
-        html += `<div class="detail-total">Tổng: ${total} người</div>`;
+        html += "</table>";
     }
 
     box.innerHTML = html;
+    box.style.display = "block";
 }
-                                 
+
+
+    
 
     function getChecklistWarnings() {
     let warnings = [];

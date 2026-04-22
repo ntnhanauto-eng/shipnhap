@@ -1311,6 +1311,33 @@ button {
 
     
     <div class="table-wrap">
+
+   <div style="display:flex; gap:10px; margin-bottom:10px; flex-wrap:wrap;">
+
+    <!-- 🔎 TẦNG 1: LOẠI MISTAKE -->
+    <select id="filterMistake" onchange="filterJobList()">
+        <option value="">-- Tất cả loại mistake --</option>
+        <option value="DESIGN MISTAKE">Design mistake</option>
+        <option value="MATERIAL MISTAKE">Material mistake</option>
+        <option value="MAKER MISTAKE">Maker mistake</option>
+        <option value="PRODUCTION MISTAKE">Production mistake</option>
+        <option value="PRE MISTAKE">Pre mistake</option>
+        <option value="MATERIAL DELAY">Material delay</option>
+        <option value="KHÁC">Khác</option>
+    </select>
+
+    <!-- 🔎 TẦNG 2: TRẠNG THÁI -->
+    <select id="filterJobStatus" onchange="filterJobList()">
+        <option value="">-- Tất cả trạng thái --</option>
+        <option value="pending">⚪ Chưa làm</option>
+        <option value="doing">🔴 Đang làm</option>
+        <option value="done">🟢 Đã xong</option>
+    </select>
+
+</div>
+
+
+        
     <table id="jobTable">
         <thead>
             <tr>
@@ -2073,71 +2100,7 @@ window.renderSummaryDetail = function(selectedShip) {
     // 👉 update chart
     updateChartData(data, ship);
 }
-/*
-function renderSummaryDetail(ship) {
-    const box = document.getElementById("summaryDetail");
-    const result = window.summaryDataCache;
 
-    let html = "";
-
-    Object.keys(result).forEach(s => {
-        if (ship !== "all" && s !== ship) return;
-
-        let key = s.replace(/\s/g, '_');
-        let savedPP = ppData[key]?.hours || 0;
-        let realHours = result[s].totalWorkers * 8;
-
-        let efficiency = 0;
-        if (realHours > 0) {
-            efficiency = (savedPP / realHours) * 100;
-        }
-        
-        let progress = progressData[key]?.percent || 0;
-        let checkedItems = progressData[key]?.items || [];
-        let checkedText = checkedItems.length > 0 ? checkedItems.join(", ") : "Chưa có";
-
-        let color = "red";
-        if (efficiency >= 100) color = "green";
-        else if (efficiency >= 70) color = "orange";
-
-        // --- XỬ LÝ HIỂN THỊ TRẠNG THÁI VÀ NGÀY BÀN GIAO ---
-        let shipInfo = shipsData[s] || {};
-        let group = shipInfo.group || "-";
-        let isDone = shipInfo.status === "done";
-        
-        let statusText = isDone ? "Đã bàn giao" : "Đang làm";
-        let statusColor = isDone ? "#188038" : "#1a73e8"; // Xanh lá nếu xong, xanh dương nếu đang làm
-        
-        // Chỉ hiện ngày bàn giao nếu tàu đã bàn giao và có dữ liệu ngày
-        let deliveryDateText = "";
-        if (isDone && shipInfo.deliveryDate) {
-            // Chuyển định dạng YYYY-MM-DD sang DD/MM/YYYY cho dễ nhìn
-            const d = shipInfo.deliveryDate.split("-");
-            const formattedDate = (d.length === 3) ? `${d[2]}/${d[1]}/${d[0]}` : shipInfo.deliveryDate;
-            deliveryDateText = ` - ${formattedDate}`;
-        }
-
-        html += `
-        <div class="summary-item">
-            <div style="font-size: 15px; margin-bottom: 8px;">
-                <b style="color: #333;">🚢 Tàu: ${s} (${group})</b> 
-                <span style="color: ${statusColor}; font-weight: bold;">
-                    - ${statusText}${deliveryDateText}
-                </span>
-            </div>
-            <div style="padding-left: 15px; line-height: 1.6;">
-                - Tổng nhân công: <b>${result[s].totalWorkers}</b> lượt người<br>
-                - Tổng giờ thực tế: <b>${realHours.toLocaleString()}</b> giờ<br>
-                - Giờ định mức PP: <b>${savedPP.toLocaleString()}</b> giờ<br>
-                - Hiệu quả tàu: <b style="color:${color}">${efficiency.toFixed(1)} %</b><br>
-                - Tiến độ thực tế: <b style="color:#1a73e8">${progress} %</b><br>
-                - Các hạng mục đã kiểm tra: <b>${checkedText}</b>
-            </div>
-        </div>`;
-    });
-
-    box.innerHTML = html;
-} */
 
     function renderSummaryChart(result){
         Chart.register(ChartDataLabels);
@@ -3304,6 +3267,11 @@ window.renderJobList = function() {
             options += `<option value="${shipId}">${shipId}</option>`;
         }
     });
+
+   window.filterJobList = function() {
+    renderJobList();
+};
+
     
     viewSelect.innerHTML = options;
     inputSelect.innerHTML = options;
@@ -3320,7 +3288,22 @@ window.renderJobList = function() {
         html = "<tr><td colspan='8' style='text-align:center; padding:20px; color:#888;'>👉 Vui lòng chọn một tàu đang thi công để xem công việc tồn đọng.</td></tr>";
     } else {
         // Lọc dữ liệu công việc của tàu được chọn
-        const filteredJobs = Object.entries(jobsData).filter(([id, j]) => j.ship === selectedShip);
+       const typeFilter = document.getElementById("filterMistake")?.value || "";
+const statusFilter = document.getElementById("filterJobStatus")?.value || "";
+
+const filteredJobs = Object.entries(jobsData).filter(([id, j]) => {
+
+    // lọc theo tàu
+    if (j.ship !== selectedShip) return false;
+
+    // lọc theo LOẠI
+    if (typeFilter && (j.type || "").toUpperCase() !== typeFilter.toUpperCase()) return false;
+
+    // lọc theo TRẠNG THÁI
+    if (statusFilter && (j.status || "pending") !== statusFilter) return false;
+
+    return true;
+});
 
         if (filteredJobs.length === 0) {
             html = `<tr><td colspan='8' style='text-align:center; padding:20px;'>Tàu <b>${selectedShip}</b> hiện không có công việc tồn đọng.</td></tr>`;

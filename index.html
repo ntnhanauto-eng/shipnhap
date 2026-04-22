@@ -1046,6 +1046,19 @@ button {
     overflow-y: auto;
     border: 1px solid #ddd;
 }
+
+    .job-filter-bar button {
+    padding: 6px 12px;
+    border: none;
+    background: #1a73e8;
+    color: white;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.job-filter-bar button:hover {
+    background: #1558b0;
+}    
         
     </style>
 </head>
@@ -1333,7 +1346,7 @@ button {
         <option value="doing">🔴 Đang làm</option>
         <option value="done">🟢 Đã xong</option>
     </select>
-
+<button onclick="exportFilteredJobs()">📤 Xuất Excel</button>
 </div>
 
 
@@ -3404,7 +3417,97 @@ function clearJobForm() {
     ].forEach(id => document.getElementById(id).value = "");
 }
 
+window.exportFilteredJobs = function() {
 
+    const mistakeFilter = document.getElementById("filterMistake")?.value || "";
+    const statusFilter = document.getElementById("filterJobStatus")?.value || "";
+    const selectedShip = document.getElementById("viewJobByShip").value;
+
+    // 🔥 LỌC GIỐNG renderJobList
+    const filteredJobs = Object.entries(jobsData).filter(([id, j]) => {
+
+        if (selectedShip && j.ship !== selectedShip) return false;
+
+        if (mistakeFilter && (j.type || "").toUpperCase() !== mistakeFilter) return false;
+
+        if (statusFilter && (j.status || "pending") !== statusFilter) return false;
+
+        return true;
+    });
+
+    if (filteredJobs.length === 0) {
+        alert("Không có dữ liệu để xuất!");
+        return;
+    }
+
+    let data = [];
+
+    filteredJobs.forEach(([id, j], index) => {
+        data.push({
+            "STT": index + 1,
+            "BLOCK": j.block || "",
+            "POR": j.por || "",
+            "PART NO": j.partNo || "",
+            "TÊN VẬT TƯ": j.name || "",
+            "QUANTITY": j.qty || "",
+            "LOẠI": j.type || "",
+            "VẬT TƯ VỀ": j.matDate || "",
+            "NGÀY XONG": j.doneDate || "",
+            "GHI CHÚ": j.note || "",
+            "TRẠNG THÁI":
+                j.status === "done" ? "Đã xong" :
+                j.status === "doing" ? "Đang làm" : "Chưa làm"
+        });
+    });
+
+    // ===== TẠO FILE EXCEL =====
+    let ws = XLSX.utils.json_to_sheet(data);
+
+    ws['!cols'] = [
+        { wch: 6 },
+        { wch: 10 },
+        { wch: 10 },
+        { wch: 15 },
+        { wch: 30 },
+        { wch: 10 },
+        { wch: 20 },
+        { wch: 12 },
+        { wch: 12 },
+        { wch: 25 },
+        { wch: 15 }
+    ];
+
+    let wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "JobList");
+
+    let wbout = XLSX.write(wb, {
+        bookType: "xlsx",
+        type: "array"
+    });
+
+    let blob = new Blob([wbout], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    });
+
+    let url = URL.createObjectURL(blob);
+
+    let a = document.createElement("a");
+    a.href = url;
+
+    let now = new Date();
+    let date = now.toISOString().slice(0, 10);
+    let time = now.toTimeString().slice(0, 8).replace(/:/g, "-");
+
+    a.download = `Job_Filter_${date}_${time}.xlsx`;
+
+    document.body.appendChild(a);
+    a.click();
+
+    setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }, 500);
+};
 
     
 </script>

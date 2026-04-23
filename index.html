@@ -3590,6 +3590,12 @@ window.exportFilteredJobs = function() {
     
 function formatJobText(text, type){
 
+    // 🔥 XÓA PLAN + EVENT cũ trước
+    let cleanText = text
+        .replace(/^PLAN:\s*/i, "")
+        .replace(/\(EVENT\)$/i, "")
+        .trim();
+
     let prefix = "";
     let suffix = "";
 
@@ -3601,7 +3607,7 @@ function formatJobText(text, type){
         suffix = " (EVENT)";
     }
 
-    return prefix + text + suffix;
+    return prefix + cleanText + suffix;
 }
     
 </script>

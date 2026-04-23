@@ -600,9 +600,6 @@ input, select {
 
       
    #dashboardBox {
-    height: auto;        /* 🔥 cho phép giãn */
-    max-height: none;    /* 🔥 bỏ giới hạn */
-    overflow: visible;   /* 🔥 không chặn nội dung */
     border: 3px solid #34a853;
     border-radius: 14px;
 
@@ -611,7 +608,6 @@ input, select {
         0 0 10px rgba(52,168,83,0.2);
 
     transition: all 0.3s ease;
-   
 } 
 
 /* hiệu ứng hover cho đẹp */
@@ -732,12 +728,9 @@ input, select {
     background: #e8f0fe;
 }
 
-
-        
 .dash-detail {
-    height: auto !important;
-    max-height: none !important;
-    overflow: visible !important;
+    padding-left: 15px;
+    margin-bottom: 6px;
 }
 
 .detail-row {
@@ -1066,14 +1059,6 @@ button {
 .job-filter-bar button:hover {
     background: #1558b0;
 }    
-
-#eventChecklistPanel {
-     height: auto !important;
-    max-height: none !important;
-    overflow: visible !important;
-    transition: all 0.3s ease;
-}
-
         
     </style>
 </head>

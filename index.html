@@ -3587,22 +3587,23 @@ window.exportFilteredJobs = function() {
         URL.revokeObjectURL(url);
     }, 500);
 };
+    
 function formatJobText(text, type){
 
-    let prefix = "";
-    let suffix = "";
+    let result = text;
 
-    if(type === "PLAN" || type === "PLAN_EVENT") {
-        prefix = "PLAN: ";
+    if(type === "PLAN") {
+        result = "PLAN: " + text;
+    }
+    else if(type === "EVENT") {
+        result = text + " (EVENT)";
+    }
+    else if(type === "PLAN_EVENT") {
+        result = "PLAN: " + text + " (EVENT)";
     }
 
-    if(type === "EVENT" || type === "PLAN_EVENT") {
-        suffix = " (EVENT)";
-    }
-
-    return prefix + text + suffix;
+    return result;
 }
-
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

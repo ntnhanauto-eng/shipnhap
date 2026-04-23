@@ -1146,6 +1146,12 @@ button {
         <div class="flex">
             <input type="number" id="workers" placeholder="Số người thực hiện">
             <input type="text" id="job" placeholder="Nội dung công việc">
+            <select id="chosePlans">
+                <option value="">-- Không chọn --</option>
+                <option value="PLAN:">PLAN</option>
+                <option value="(EVENT)">EVENT</option>
+                 <option value="EO2">PLAN+EVENT</option>
+            </select>
         </div>
         <button class="btn-save" onclick="saveLog()">💾 Lưu Thông Tin</button>
     </div>

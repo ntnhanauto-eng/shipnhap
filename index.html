@@ -3614,18 +3614,21 @@ function formatJobText(rawJob, type){
 
 function formatJobText(text, type){
 
-    let prefix = "";
-    let suffix = "";
+    let result = text;
 
-    if(type === "PLAN" || type === "PLAN_EVENT") {
-        prefix = "PLAN: ";
+    if(type === "PLAN") {
+        result = "PLAN: " + text;
     }
 
-    if(type === "EVENT" || type === "PLAN_EVENT") {
-        suffix = " (EVENT)";
+    else if(type === "EVENT") {
+        result = text + " (EVENT)";
     }
 
-    return prefix + text + suffix;
+    else if(type === "PLAN_EVENT") {
+        result = "PLAN: " + text + " (EVENT)";
+    }
+
+    return result;
 }
 
 

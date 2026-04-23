@@ -3322,20 +3322,28 @@ function formatJobText(text, type) {
 window.saveJobData = function() {
     if(!isAdmin) return;
 
-    // Lấy tên gốc từ ô input
-    let rawName = document.getElementById("jobName").value;
-    // Lấy loại từ ô select (đã đổi ID thành chosePlans)
-    let typeJob = document.getElementById("chosePlans").value; 
+    // 1. Lấy dữ liệu từ giao diện
+    const ship = document.getElementById("jobShip").value;
+    const rawName = document.getElementById("jobName").value;
+    const typeJob = document.getElementById("chosePlans").value; // Lấy từ ID đã sửa ở bước 1
 
-    // Quan trọng: Gọi hàm định dạng trước khi gán vào object data
-    let finalName = formatJobText(rawName, typeJob);
+    if(!ship || !rawName) return alert("Vui lòng nhập Tàu và Tên vật tư!");
 
+    // 2. Hàm xử lý text trực tiếp bên trong để đảm bảo luôn chạy
+    let cleanName = rawName.replace(/^PLAN:\s*/gi, "").replace(/\s*\(EVENT\)$/gi, "").trim();
+    let finalName = cleanName;
+
+    if (typeJob === "PLAN") finalName = "PLAN: " + cleanName;
+    else if (typeJob === "EVENT") finalName = cleanName + " (EVENT)";
+    else if (typeJob === "PLAN_EVENT") finalName = "PLAN: " + cleanName + " (EVENT)";
+
+    // 3. Đóng gói dữ liệu
     const data = {
-        ship: document.getElementById("jobShip").value,
+        ship: ship,
         block: document.getElementById("jobBlock").value,
         por: document.getElementById("jobPor").value,
         partNo: document.getElementById("jobPartNo").value,
-        name: finalName, // <--- Dùng tên đã có định dạng ở đây
+        name: finalName, // <--- Lưu tên đã được định dạng
         qty: document.getElementById("jobQty").value,
         type: document.getElementById("jobType").value,
         matDate: document.getElementById("jobMatDate").value,
@@ -3344,20 +3352,20 @@ window.saveJobData = function() {
         status: document.getElementById("jobStatus").value || "pending"
     };
 
-    if(!data.ship || !rawName) return alert("Vui lòng nhập Tàu và Tên!");
-
+    // 4. Đẩy lên Firebase
     if(editJobId) {
         update(ref(db, "jobs/" + editJobId), data).then(() => {
             editJobId = null;
             document.getElementById("btnSaveJob").innerText = "💾 Lưu dữ liệu";
             clearJobForm();
-            // Reset ô chọn loại về mặc định
-            document.getElementById("chosePlans").value = ""; 
+            document.getElementById("chosePlans").value = ""; // Reset ô chọn
+            alert("Đã cập nhật công việc!");
         });
     } else {
         push(ref(db, "jobs"), data).then(() => {
             clearJobForm();
-            document.getElementById("chosePlans").value = "";
+            document.getElementById("chosePlans").value = ""; // Reset ô chọn
+            alert("Đã lưu công việc mới!");
         });
     }
 };

@@ -1361,8 +1361,8 @@ button {
         <label style="font-weight: bold; color: #1a73e8;">3. Chọn trạng thái:</label>
     <select id="filterJobStatus" onchange="filterJobList()">
         <option value="">-- Tất cả trạng thái --</option>
-        <option value="pending">⚪ Chưa làm</option>
-        <option value="doing">🔴 Đang làm</option>
+        <option value="pending">🔴 Chưa làm</option>
+        <option value="doing">🟡 Đang làm</option>
         <option value="done">🟢 Đã xong</option>
     </select>
 
@@ -1375,14 +1375,7 @@ button {
 
   
 
-    <!-- 🔎 TẦNG 2: TRẠNG THÁI -->
-        <label style="font-weight: bold; color: #1a73e8;">Chọn trạng thái:</label>
-    <select id="filterJobStatus" onchange="filterJobList()">
-        <option value="">-- Tất cả trạng thái --</option>
-        <option value="pending">⚪ Chưa làm</option>
-        <option value="doing">🔴 Đang làm</option>
-        <option value="done">🟢 Đã xong</option>
-    </select>
+  
 <button onclick="exportFilteredJobs()">📤 Xuất Excel</button>
 </div>
 

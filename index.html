@@ -3466,8 +3466,8 @@ const filteredJobs = Object.entries(jobsData).filter(([id, j]) => {
     <!-- 🔥 TRẠNG THÁI -->
     <td>
         <select onchange="updateJobStatus('${id}', this.value)">
-            <option value="pending" ${status==="pending"?"selected":""}>⚪ Chưa làm</option>
-            <option value="doing" ${status==="doing"?"selected":""}>🔴 Đang làm</option>
+            <option value="pending" ${status==="pending"?"selected":""}>🔴 Chưa làm</option>
+            <option value="doing" ${status==="doing"?"selected":""}> Đang làm</option>
             <option value="done" ${status==="done"?"selected":""}>🟢 Đã xong</option>
         </select>
     </td>

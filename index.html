@@ -3304,34 +3304,22 @@ window.updateShipSelectByStatus = function() {
     window.renderSummaryDetail("all"); 
 };
 
-function formatJobText(text, type){
-
-    let prefix = "";
-    let suffix = "";
-
-    if(type === "PLAN" || type === "PLAN_EVENT") {
-        prefix = "PLAN: ";
-    }
-
-    if(type === "EVENT" || type === "PLAN_EVENT") {
-        suffix = " (EVENT)";
-    }
-
-    return prefix + text + suffix;
-}
 
 
 
     
 window.saveJobData = function() {
     if(!isAdmin) return;
-
+let rawJob = document.getElementById("jobName").value;
+let typeJob = document.getElementById("jobPrefix").value;
+let finalJob = formatJobText(rawJob, typeJob);
+    
     const data = {
         ship: document.getElementById("jobShip").value,
         block: document.getElementById("jobBlock").value,   // ✅ NEW
         por: document.getElementById("jobPor").value,
         partNo: document.getElementById("jobPartNo").value, // ✅ NEW
-        name: document.getElementById("jobName").value,
+        name: finalJob,
         qty: document.getElementById("jobQty").value,       // ✅ NEW
         type: document.getElementById("jobType").value,
         matDate: document.getElementById("jobMatDate").value,
@@ -3599,6 +3587,21 @@ window.exportFilteredJobs = function() {
         URL.revokeObjectURL(url);
     }, 500);
 };
+function formatJobText(text, type){
+
+    let prefix = "";
+    let suffix = "";
+
+    if(type === "PLAN" || type === "PLAN_EVENT") {
+        prefix = "PLAN: ";
+    }
+
+    if(type === "EVENT" || type === "PLAN_EVENT") {
+        suffix = " (EVENT)";
+    }
+
+    return prefix + text + suffix;
+}
 
     
 </script>

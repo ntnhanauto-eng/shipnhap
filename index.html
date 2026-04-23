@@ -3304,7 +3304,27 @@ window.updateShipSelectByStatus = function() {
     window.renderSummaryDetail("all"); 
 };
 
+function formatJobText(text, type){
 
+    // 🔥 XÓA PLAN + EVENT cũ trước
+    let cleanText = text
+        .replace(/^PLAN:\s*/i, "")
+        .replace(/\(EVENT\)$/i, "")
+        .trim();
+
+    let prefix = "";
+    let suffix = "";
+
+    if(type === "PLAN" || type === "PLAN_EVENT") {
+        prefix = "PLAN: ";
+    }
+
+    if(type === "EVENT" || type === "PLAN_EVENT") {
+        suffix = " (EVENT)";
+    }
+
+    return prefix + cleanText + suffix;
+}
 
 
     
@@ -3588,27 +3608,7 @@ window.exportFilteredJobs = function() {
     }, 500);
 };
     
-function formatJobText(text, type){
 
-    // 🔥 XÓA PLAN + EVENT cũ trước
-    let cleanText = text
-        .replace(/^PLAN:\s*/i, "")
-        .replace(/\(EVENT\)$/i, "")
-        .trim();
-
-    let prefix = "";
-    let suffix = "";
-
-    if(type === "PLAN" || type === "PLAN_EVENT") {
-        prefix = "PLAN: ";
-    }
-
-    if(type === "EVENT" || type === "PLAN_EVENT") {
-        suffix = " (EVENT)";
-    }
-
-    return prefix + cleanText + suffix;
-}
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

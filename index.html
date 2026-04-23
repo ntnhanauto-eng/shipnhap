@@ -3590,19 +3590,18 @@ window.exportFilteredJobs = function() {
     
 function formatJobText(text, type){
 
-    let result = text;
+    let prefix = "";
+    let suffix = "";
 
-    if(type === "PLAN") {
-        result = "PLAN: " + text;
-    }
-    else if(type === "EVENT") {
-        result = text + " (EVENT)";
-    }
-    else if(type === "PLAN_EVENT") {
-        result = "PLAN: " + text + " (EVENT)";
+    if(type === "PLAN" || type === "PLAN_EVENT") {
+        prefix = "PLAN: ";
     }
 
-    return result;
+    if(type === "EVENT" || type === "PLAN_EVENT") {
+        suffix = " (EVENT)";
+    }
+
+    return prefix + text + suffix;
 }
     
 </script>

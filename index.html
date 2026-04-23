@@ -1146,8 +1146,8 @@ button {
         <div class="flex">
             <input type="number" id="workers" placeholder="Số người thực hiện">
             <input type="text" id="job" placeholder="Nội dung công việc">
-           <select id="jobPrefix">
-    <option value="">-- Không chọn --</option>
+         <select id="chosePlans">
+    <option value="">-- Loại --</option>
     <option value="PLAN">PLAN</option>
     <option value="EVENT">EVENT</option>
     <option value="PLAN_EVENT">PLAN + EVENT</option>
@@ -3304,49 +3304,37 @@ window.updateShipSelectByStatus = function() {
     window.renderSummaryDetail("all"); 
 };
 
-function formatJobText(text, type){
+// 1. Hàm định dạng text (Đảm bảo không bị cộng dồn chữ PLAN nếu nhấn lưu nhiều lần)
+function formatJobText(text, type) {
+    // Xóa các tiền tố/hậu tố cũ nếu có để tránh trùng lặp
+    let cleanText = text.replace(/^PLAN:\s*/i, "").replace(/\s*\(EVENT\)$/i, "").trim();
 
-    // 🔥 XÓA PLAN + EVENT cũ trước
-    let cleanText = text
-        
-        .trim();
-
-    let prefix = "";
-    let suffix = "";
-
-    if(type === "PLAN" || type === "PLAN_EVENT") {
-        prefix = "PLAN: ";
-    }
-
-    if(type === "EVENT" || type === "PLAN_EVENT") {
-        suffix = " (EVENT)";
-    }
-
-    return prefix + cleanText + suffix;
+    if (type === "PLAN") return "PLAN: " + cleanText;
+    if (type === "EVENT") return cleanText + " (EVENT)";
+    if (type === "PLAN_EVENT") return "PLAN: " + cleanText + " (EVENT)";
+    
+    return cleanText; // Trả về text gốc nếu không chọn loại
 }
 
-
+// 2. Cập nhật hàm lưu
 window.saveJobData = function() {
     if(!isAdmin) return;
 
-    // 🔥 LẤY TEXT + TYPE
-    let rawJob = document.getElementById("jobName").value;
-    let typeJob = document.getElementById("chosePlans").value;
+    const ship = document.getElementById("jobShip").value;
+    const rawName = document.getElementById("jobName").value;
+    const typeJob = document.getElementById("chosePlans").value; // Đã có ID này ở bước 1
 
-    // 🔥 FORMAT
-    let finalJob = formatJobText(rawJob, typeJob);
-    
-console.log("RAW:", rawJob);
-console.log("TYPE:", typeJob);
-console.log("FINAL:", finalJob);
+    if(!ship || !rawName) return alert("Vui lòng nhập Tàu và Tên vật tư!");
+
+    // Định dạng lại tên trước khi lưu vào Firebase
+    const finalName = formatJobText(rawName, typeJob);
+
     const data = {
-        ship: document.getElementById("jobShip").value,
+        ship: ship,
         block: document.getElementById("jobBlock").value,
         por: document.getElementById("jobPor").value,
         partNo: document.getElementById("jobPartNo").value,
-
-        name: finalJob,   // 🔥 QUAN TRỌNG NHẤT
-
+        name: finalName, // Lưu tên đã có PLAN/EVENT
         qty: document.getElementById("jobQty").value,
         type: document.getElementById("jobType").value,
         matDate: document.getElementById("jobMatDate").value,
@@ -3355,17 +3343,18 @@ console.log("FINAL:", finalJob);
         status: document.getElementById("jobStatus").value || "pending"
     };
 
-    if(!data.ship || !data.name) 
-        return alert("Vui lòng nhập Tàu và Tên công việc!");
-
     if(editJobId) {
         update(ref(db, "jobs/" + editJobId), data).then(() => {
             editJobId = null;
-            document.getElementById("btnSaveJob").innerText = "➕ Lưu công việc";
+            document.getElementById("btnSaveJob").innerText = "💾 Lưu dữ liệu";
             clearJobForm();
+            alert("Đã cập nhật!");
         });
     } else {
-        push(ref(db, "jobs"), data).then(() => clearJobForm());
+        push(ref(db, "jobs"), data).then(() => {
+            clearJobForm();
+            alert("Đã thêm mới!");
+        });
     }
 };
 

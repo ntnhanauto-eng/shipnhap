@@ -729,8 +729,9 @@ input, select {
 }
 
  .dash-detail {
-    max-height: 0;
-    overflow: hidden;
+    height: 500px;          /* 🔥 cho phép giãn */
+    max-height: none; 
+    overflow: auto;
     transition: max-height 0.3s ease;
 }    
 

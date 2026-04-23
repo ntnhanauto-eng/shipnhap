@@ -3336,7 +3336,10 @@ window.saveJobData = function() {
 
     // 🔥 FORMAT
     let finalJob = formatJobText(rawJob, typeJob);
-
+    
+console.log("RAW:", rawJob);
+console.log("TYPE:", typeJob);
+console.log("FINAL:", finalJob);
     const data = {
         ship: document.getElementById("jobShip").value,
         block: document.getElementById("jobBlock").value,

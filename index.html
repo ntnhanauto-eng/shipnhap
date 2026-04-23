@@ -3313,18 +3313,19 @@ window.saveJobData = function() {
     let finalJob = formatJobText(rawJob, typeJob);
 
     const data = {
-        ship: document.getElementById("jobShip").value,
-        block: document.getElementById("jobBlock").value,
-        por: document.getElementById("jobPor").value,
-        partNo: document.getElementById("jobPartNo").value,
-        name: finalJob,   // 👈 QUAN TRỌNG
-        qty: document.getElementById("jobQty").value,
-        type: document.getElementById("jobType").value,
-        matDate: document.getElementById("jobMatDate").value,
-        doneDate: document.getElementById("jobDoneDate").value,
-        note: document.getElementById("jobNote").value,
-        status: document.getElementById("jobStatus").value || "pending"
-    };
+       const data = {
+    ship: document.getElementById("jobShip").value,
+    block: document.getElementById("jobBlock").value,
+    por: document.getElementById("jobPor").value,
+    partNo: document.getElementById("jobPartNo").value,
+    name: finalJob,   // 👈 CHỖ NÀY
+    qty: document.getElementById("jobQty").value,
+    type: document.getElementById("jobType").value,
+    matDate: document.getElementById("jobMatDate").value,
+    doneDate: document.getElementById("jobDoneDate").value,
+    note: document.getElementById("jobNote").value,
+    status: document.getElementById("jobStatus").value || "pending"
+};
 }
 
     if(!data.ship || !data.name) 

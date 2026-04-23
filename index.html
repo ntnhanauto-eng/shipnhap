@@ -3327,21 +3327,25 @@ function formatJobText(text, type){
 }
 
 
-    
 window.saveJobData = function() {
     if(!isAdmin) return;
-console.log("TYPE:", document.getElementById("jobPrefix")?.value);
-let rawJob = document.getElementById("jobName").value;
-let typeJob = document.getElementById("jobPrefix").value;
-let finalJob = formatJobText(rawJob, typeJob);
-    
+
+    // 🔥 LẤY TEXT + TYPE
+    let rawJob = document.getElementById("jobName").value;
+    let typeJob = document.getElementById("chosePlans").value;
+
+    // 🔥 FORMAT
+    let finalJob = formatJobText(rawJob, typeJob);
+
     const data = {
         ship: document.getElementById("jobShip").value,
-        block: document.getElementById("jobBlock").value,   // ✅ NEW
+        block: document.getElementById("jobBlock").value,
         por: document.getElementById("jobPor").value,
-        partNo: document.getElementById("jobPartNo").value, // ✅ NEW
-        name: finalJob,
-        qty: document.getElementById("jobQty").value,       // ✅ NEW
+        partNo: document.getElementById("jobPartNo").value,
+
+        name: finalJob,   // 🔥 QUAN TRỌNG NHẤT
+
+        qty: document.getElementById("jobQty").value,
         type: document.getElementById("jobType").value,
         matDate: document.getElementById("jobMatDate").value,
         doneDate: document.getElementById("jobDoneDate").value,

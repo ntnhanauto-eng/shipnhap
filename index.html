@@ -1059,6 +1059,46 @@ button {
 .job-filter-bar button:hover {
     background: #1558b0;
 }    
+#smartCalendar {
+    margin-bottom: 12px;
+}
+
+.cal-box {
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* loại box */
+.cal-holiday {
+    background: #ffeaea;
+    color: #b00020;
+    border-left: 5px solid #d93025;
+}
+
+.cal-upcoming {
+    background: #fff4e5;
+    color: #b06000;
+    border-left: 5px solid #f9ab00;
+}
+
+.cal-plan {
+    background: #e8f0fe;
+    color: #1a73e8;
+    border-left: 5px solid #1a73e8;
+}
+
+.cal-warning {
+    background: #fdecea;
+    color: #d93025;
+    border-left: 5px solid red;
+    font-weight: bold;
+}
         
     </style>
 </head>
@@ -1080,6 +1120,7 @@ button {
     <div class="dashboard-sub" id="dashboardSub"></div>
 </div>
 
+    <div id="smartCalendar"></div>
       <h4 style="color:#1a73e8; font-weight:bold;">
     📋 NHÂN LỰC HÔM NAY:
      </h4>
@@ -1455,6 +1496,111 @@ document.getElementById("date").value = `${yyyy}-${mm}-${dd}`;
     let isFirstLoad = true;
     let jobsData = {}; // Lưu trữ danh sách công việc
     let editJobId = null; // Dùng khi sửa
+    // ===== 🌐 DATA NGÀY LỄ =====
+
+// Dương lịch
+const holidaySolar = [
+    { name: "Giải phóng miền Nam", date: "30-04" },
+    { name: "Quốc tế Lao động", date: "01-05" },
+    { name: "Quốc khánh", date: "02-09" }
+];
+
+// ⚠️ Âm lịch (tạm fix cứng)
+const holidayLunar = [
+    { name: "Giỗ tổ Hùng Vương", date: "10-03" }
+];
+
+// ===== 🔁 CHUYỂN ÂM → DƯƠNG (mock) =====
+function convertLunarToSolar(day, month, year) {
+    // ⚠️ Demo fix cứng theo năm
+    if (year === 2026 && day == 10 && month == 3) {
+        return "2026-04-26";
+    }
+    return null;
+}
+
+    function renderSmartCalendar() {
+
+    const box = document.getElementById("smartCalendar");
+    if (!box) return;
+
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const todayStr = now.toISOString().slice(0,10);
+
+    let html = "";
+
+    // ===== 1. HOLIDAY (DƯƠNG) =====
+    holidaySolar.forEach(h => {
+
+        const [d,m] = h.date.split("-");
+        const date = new Date(yyyy, m-1, d);
+        const diff = Math.ceil((date - now)/(1000*60*60*24));
+
+        if (diff === 0) {
+            html += `<div class="cal-box cal-holiday">🎉 Hôm nay: ${h.name} (${h.date})</div>`;
+        }
+        else if (diff > 0 && diff <= 7) {
+            html += `<div class="cal-box cal-upcoming">⏳ Sắp tới: ${h.name} (${h.date}) - ${diff} ngày</div>`;
+        }
+    });
+
+    // ===== 2. HOLIDAY (ÂM) =====
+    holidayLunar.forEach(h => {
+
+        const solar = convertLunarToSolar(
+            Number(h.date.split("-")[0]),
+            Number(h.date.split("-")[1]),
+            yyyy
+        );
+
+        if (!solar) return;
+
+        const date = new Date(solar);
+        const diff = Math.ceil((date - now)/(1000*60*60*24));
+
+        if (diff === 0) {
+            html += `<div class="cal-box cal-holiday">🎉 Hôm nay: ${h.name} (Âm ${h.date})</div>`;
+        }
+        else if (diff > 0 && diff <= 7) {
+            html += `<div class="cal-box cal-upcoming">⏳ Gần đến: ${h.name} (Âm ${h.date}) - ${diff} ngày</div>`;
+        }
+    });
+
+    // ===== 3. PLAN TÀU =====
+    let plans = Object.values(rawData).filter(x => 
+        (x.job || "").toUpperCase().includes("PLAN:")
+    );
+
+    plans.forEach(p => {
+
+        const date = new Date(p.date);
+        const diff = Math.ceil((date - now)/(1000*60*60*24));
+
+        if (diff >= 0 && diff <= 7) {
+
+            let isHoliday = html.includes(p.date);
+
+            let cls = isHoliday ? "cal-warning" : "cal-plan";
+
+            html += `
+            <div class="cal-box ${cls}">
+                📅 ${p.ship_id} - ${p.job.replace(/PLAN:/i,'')}
+                <span>${p.date}</span>
+            </div>
+            `;
+        }
+    });
+
+    // ===== ẨN nếu không có gì =====
+    if (!html) {
+        box.style.display = "none";
+        return;
+    }
+
+    box.style.display = "block";
+    box.innerHTML = html;
+}
     
     onValue(ref(db, "jobs"), snapshot => {
     jobsData = snapshot.val() || {};
@@ -2983,7 +3129,8 @@ html += `
 
 // 👉 render 1 lần duy nhất
 document.getElementById("dashboardSummary").innerHTML = html;
-
+        
+renderSmartCalendar();
 
     // ===== 2. NHẮC CHECKLIST CHƯA CÓ =====
  // ===== 2. PHÂN LOẠI CHECKLIST =====

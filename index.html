@@ -1295,12 +1295,7 @@ button {
 <div id="jobManagerBox" class="card" style="display:none; margin-top:15px;">
     <h4>📋 CÔNG VIỆC CÒN LẠI TỪ GIAI ĐOẠN TRƯỚC</h4>
     
-    <div style="margin-bottom: 15px; background: #e8f0fe; padding: 10px; border-radius: 8px;">
-        <label style="font-weight: bold; color: #1a73e8;">🚢 Chọn tàu để xem công việc:</label>
-        <select id="viewJobByShip" onchange="renderJobList()">
-            <option value="">-- Chọn tàu --</option>
-        </select>
-    </div>
+   
 
     <div class="admin-only" style="background: #f9f9f9; padding: 10px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #ddd;">
         <p style="margin-top:0; font-weight:bold;">➕ Thêm/Sửa công việc:</p>
@@ -1341,6 +1336,12 @@ button {
         <button onclick="saveJobData()" id="btnSaveJob" style="background: #28a745;">💾 Lưu dữ liệu</button>
     </div>
 
+     <div style="margin-bottom: 15px; background: #e8f0fe; padding: 10px; border-radius: 8px;">
+        <label style="font-weight: bold; color: #1a73e8;">🚢 Chọn tàu để xem công việc:</label>
+        <select id="viewJobByShip" onchange="renderJobList()">
+            <option value="">-- Chọn tàu --</option>
+        </select>
+    </div>
     
     <div class="table-wrap">
 

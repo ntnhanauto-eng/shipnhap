@@ -1724,36 +1724,49 @@ function renderShipManagerList() {
     });
 
     // --- CÁC HÀM CỦA BẠN (GIỮ NGUYÊN LOGIC) ---
-    window.saveLog = function(){
-        const shipVal = document.getElementById("ship").value;
-        const dateVal = document.getElementById("date").value;
-        const workerVal = document.getElementById("workers").value;
-        const jobVal = document.getElementById("job").value;
-         if (shipsData[shipVal]?.status === "done") {
+   window.saveLog = function(){
+    const shipVal = document.getElementById("ship").value;
+    const dateVal = document.getElementById("date").value;
+    const workerVal = document.getElementById("workers").value;
+    const rawJobVal = document.getElementById("job").value; // Lấy text gốc
+    const typeJob = document.getElementById("chosePlans").value; // Lấy loại PLAN/EVENT
+
+    if (shipsData[shipVal]?.status === "done") {
         alert("⚠️ Tàu này đã bàn giao, không thể nhập dữ liệu!");
         return;
     }
 
-        if(shipVal === 'all' || !dateVal || !workerVal) {
-            alert("Vui lòng nhập đầy đủ Tàu, Ngày và Số người!");
-            return;
-        }
-
-        let data = { ship_id: shipVal, date: dateVal, workers: Number(workerVal), job: jobVal,  createdAt: Date.now() };
-
-        if(editId){
-            update(ref(db, "logs/" + editId), data).then(() => {
-                editId = null;
-                alert("Cập nhật thành công!");
-                clearForm();
-            });
-        } else {
-            push(ref(db, "logs"), data).then(() => {
-                alert("Đã lưu!");
-                clearForm();
-            });
-        }
+    if(shipVal === 'all' || !dateVal || !workerVal || !rawJobVal) {
+        alert("Vui lòng nhập đầy đủ Tàu, Ngày, Số người và Công việc!");
+        return;
     }
+
+    // 🔥 QUAN TRỌNG: Gọi hàm định dạng để thêm chữ PLAN/EVENT vào nội dung công việc
+    const finalJobVal = formatJobText(rawJobVal, typeJob);
+
+    let data = { 
+        ship_id: shipVal, 
+        date: dateVal, 
+        workers: Number(workerVal), 
+        job: finalJobVal, // Lưu nội dung đã định dạng
+        createdAt: Date.now() 
+    };
+
+    if(editId){
+        update(ref(db, "logs/" + editId), data).then(() => {
+            editId = null;
+            alert("Cập nhật thành công!");
+            clearForm();
+            document.getElementById("chosePlans").value = ""; // Reset ô chọn
+        });
+    } else {
+        push(ref(db, "logs"), data).then(() => {
+            alert("Đã lưu!");
+            clearForm();
+            document.getElementById("chosePlans").value = ""; // Reset ô chọn
+        });
+    }
+}
 
     onValue(ref(db, "logs"), snapshot => {
 
@@ -3305,17 +3318,15 @@ window.updateShipSelectByStatus = function() {
 
 // 1. Hàm định dạng text (Đảm bảo không bị cộng dồn chữ PLAN nếu nhấn lưu nhiều lần)
 function formatJobText(text, type) {
-    // Bước 1: Xóa sạch chữ PLAN: hoặc (EVENT) nếu đã có trong tên
-    let cleanText = text.replace(/^PLAN:\s*/gi, "")    // Xóa "PLAN: " ở đầu
-                        .replace(/\s*\(EVENT\)$/gi, "") // Xóa " (EVENT)" ở cuối
-                        .trim();
+    if (!text) return "";
+    // Xóa sạch chữ PLAN: hoặc (EVENT) nếu lỡ tay nhập vào ô input
+    let cleanText = text.replace(/^PLAN:\s*/gi, "").replace(/\s*\(EVENT\)$/gi, "").trim();
 
-    // Bước 2: Thêm lại theo lựa chọn mới
     if (type === "PLAN") return "PLAN: " + cleanText;
     if (type === "EVENT") return cleanText + " (EVENT)";
     if (type === "PLAN_EVENT") return "PLAN: " + cleanText + " (EVENT)";
     
-    return cleanText; // Nếu không chọn gì thì trả về tên sạch
+    return cleanText;
 }
 
 // 2. Cập nhật hàm lưu

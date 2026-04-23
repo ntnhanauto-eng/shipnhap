@@ -1343,19 +1343,21 @@ button {
         </select>
     </div>
 
-      <div>
-     <select id="jobType">
-    <option value="">-- Chọn loại --</option>
-    <option value="DESIGN MISTAKE">DESIGN MISTAKE</option>
-    <option value="MATERIAL MISTAKE">MATERIAL MISTAKE</option>
-    <option value="MATERIAL DELAY">MATERIAL DELAY</option>
-    <option value="MAKER MISTAKE">MAKER MISTAKE</option>
-    <option value="PRE MISTAKE">PRE MISTAKE</option>
-    <option value="PRODUCTION MISTAKE">PRODUCTION MISTAKE</option>
-    <option value="KHÁC">KHÁC</option>
-   </select>
-     </div>
 
+      <!-- 🔎 TẦNG 1: LOẠI MISTAKE -->
+       <label style="font-weight: bold; color: #1a73e8;">Chọn loại mistakec:</label>
+    <select id="filterMistake" onchange="filterJobList()">
+        <option value="">-- Tất cả loại mistake --</option>
+        <option value="DESIGN MISTAKE">Design mistake</option>
+        <option value="MATERIAL MISTAKE">Material mistake</option>
+        <option value="MAKER MISTAKE">Maker mistake</option>
+        <option value="PRODUCTION MISTAKE">Production mistake</option>
+        <option value="PRE MISTAKE">Pre mistake</option>
+        <option value="MATERIAL DELAY">Material delay</option>
+        <option value="KHÁC">Khác</option>
+    </select>
+
+    
 
 
 

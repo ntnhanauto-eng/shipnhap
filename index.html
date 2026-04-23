@@ -600,6 +600,9 @@ input, select {
 
       
    #dashboardBox {
+    height: auto;        /* 🔥 cho phép giãn */
+    max-height: none;    /* 🔥 bỏ giới hạn */
+    overflow: visible;   /* 🔥 không chặn nội dung */
     border: 3px solid #34a853;
     border-radius: 14px;
 
@@ -608,9 +611,7 @@ input, select {
         0 0 10px rgba(52,168,83,0.2);
 
     transition: all 0.3s ease;
-    height: auto;        /* 🔥 cho phép giãn */
-    max-height: none;    /* 🔥 bỏ giới hạn */
-    overflow: visible;   /* 🔥 không chặn nội dung */
+   
 } 
 
 /* hiệu ứng hover cho đẹp */

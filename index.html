@@ -3130,7 +3130,7 @@ window.toggleChecklistEvent = function(ship){
     if(events.length === 0){
         html += `<div class="empty">Không có EVENT</div>`;
     } else {
-        events.slice(0,7).forEach(e => {
+        events.slice(0,20).forEach(e => {
             let jobText = (e.job || "")
     .replace(/PLAN:/gi, "")
     .replace(/\(EVENT\)/gi, "")   // 🔥 thêm dòng này

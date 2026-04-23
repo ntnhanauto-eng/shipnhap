@@ -3330,6 +3330,7 @@ function formatJobText(text, type){
     
 window.saveJobData = function() {
     if(!isAdmin) return;
+console.log("TYPE:", document.getElementById("jobPrefix")?.value);
 let rawJob = document.getElementById("jobName").value;
 let typeJob = document.getElementById("jobPrefix").value;
 let finalJob = formatJobText(rawJob, typeJob);

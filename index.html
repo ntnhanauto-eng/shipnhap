@@ -1145,14 +1145,7 @@ button {
 </div>
         <div class="flex">
             <input type="number" id="workers" placeholder="Số người thực hiện">
-            <input type="text" id="job" placeholder="Nhập công việc...">
-
-<select id="jobPrefix" style="margin-top:5px;">
-    <option value="">-- Không chọn --</option>
-    <option value="PLAN">PLAN:</option>
-    <option value="EVENT">(EVENT)</option>
-    <option value="PLAN_EVENT">PLAN + EVENT</option>
-</select>
+            <input type="text" id="job" placeholder="Nội dung công việc">
         </div>
         <button class="btn-save" onclick="saveLog()">💾 Lưu Thông Tin</button>
     </div>
@@ -3308,17 +3301,13 @@ window.updateShipSelectByStatus = function() {
 window.saveJobData = function() {
     if(!isAdmin) return;
 
-    let rawJob = document.getElementById("jobName").value;
-    let typeJob = document.getElementById("jobPrefix")?.value || "";
-    let finalJob = formatJobText(rawJob, typeJob);
-
     const data = {
         ship: document.getElementById("jobShip").value,
-        block: document.getElementById("jobBlock").value,
+        block: document.getElementById("jobBlock").value,   // ✅ NEW
         por: document.getElementById("jobPor").value,
-        partNo: document.getElementById("jobPartNo").value,
-        name: finalJob,
-        qty: document.getElementById("jobQty").value,
+        partNo: document.getElementById("jobPartNo").value, // ✅ NEW
+        name: document.getElementById("jobName").value,
+        qty: document.getElementById("jobQty").value,       // ✅ NEW
         type: document.getElementById("jobType").value,
         matDate: document.getElementById("jobMatDate").value,
         doneDate: document.getElementById("jobDoneDate").value,
@@ -3326,9 +3315,8 @@ window.saveJobData = function() {
         status: document.getElementById("jobStatus").value || "pending"
     };
 
-    if(!data.ship || !data.name) {
+    if(!data.ship || !data.name) 
         return alert("Vui lòng nhập Tàu và Tên công việc!");
-    }
 
     if(editJobId) {
         update(ref(db, "jobs/" + editJobId), data).then(() => {
@@ -3586,51 +3574,6 @@ window.exportFilteredJobs = function() {
         URL.revokeObjectURL(url);
     }, 500);
 };
-function formatJobText(rawJob, type){
-    let job = rawJob.trim();
-
-    // ❌ nếu rỗng thì thôi
-    if(!job) return "";
-
-    // 🔥 XÓA dữ liệu cũ để tránh bị lặp
-    job = job
-        .replace(/^PLAN:\s*/i, "")
-        .replace(/\(EVENT\)$/i, "")
-        .trim();
-
-    // 👉 xử lý theo lựa chọn
-    if(type === "PLAN"){
-        job = "PLAN: " + job;
-    }
-    else if(type === "EVENT"){
-        job = job + " (EVENT)";
-    }
-    else if(type === "PLAN_EVENT"){
-        job = "PLAN: " + job + " (EVENT)";
-    }
-
-    return job;
-};
-
-function formatJobText(text, type){
-
-    let result = text;
-
-    if(type === "PLAN") {
-        result = "PLAN: " + text;
-    }
-
-    else if(type === "EVENT") {
-        result = text + " (EVENT)";
-    }
-
-    else if(type === "PLAN_EVENT") {
-        result = "PLAN: " + text + " (EVENT)";
-    }
-
-    return result;
-};
-
 
     
 </script>

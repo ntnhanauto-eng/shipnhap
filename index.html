@@ -2967,17 +2967,21 @@ if (items.length === 0) {
 }
 
 html += `
-<div class="dash-row">
+<div class="dash-row" onclick="toggleShipDetail('${ship}')">
     🚢 <b style="color:${textColor}">${ship}</b> 
     <span style="color:${textColor}">(${group})</span> 
     : ${shipMap[ship]} người
 
     ${isAdmin ? `
-        <button onclick="editShipToday('${ship}')" 
-        style="margin-left:10px;">✏️</button>
+        <button 
+            onclick="event.stopPropagation(); editShipToday('${ship}')"
+            style="margin-left:10px;">
+            ✏️
+        </button>
     ` : ""}
 </div>
 
+<div id="detail-${ship}" class="dash-detail"></div>
 <div id="edit-${ship}" class="dash-detail"></div>
 `;
     });

@@ -1088,7 +1088,37 @@ button {
     color: #888;
     font-style: italic;
 }
+.job-row{
+    display: grid;
+    grid-template-columns: 110px 100px 1fr; /* ngày | tàu | nội dung */
+    gap: 6px;
+    padding: 6px 8px;
+    border-bottom: 1px dashed #eee;
+    align-items: start;
+}
 
+/* nội dung xuống dòng nhưng không phá layout */
+.job-text{
+    word-break: break-word;
+    line-height: 1.4;
+}
+
+/* zebra màu */
+.job-row:nth-child(odd){
+    background: #ffffff;
+}
+
+.job-row:nth-child(even){
+    background: #e8f0fe; /* xanh nhạt */
+}
+
+/* khi không có data */
+.job-empty{
+    padding: 6px 8px;
+    background: #fff;
+    color: #888;
+    border-radius: 6px;
+}
         
     </style>
 </head>
@@ -3251,12 +3281,13 @@ function renderUpcomingJobs(){
 
         list.forEach(item => {
 
-            html += `
-                <div class="job-row">
-                    📅 ${item.date} — 🚢 <b>${item.ship}</b><br>
-                    ${item.job}
-                </div>
-            `;
+          html += `
+    <div class="job-row">
+        <div class="job-date">📅 ${item.date}</div>
+        <div class="job-ship">🚢 ${item.ship}</div>
+        <div class="job-text">${item.job}</div>
+    </div>
+`;
         });
     }
 

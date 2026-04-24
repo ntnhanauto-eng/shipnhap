@@ -3214,14 +3214,19 @@ function renderUpcomingJobs(){
     Object.values(rawData).forEach(x => {
 
         if(!x.date || !x.ship_id || !x.job) return;
+         const jobUpper = x.job.toUpperCase();
+    const isPlan = jobUpper.includes("PLAN:");
+    const isEvent = jobUpper.includes("(EVENT)");
+
+    if (!isPlan && !isEvent) return;
 
         // lọc từ hôm nay → +7 ngày
         if (x.date >= today && x.date <= futureDate){
 
-            let jobText = x.job
-                .replace(/PLAN:/gi, "")
-                .replace(/\(EVENT\)/gi, "")
-                .trim();
+          let jobText = (x.job || "")
+    .replace(/PLAN:/gi, "")        // bỏ PLAN:
+    .replace(/\(EVENT\)/gi, "")    // bỏ (EVENT)
+    .trim();
 
             if(jobText){
                 list.push({

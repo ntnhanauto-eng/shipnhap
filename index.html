@@ -1519,7 +1519,10 @@ function convertLunarToSolar(day, month, year) {
     return null;
 }
 
-    function renderSmartCalendar() {
+   function renderSmartCalendar() {
+
+    const box = document.getElementById("smartCalendarBox");
+    if (!box) return;
 
     const today = new Date();
     today.setHours(0,0,0,0);
@@ -1554,7 +1557,6 @@ function convertLunarToSolar(day, month, year) {
         let year = today.getFullYear();
 
         let solar = convertLunarToSolar(Number(d), Number(m), year);
-
         if (!solar) return;
 
         let dObj = new Date(solar);
@@ -1568,7 +1570,7 @@ function convertLunarToSolar(day, month, year) {
         }
     });
 
-    // ===== 3. PLAN TÀU =====
+    // ===== 3. PLAN =====
     Object.values(rawData).forEach(x => {
 
         if (!x.date) return;
@@ -1591,20 +1593,21 @@ function convertLunarToSolar(day, month, year) {
     // ===== 4. SORT =====
     calendarData.sort((a, b) => new Date(a.date) - new Date(b.date));
 
-    // ===== 5. RENDER =====
-    let html = "";
-
+    // ===== 5. KHÔNG CÓ DATA → ẨN =====
     if (calendarData.length === 0) {
-        document.getElementById("smartCalendar").innerHTML = "";
+        box.style.display = "none";
+        box.innerHTML = "";
         return;
     }
+
+    // ===== 6. RENDER =====
+    let html = "";
 
     calendarData.forEach(item => {
 
         let color = "#1a73e8";
         let bg = "#e8f0fe";
 
-        // 🔴 NGÀY LỄ
         if (item.type === "holiday") {
             color = "#d93025";
             bg = "#fff";
@@ -1625,28 +1628,9 @@ function convertLunarToSolar(day, month, year) {
         `;
     });
 
-    document.getElementById("smartCalendar").innerHTML = html;
-}
-
-    // ===== ẨN nếu không có gì =====
-    if (!html) {
-        box.style.display = "none";
-        return;
-    }
-
     box.style.display = "block";
     box.innerHTML = html;
 }
-    
-    onValue(ref(db, "jobs"), snapshot => {
-    jobsData = snapshot.val() || {};
-    // Nếu bảng đang mở thì vẽ lại dữ liệu mới nhất
-    const jobBox = document.getElementById("jobManagerBox");
-    if(jobBox && jobBox.style.display === "block") {
-        renderJobList();
-    }
-});
-
     function showNotification(message) {
 
     const box = document.createElement("div");

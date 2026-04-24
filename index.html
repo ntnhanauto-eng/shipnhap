@@ -1059,46 +1059,6 @@ button {
 .job-filter-bar button:hover {
     background: #1558b0;
 }    
-#smartCalendar {
-    margin-bottom: 12px;
-}
-
-.cal-box {
-    border-radius: 10px;
-    padding: 10px 12px;
-    margin-bottom: 6px;
-    font-size: 13px;
-    font-weight: 500;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-/* loại box */
-.cal-holiday {
-    background: #ffeaea;
-    color: #b00020;
-    border-left: 5px solid #d93025;
-}
-
-.cal-upcoming {
-    background: #fff4e5;
-    color: #b06000;
-    border-left: 5px solid #f9ab00;
-}
-
-.cal-plan {
-    background: #e8f0fe;
-    color: #1a73e8;
-    border-left: 5px solid #1a73e8;
-}
-
-.cal-warning {
-    background: #fdecea;
-    color: #d93025;
-    border-left: 5px solid red;
-    font-weight: bold;
-}
         
     </style>
 </head>
@@ -1120,7 +1080,6 @@ button {
     <div class="dashboard-sub" id="dashboardSub"></div>
 </div>
 
-    <div id="smartCalendar"></div>
       <h4 style="color:#1a73e8; font-weight:bold;">
     📋 NHÂN LỰC HÔM NAY:
      </h4>
@@ -1496,137 +1455,16 @@ document.getElementById("date").value = `${yyyy}-${mm}-${dd}`;
     let isFirstLoad = true;
     let jobsData = {}; // Lưu trữ danh sách công việc
     let editJobId = null; // Dùng khi sửa
-    // ===== 🌐 DATA NGÀY LỄ =====
-
-// Dương lịch
-const holidaySolar = [
-    { name: "Giải phóng miền Nam", date: "30-04" },
-    { name: "Quốc tế Lao động", date: "01-05" },
-    { name: "Quốc khánh", date: "02-09" }
-];
-
-// ⚠️ Âm lịch (tạm fix cứng)
-const holidayLunar = [
-    { name: "Giỗ tổ Hùng Vương", date: "10-03" }
-];
-
-// ===== 🔁 CHUYỂN ÂM → DƯƠNG (mock) =====
-function convertLunarToSolar(day, month, year) {
-    // ⚠️ Demo fix cứng theo năm
-    if (year === 2026 && day == 10 && month == 3) {
-        return "2026-04-26";
+    
+    onValue(ref(db, "jobs"), snapshot => {
+    jobsData = snapshot.val() || {};
+    // Nếu bảng đang mở thì vẽ lại dữ liệu mới nhất
+    const jobBox = document.getElementById("jobManagerBox");
+    if(jobBox && jobBox.style.display === "block") {
+        renderJobList();
     }
-    return null;
-}
+});
 
-  function renderSmartCalendar() {
-
-    const today = new Date();
-    today.setHours(0,0,0,0);
-
-    const sevenDaysLater = new Date(today);
-    sevenDaysLater.setDate(today.getDate() + 7);
-
-    let calendarData = [];
-
-    // ===== 1. NGÀY LỄ DƯƠNG =====
-    holidaySolar.forEach(h => {
-
-        let [d, m] = h.date.split("-");
-        let year = today.getFullYear();
-
-        let dateStr = `${year}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
-        let dObj = new Date(dateStr);
-
-        if (dObj >= today && dObj <= sevenDaysLater) {
-            calendarData.push({
-                date: dateStr,
-                type: "holiday",
-                text: `🎉 ${h.name}`
-            });
-        }
-    });
-
-    // ===== 2. NGÀY LỄ ÂM =====
-    holidayLunar.forEach(h => {
-
-        let [d, m] = h.date.split("-");
-        let year = today.getFullYear();
-
-        let solar = convertLunarToSolar(Number(d), Number(m), year);
-
-        if (!solar) return;
-
-        let dObj = new Date(solar);
-
-        if (dObj >= today && dObj <= sevenDaysLater) {
-            calendarData.push({
-                date: solar,
-                type: "holiday",
-                text: `🎎 ${h.name}`
-            });
-        }
-    });
-
-    // ===== 3. PLAN TÀU =====
-    Object.values(rawData).forEach(x => {
-
-        if (!x.date) return;
-
-        let dObj = new Date(x.date);
-
-        if (
-            dObj >= today &&
-            dObj <= sevenDaysLater &&
-            (x.job || "").toUpperCase().includes("PLAN:")
-        ) {
-            calendarData.push({
-                date: x.date,
-                type: "plan",
-                text: `🚢 ${x.ship_id} - ${x.job.replace(/^PLAN:\s*/i, "")}`
-            });
-        }
-    });
-
-    // ===== 4. SORT =====
-    calendarData.sort((a, b) => new Date(a.date) - new Date(b.date));
-
-    // ===== 5. RENDER =====
-    let html = "";
-
-    if (calendarData.length === 0) {
-        document.getElementById("smartCalendar").innerHTML = "";
-        return;
-    }
-
-    calendarData.forEach(item => {
-
-        let color = "#1a73e8";
-        let bg = "#e8f0fe";
-
-        // 🔴 NGÀY LỄ
-        if (item.type === "holiday") {
-            color = "#d93025";
-            bg = "#fff";
-        }
-
-        html += `
-        <div style="
-            padding:6px 10px;
-            margin-bottom:5px;
-            border-radius:6px;
-            font-size:13px;
-            background:${bg};
-            color:${color};
-            border-left:4px solid ${color};
-        ">
-            <b>${item.date}</b> — ${item.text}
-        </div>
-        `;
-    });
-
-    document.getElementById("smartCalendar").innerHTML = html;
-}
     function showNotification(message) {
 
     const box = document.createElement("div");
@@ -3145,8 +2983,7 @@ html += `
 
 // 👉 render 1 lần duy nhất
 document.getElementById("dashboardSummary").innerHTML = html;
-        
-renderSmartCalendar();
+
 
     // ===== 2. NHẮC CHECKLIST CHƯA CÓ =====
  // ===== 2. PHÂN LOẠI CHECKLIST =====

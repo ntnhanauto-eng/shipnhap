@@ -2973,11 +2973,12 @@ html += `
     : ${shipMap[ship]} người
 
     ${isAdmin ? `
-        <button 
-            onclick="event.stopPropagation(); editShipToday('${ship}')"
-            style="margin-left:10px;">
-            ✏️
-        </button>
+       <button 
+    onclick="event.stopPropagation(); editShipToday('${ship}')"
+    title="Sửa"
+    style="margin-left:8px;">
+    ✏️
+</button>
     ` : ""}
 </div>
 
@@ -3690,7 +3691,12 @@ window.editShipToday = function(ship){
                     value="${x.job || ""}" 
                     style="width:60%">
 
-                <button onclick="saveEditRow('${id}')">💾</button>
+                <button 
+    onclick="saveEditRow('${id}')"
+    title="Lưu"
+    style="margin-left:5px;">
+    💾
+</button>
 
             </div>
             `;

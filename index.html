@@ -1107,6 +1107,13 @@ button {
     color: #888;
     border-radius: 6px;
 }
+.today-highlight {
+    background: #fff3cd;   /* vàng nhẹ */
+    border-left: 4px solid #f9ab00;
+    padding-left: 6px;
+}
+
+
         
     </style>
 </head>
@@ -1460,6 +1467,13 @@ button {
 
 <script type="module">
 
+    function getTodayStr() {
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+}
     
     // cài đặt web lên màn hình
   if ('serviceWorker' in navigator) {
@@ -3193,7 +3207,24 @@ window.toggleChecklistEvent = function(ship){
     if(events.length === 0){
         html += `<div class="empty">Không có EVENT</div>`;
     } else {
-        events.slice(0,20).forEach(e => {
+        const today = getTodayStr();
+
+events.slice(0,20).forEach(e => {
+
+    let isToday = e.date === today;
+
+    let jobText = (e.job || "")
+        .replace(/PLAN:/gi, "")
+        .replace(/\(EVENT\)/gi, "")
+        .trim();
+
+    html += `
+        <div class="${isToday ? 'today-highlight' : ''}"
+             style="padding:4px 0; border-bottom:1px dashed #eee;">
+            📅 ${e.date} — ${jobText}
+        </div>
+    `;
+});
             let jobText = (e.job || "")
     .replace(/PLAN:/gi, "")
     .replace(/\(EVENT\)/gi, "")   // 🔥 thêm dòng này
@@ -3269,16 +3300,18 @@ function renderUpcomingJobs(){
 
     } else {
 
-        list.forEach(item => {
+       list.forEach(item => {
 
-          html += `
-    <div class="job-row">
+    let isToday = item.date === today; // 🔥 THÊM DÒNG NÀY
+
+    html += `
+    <div class="job-row ${isToday ? 'today-highlight' : ''}">
         <div class="job-date">${item.date}</div>
         <div class="job-ship">🚢 ${item.ship}</div>
         <div class="job-text">${item.job}</div>
     </div>
 `;
-        });
+});
     }
 
     document.getElementById("dashboardJobsUpcoming").innerHTML = html;

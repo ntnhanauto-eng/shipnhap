@@ -3017,7 +3017,7 @@ html += `
 }
 
 // 👉 render 1 lần duy nhất
-document.getElementById("dashboardSummary").innerHTML = html;
+renderUpcomingJobs(html);
 
 
     // ===== 2. NHẮC CHECKLIST CHƯA CÓ =====
@@ -3142,6 +3142,7 @@ let infoHTML = `
 `;
 
 document.getElementById("dashboardInfo").innerHTML = infoHTML;
+        renderUpcomingJobs();
 }
 
 let openedChecklistShip = null;
@@ -3259,11 +3260,10 @@ window.toggleShipDetail = function(ship) {
     box.innerHTML = html;
 }
 
-function renderUpcomingJobs(){
+function renderUpcomingJobs(summaryHTML){
 
     const now = new Date();
 
-    // chuẩn yyyy-mm-dd
     const formatDate = (d) => {
         const yyyy = d.getFullYear();
         const mm = String(d.getMonth()+1).padStart(2,'0');
@@ -3273,7 +3273,6 @@ function renderUpcomingJobs(){
 
     const today = formatDate(now);
 
-    // +7 ngày
     const future = new Date();
     future.setDate(now.getDate() + 7);
     const futureDate = formatDate(future);
@@ -3284,7 +3283,6 @@ function renderUpcomingJobs(){
 
         if(!x.date || !x.ship_id || !x.job) return;
 
-        // lọc từ hôm nay → +7 ngày
         if (x.date >= today && x.date <= futureDate){
 
             let jobText = x.job
@@ -3302,20 +3300,19 @@ function renderUpcomingJobs(){
         }
     });
 
-    // sort gần → xa
     list.sort((a,b) => a.date.localeCompare(b.date));
 
-    let html = "";
+    let jobHTML = "";
 
     if(list.length === 0){
 
-        html = `<div class="job-empty">Không có công việc 7 ngày tới</div>`;
+        jobHTML = `<div class="job-empty">Không có công việc 7 ngày tới</div>`;
 
     } else {
 
         list.forEach(item => {
 
-            html += `
+            jobHTML += `
                 <div class="job-row">
                     📅 ${item.date} — 🚢 <b>${item.ship}</b><br>
                     ${item.job}
@@ -3324,10 +3321,10 @@ function renderUpcomingJobs(){
         });
     }
 
-    document.getElementById("dashboardJobsUpcoming").innerHTML = html;
-    renderUpcomingJobs();
+    // 🔥 GHÉP VÀO TRÊN NHÂN LỰC
+    document.getElementById("dashboardSummary").innerHTML =
+        jobHTML + "<hr>" + summaryHTML;
 }
-
 
     
 

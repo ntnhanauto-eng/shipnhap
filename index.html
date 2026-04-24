@@ -1519,10 +1519,7 @@ function convertLunarToSolar(day, month, year) {
     return null;
 }
 
-   function renderSmartCalendar() {
-
-    const box = document.getElementById("smartCalendar");
-    if (!box) return;
+  function renderSmartCalendar() {
 
     const today = new Date();
     today.setHours(0,0,0,0);
@@ -1557,6 +1554,7 @@ function convertLunarToSolar(day, month, year) {
         let year = today.getFullYear();
 
         let solar = convertLunarToSolar(Number(d), Number(m), year);
+
         if (!solar) return;
 
         let dObj = new Date(solar);
@@ -1570,7 +1568,7 @@ function convertLunarToSolar(day, month, year) {
         }
     });
 
-    // ===== 3. PLAN =====
+    // ===== 3. PLAN TÀU =====
     Object.values(rawData).forEach(x => {
 
         if (!x.date) return;
@@ -1593,21 +1591,20 @@ function convertLunarToSolar(day, month, year) {
     // ===== 4. SORT =====
     calendarData.sort((a, b) => new Date(a.date) - new Date(b.date));
 
-    // ===== 5. KHÔNG CÓ DATA → ẨN =====
+    // ===== 5. RENDER =====
+    let html = "";
+
     if (calendarData.length === 0) {
-        box.style.display = "none";
-        box.innerHTML = "";
+        document.getElementById("smartCalendarBox").innerHTML = "";
         return;
     }
-
-    // ===== 6. RENDER =====
-    let html = "";
 
     calendarData.forEach(item => {
 
         let color = "#1a73e8";
         let bg = "#e8f0fe";
 
+        // 🔴 NGÀY LỄ
         if (item.type === "holiday") {
             color = "#d93025";
             bg = "#fff";
@@ -1628,8 +1625,7 @@ function convertLunarToSolar(day, month, year) {
         `;
     });
 
-    box.style.display = "block";
-    box.innerHTML = html;
+    document.getElementById("smartCalendarBox").innerHTML = html;
 }
     function showNotification(message) {
 

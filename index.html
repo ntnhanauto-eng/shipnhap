@@ -1595,7 +1595,7 @@ function convertLunarToSolar(day, month, year) {
     let html = "";
 
     if (calendarData.length === 0) {
-        document.getElementById("smartCalendarBox").innerHTML = "";
+        document.getElementById("smartCalendar").innerHTML = "";
         return;
     }
 
@@ -1625,7 +1625,7 @@ function convertLunarToSolar(day, month, year) {
         `;
     });
 
-    document.getElementById("smartCalendarBox").innerHTML = html;
+    document.getElementById("smartCalendar").innerHTML = html;
 }
     function showNotification(message) {
 

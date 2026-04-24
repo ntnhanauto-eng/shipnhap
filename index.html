@@ -3218,12 +3218,13 @@ events.slice(0,20).forEach(e => {
         .replace(/\(EVENT\)/gi, "")
         .trim();
 
-    html += `
+     html += `
         <div class="${isToday ? 'today-highlight' : ''}"
              style="padding:4px 0; border-bottom:1px dashed #eee;">
             📅 ${e.date} — ${jobText}
         </div>
     `;
+
 });
             let jobText = (e.job || "")
     .replace(/PLAN:/gi, "")

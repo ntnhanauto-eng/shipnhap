@@ -3300,9 +3300,9 @@ function renderUpcomingJobs(){
 
     } else {
 
-       list.forEach(item => {
+      list.forEach(item => {
 
-    let isToday = item.date === today; // 🔥 THÊM DÒNG NÀY
+    let isToday = item.date === today;
 
     html += `
     <div class="job-row ${isToday ? 'today-highlight' : ''}">
@@ -3310,7 +3310,7 @@ function renderUpcomingJobs(){
         <div class="job-ship">🚢 ${item.ship}</div>
         <div class="job-text">${item.job}</div>
     </div>
-`;
+    `;
 });
     }
 

@@ -3211,12 +3211,13 @@ window.toggleChecklistEvent = function(ship){
 
 events.slice(0,20).forEach(e => {
 
-    let isToday = e.date === today;
+    
 
     let jobText = (e.job || "")
         .replace(/PLAN:/gi, "")
         .replace(/\(EVENT\)/gi, "")
         .trim();
+    let isToday = e.date === today;
 
      html += `
         <div class="${isToday ? 'today-highlight' : ''}"

@@ -1103,13 +1103,14 @@ button {
     line-height: 1.4;
 }
 
-/* zebra màu */
-.job-row:nth-child(odd){
-    background: #ffffff;
-}
-
-.job-row:nth-child(even){
-    background: #e8f0fe; /* xanh nhạt */
+.job-row{
+    display: grid;
+    grid-template-columns: 90px 60px 1fr;
+    gap: 6px;
+    padding: 6px 8px;
+    background: #fff; /* 🔥 luôn trắng */
+    border-bottom: 1px solid #eee; /* 🔥 nét mờ ngăn cách */
+    align-items: start;
 }
 
 /* khi không có data */

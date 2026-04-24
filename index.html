@@ -1059,7 +1059,50 @@ button {
 .job-filter-bar button:hover {
     background: #1558b0;
 }    
-        
+   .upcoming-box{
+    margin-bottom: 10px;
+}
+
+.upcoming-title{
+    font-weight: bold;
+    margin-bottom: 6px;
+    color: #1a73e8;
+}
+
+/* layout 1 hàng */
+.upcoming-row{
+    display: grid;
+    grid-template-columns: 90px 70px 1fr; /* 🔥 ngày | tàu | nội dung */
+    gap: 6px;
+    padding: 6px 8px;
+    border-bottom: 1px solid rgba(0,0,0,0.08); /* 🔥 gạch mờ */
+    align-items: start;
+}
+
+/* cột ngày + tàu không xuống dòng */
+.col-date,
+.col-ship{
+    white-space: nowrap;
+    font-size: 13px;
+}
+
+/* nội dung tự xuống dòng */
+.col-job{
+    word-break: break-word;
+    line-height: 1.4;
+}
+
+/* highlight hôm nay */
+.today-row{
+    background: #fff3cd; /* vàng nhạt */
+    border-radius: 6px;
+}
+
+/* không có data */
+.upcoming-empty{
+    padding: 6px;
+    color: #888;
+}     
     </style>
 </head>
 <body id="mainBody">
@@ -1079,7 +1122,14 @@ button {
     <h3 id="dashboardTitle">📊 Dashboard</h3>
     <div class="dashboard-sub" id="dashboardSub"></div>
 </div>
+   
+      <h4 style="color:#1a73e8; font-weight:bold;">
+    📋 SỰ KIỆN 7 NGÀY TỚI:
+     </h4>
+     <div id="upcomingList"></div>
 
+
+    
       <h4 style="color:#1a73e8; font-weight:bold;">
     📋 NHÂN LỰC HÔM NAY:
      </h4>
@@ -3107,6 +3157,7 @@ let infoHTML = `
 `;
 
 document.getElementById("dashboardInfo").innerHTML = infoHTML;
+        renderUpcomingJobs();
 }
 
 let openedChecklistShip = null;
@@ -3223,7 +3274,79 @@ window.toggleShipDetail = function(ship) {
 
     box.innerHTML = html;
 }
-                                 
+
+function renderUpcomingJobs(){
+
+    const now = new Date();
+
+    const formatDate = (d) => {
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth()+1).padStart(2,'0');
+        const dd = String(d.getDate()).padStart(2,'0');
+        return `${yyyy}-${mm}-${dd}`;
+    };
+
+    const today = formatDate(now);
+
+    const future = new Date();
+    future.setDate(now.getDate() + 7);
+    const futureDate = formatDate(future);
+
+    let list = [];
+
+    Object.values(rawData).forEach(x => {
+
+        if(!x.date || !x.ship_id || !x.job) return;
+
+        const jobUpper = x.job.toUpperCase();
+
+        // 🔥 CHỈ LẤY PLAN + EVENT
+        if(!jobUpper.includes("PLAN:") && !jobUpper.includes("(EVENT)")) return;
+
+        if (x.date >= today && x.date <= futureDate){
+
+            let jobText = x.job
+                .replace(/PLAN:/gi, "")
+                .replace(/\(EVENT\)/gi, "")
+                .trim();
+
+            if(jobText){
+                list.push({
+                    date: x.date,
+                    ship: x.ship_id,
+                    job: jobText
+                });
+            }
+        }
+    });
+
+    // sort gần → xa
+    list.sort((a,b) => a.date.localeCompare(b.date));
+
+    let html = "";
+
+    if(list.length === 0){
+        html = `<div class="upcoming-empty">Không có công việc</div>`;
+    } else {
+
+        list.forEach(item => {
+
+            const isToday = item.date === today ? "today-row" : "";
+
+            html += `
+                <div class="upcoming-row ${isToday}">
+                    <div class="col-date">${item.date}</div>
+                    <div class="col-ship">${item.ship}</div>
+                    <div class="col-job">${item.job}</div>
+                </div>
+            `;
+        });
+    }
+
+    document.getElementById("upcomingList").innerHTML = html;
+}
+
+    
 
     function getChecklistWarnings() {
     let warnings = [];

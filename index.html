@@ -3260,6 +3260,55 @@ window.toggleShipDetail = function(ship) {
     box.innerHTML = html;
 }
 
+    // ===== DANH SÁCH NGÀY LỄ =====
+const holidays = [
+    // DƯƠNG LỊCH
+    { name: "Tết Dương Lịch", date: "01-01" },
+    { name: "Giải phóng miền Nam", date: "30-04" },
+    { name: "Quốc tế Lao động", date: "01-05" },
+    { name: "Quốc khánh", date: "02-09" },
+
+    // ÂM LỊCH (fix cơ bản - có thể nâng cấp sau)
+    { name: "Tết Nguyên Đán", lunar: "01-01" },
+    { name: "Rằm tháng Giêng", lunar: "15-01" },
+    { name: "Giỗ Tổ Hùng Vương", lunar: "10-03" },
+    { name: "Trung Thu", lunar: "15-08" }
+];
+
+function getUpcomingHolidays() {
+
+    const now = new Date();
+
+    const format = (d) => {
+        const dd = String(d.getDate()).padStart(2,'0');
+        const mm = String(d.getMonth()+1).padStart(2,'0');
+        return `${dd}-${mm}`;
+    };
+
+    let result = [];
+
+    for (let i = 0; i <= 7; i++) {
+
+        let d = new Date();
+        d.setDate(now.getDate() + i);
+
+        let key = format(d);
+
+        holidays.forEach(h => {
+            if (h.date === key) {
+                result.push({
+                    name: h.name,
+                    date: d,
+                    type: i === 0 ? "today" : "upcoming"
+                });
+            }
+        });
+    }
+
+    return result;
+}
+    
+
 function renderUpcomingJobs(){
 
     const now = new Date();
@@ -3308,6 +3357,37 @@ function renderUpcomingJobs(){
     // sort gần → xa
     list.sort((a,b) => a.date.localeCompare(b.date));
 
+   // ===== HIỂN THỊ NGÀY LỄ =====
+const holidayList = getUpcomingHolidays();
+
+let holidayHTML = "";
+
+if (holidayList.length > 0) {
+
+    holidayList.forEach(h => {
+
+        const dd = String(h.date.getDate()).padStart(2,'0');
+        const mm = String(h.date.getMonth()+1).padStart(2,'0');
+
+        if (h.type === "today") {
+            holidayHTML += `
+                <div style="color:#d93025; font-weight:bold;">
+                    🎉 Hôm nay: ${h.name} (${dd}/${mm})
+                </div>
+            `;
+        } else {
+            holidayHTML += `
+                <div style="color:#d93025; font-weight:bold;">
+                    ⏳ Gần tới: ${h.name} (${dd}/${mm})
+                </div>
+            `;
+        }
+    });
+
+    holidayHTML += `<hr>`;
+}
+
+    
     let html = "";
 
     if(list.length === 0){
@@ -3328,7 +3408,7 @@ function renderUpcomingJobs(){
         });
     }
 
-    document.getElementById("upcomingList").innerHTML = html;
+    document.getElementById("upcomingList").innerHTML = holidayHTML + html;
 }
 
     

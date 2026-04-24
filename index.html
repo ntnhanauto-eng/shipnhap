@@ -1059,8 +1059,6 @@ button {
 .job-filter-bar button:hover {
     background: #1558b0;
 }    
-
-
         
     </style>
 </head>
@@ -1445,10 +1443,6 @@ document.getElementById("date").value = `${yyyy}-${mm}-${dd}`;
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
     const auth = getAuth(app);
-    onValue(ref(db, "data"), snapshot => {
-    rawData = snapshot.val() || {};
-    renderDashboard(); // 🔥 cập nhật dashboard realtime
-});
 
     let rawData = {};
     let ppData = {};
@@ -2973,23 +2967,13 @@ if (items.length === 0) {
 }
 
 html += `
-<div class="dash-row" onclick="toggleShipDetail('${ship}')">
+    <div class="dash-row" onclick="toggleShipDetail('${ship}')">
     🚢 <b style="color:${textColor}">${ship}</b> 
     <span style="color:${textColor}">(${group})</span> 
     : ${shipMap[ship]} người
-
-    ${isAdmin ? `
-       <button 
-    onclick="event.stopPropagation(); editShipToday('${ship}')"
-    title="Sửa"
-    style="margin-left:8px;">
-    ✏️
-</button>
-    ` : ""}
 </div>
 
-<div id="detail-${ship}" class="dash-detail"></div>
-<div id="edit-${ship}" class="dash-detail"></div>
+    <div id="detail-${ship}" class="dash-detail"></div>
 `;
     });
 
@@ -3650,94 +3634,6 @@ window.exportFilteredJobs = function() {
     }, 500);
 };
     
-window.editShipToday = function(ship){
-
-    const box = document.getElementById("edit-" + ship);
-
-    // toggle
-    if(box.innerHTML.trim() !== ""){
-        box.innerHTML = "";
-        return;
-    }
-
-    const now = new Date();
-    const yyyy = now.getFullYear();
-    const mm = String(now.getMonth()+1).padStart(2,'0');
-    const dd = String(now.getDate()).padStart(2,'0');
-    const today = `${yyyy}-${mm}-${dd}`;
-
-    // lấy dữ liệu hôm nay của tàu
-    const list = Object.entries(rawData).filter(([id,x]) =>
-        x.ship_id === ship &&
-        x.date === today &&
-        Number(x.workers) > 0
-    );
-
-    let html = "";
-
-    if(list.length === 0){
-        html = `<div class="empty">Không có dữ liệu</div>`;
-    } else {
-
-        list.forEach(([id,x]) => {
-
-            html += `
-            <div style="margin:6px 0; padding:6px; border:1px solid #eee; border-radius:6px;">
-
-                👷 
-                <input type="number" 
-                    id="w_${id}" 
-                    value="${x.workers}" 
-                    style="width:60px">
-
-                người —
-
-                <input type="text" 
-                    id="j_${id}" 
-                    value="${x.job || ""}" 
-                    style="width:60%">
-
-                <button 
-    onclick="saveEditRow('${id}')"
-    title="Lưu"
-    style="margin-left:5px;">
-    💾
-</button>
-
-            </div>
-            `;
-        });
-    }
-
-    box.innerHTML = html;
-}
-
-window.saveEditRow = function(id){
-
-    let workers = document.getElementById("w_" + id).value;
-    let job = document.getElementById("j_" + id).value;
-
-    if(workers === ""){
-        alert("Nhập số người!");
-        return;
-    }
-
-    update(ref(db, "data/" + id), {
-        workers: Number(workers),
-        job: job
-    })
-    .then(() => {
-        alert("✅ Đã cập nhật!");
-
-        // 🔥 THÊM DÒNG NÀY
-        renderDashboard();
-
-    })
-    .catch(err => {
-        alert("❌ Lỗi: " + err.message);
-    });
-}
-
 
     
 </script>

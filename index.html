@@ -1059,61 +1059,6 @@ button {
 .job-filter-bar button:hover {
     background: #1558b0;
 }    
-#dashboardJobsUpcoming {
-    margin-top: 10px;
-    border-radius: 8px;
-    overflow: hidden;
-    font-size: 13px;
-}
-
-.job-row {
-    padding: 6px 8px;
-    line-height: 1.4;
-    word-wrap: break-word;
-}
-
-
-
-/* không có dữ liệu */
-.job-empty {
-    background: #ffffff;
-    padding: 6px 8px;
-    color: #888;
-    font-style: italic;
-}
-
-    
-
-/* nội dung xuống dòng nhưng không phá layout */
-.job-text{
-    word-break: break-word;
-    line-height: 1.4;
-}
-
-.job-row{
-    display: grid;
-    grid-template-columns: 90px 60px 1fr;
-    gap: 6px;
-    padding: 6px 8px;
-    background: #fff; /* 🔥 luôn trắng */
-    border-bottom: 1px solid #eee; /* 🔥 nét mờ ngăn cách */
-    align-items: start;
-}
-
-/* khi không có data */
-.job-empty{
-    padding: 6px 8px;
-    background: #fff;
-    color: #888;
-    border-radius: 6px;
-}
-.today-highlight {
-    background: #fff3cd;   /* vàng nhẹ */
-    border-left: 4px solid #f9ab00;
-    padding-left: 6px;
-}
-
-
         
     </style>
 </head>
@@ -1134,11 +1079,7 @@ button {
     <h3 id="dashboardTitle">📊 Dashboard</h3>
     <div class="dashboard-sub" id="dashboardSub"></div>
 </div>
-     <h4 style="color:#1a73e8; font-weight:bold;">
-    📋 SỰ KIỆN 7 NGÀY TỚI:
-     </h4>
-    <div id="dashboardJobsUpcoming"></div>
-    
+
       <h4 style="color:#1a73e8; font-weight:bold;">
     📋 NHÂN LỰC HÔM NAY:
      </h4>
@@ -1467,13 +1408,6 @@ button {
 
 <script type="module">
 
-    function getTodayStr() {
-    const now = new Date();
-    const yyyy = now.getFullYear();
-    const mm = String(now.getMonth() + 1).padStart(2, '0');
-    const dd = String(now.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
-}
     
     // cài đặt web lên màn hình
   if ('serviceWorker' in navigator) {
@@ -3173,7 +3107,6 @@ let infoHTML = `
 `;
 
 document.getElementById("dashboardInfo").innerHTML = infoHTML;
-        renderUpcomingJobs();
 }
 
 let openedChecklistShip = null;
@@ -3207,26 +3140,7 @@ window.toggleChecklistEvent = function(ship){
     if(events.length === 0){
         html += `<div class="empty">Không có EVENT</div>`;
     } else {
-        const today = getTodayStr();
-
-events.slice(0,20).forEach(e => {
-
-    
-
-    let jobText = (e.job || "")
-        .replace(/PLAN:/gi, "")
-        .replace(/\(EVENT\)/gi, "")
-        .trim();
-    let isToday = e.date === today;
-
-     html += `
-        <div class="${isToday ? 'today-highlight' : ''}"
-             style="padding:4px 0; border-bottom:1px dashed #eee;">
-            📅 ${e.date} — ${jobText}
-        </div>
-    `;
-
-});
+        events.slice(0,20).forEach(e => {
             let jobText = (e.job || "")
     .replace(/PLAN:/gi, "")
     .replace(/\(EVENT\)/gi, "")   // 🔥 thêm dòng này
@@ -3242,82 +3156,6 @@ events.slice(0,20).forEach(e => {
 
     box.innerHTML = html;
 };
-
-function renderUpcomingJobs(){
-
-    const now = new Date();
-
-    // chuẩn yyyy-mm-dd
-    const formatDate = (d) => {
-        const yyyy = d.getFullYear();
-        const mm = String(d.getMonth()+1).padStart(2,'0');
-        const dd = String(d.getDate()).padStart(2,'0');
-        return `${yyyy}-${mm}-${dd}`;
-    };
-
-    const today = formatDate(now);
-
-    // +7 ngày
-    const future = new Date();
-    future.setDate(now.getDate() + 7);
-    const futureDate = formatDate(future);
-
-    let list = [];
-
-    Object.values(rawData).forEach(x => {
-
-        if(!x.date || !x.ship_id || !x.job) return;
-         const jobUpper = x.job.toUpperCase();
-    const isPlan = jobUpper.includes("PLAN:");
-    const isEvent = jobUpper.includes("(EVENT)");
-
-    if (!isPlan && !isEvent) return;
-
-        // lọc từ hôm nay → +7 ngày
-        if (x.date >= today && x.date <= futureDate){
-
-          let jobText = (x.job || "")
-    .replace(/PLAN:/gi, "")        // bỏ PLAN:
-    .replace(/\(EVENT\)/gi, "")    // bỏ (EVENT)
-    .trim();
-
-            if(jobText){
-                list.push({
-                    date: x.date,
-                    ship: x.ship_id,
-                    job: jobText
-                });
-            }
-        }
-    });
-
-    // sort gần → xa
-    list.sort((a,b) => a.date.localeCompare(b.date));
-
-    let html = "";
-
-    if(list.length === 0){
-
-        html = `<div class="job-empty">Không có công việc 7 ngày tới</div>`;
-
-    } else {
-
-      list.forEach(item => {
-
-    let isToday = item.date === today;
-
-    html += `
-    <div class="job-row ${isToday ? 'today-highlight' : ''}">
-        <div class="job-date">${item.date}</div>
-        <div class="job-ship">🚢 ${item.ship}</div>
-        <div class="job-text">${item.job}</div>
-    </div>
-    `;
-});
-    }
-
-    document.getElementById("dashboardJobsUpcoming").innerHTML = html;
-}
     
 
 window.toggleShipDetail = function(ship) {

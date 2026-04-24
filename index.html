@@ -1455,6 +1455,10 @@ document.getElementById("date").value = `${yyyy}-${mm}-${dd}`;
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
     const auth = getAuth(app);
+    onValue(ref(db, "data"), snapshot => {
+    rawData = snapshot.val() || {};
+    renderDashboard(); // 🔥 cập nhật dashboard realtime
+});
 
     let rawData = {};
     let ppData = {};
@@ -3734,6 +3738,10 @@ window.saveEditRow = function(id){
     })
     .then(() => {
         alert("✅ Đã cập nhật!");
+
+        // 🔥 THÊM DÒNG NÀY
+        renderDashboard();
+
     })
     .catch(err => {
         alert("❌ Lỗi: " + err.message);

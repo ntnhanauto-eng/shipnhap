@@ -1159,7 +1159,22 @@ button {
 <div id="dashboardInfo"></div>
 </div>
 
-
+<div class="card" id="upcomingEventsBox">
+    <h3>📅 Các sự kiện trong 7 ngày tới</h3>
+    <div class="table-wrap">
+        <table id="upcomingEventsTable">
+            <thead>
+                <tr>
+                    <th style="width: 90px;">Ngày</th>
+                    <th style="width: 70px;">Tàu</th>
+                    <th>Nội dung công việc</th>
+                </tr>
+            </thead>
+            <tbody id="upcomingEventsBody">
+                </tbody>
+        </table>
+    </div>
+</div>
 
 
     
@@ -1442,8 +1457,8 @@ button {
 </div>
 
 <script type="module">
-<script src="https://unpkg.com/solarlunar@2.0.7"></script>
- <script>   
+
+    
     // cài đặt web lên màn hình
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
@@ -3260,69 +3275,6 @@ window.toggleShipDetail = function(ship) {
     box.innerHTML = html;
 }
 
-    // ===== DANH SÁCH NGÀY LỄ =====
-const holidays = [
-    // DƯƠNG
-    { name: "Tết Dương Lịch", date: "01-01" },
-    { name: "Giải phóng miền Nam", date: "30-04" },
-    { name: "Quốc tế Lao động", date: "01-05" },
-    { name: "Quốc khánh", date: "02-09" },
-
-    // ÂM
-    { name: "Tết Nguyên Đán", lunar: "01-01" },
-    { name: "Rằm tháng Giêng", lunar: "15-01" },
-    { name: "Giỗ Tổ Hùng Vương", lunar: "10-03" },
-    { name: "Trung Thu", lunar: "15-08" }
-];
-
-fufunction getUpcomingHolidays() {
-
-    const now = new Date();
-
-    const format = (d) => {
-        const dd = String(d.getDate()).padStart(2,'0');
-        const mm = String(d.getMonth()+1).padStart(2,'0');
-        return `${dd}-${mm}`;
-    };
-
-    let result = [];
-
-    for (let i = 0; i <= 7; i++) {
-
-        let d = new Date();
-        d.setDate(now.getDate() + i);
-
-        const solarKey = format(d);
-
-        // 🔥 CHUYỂN SANG ÂM LỊCH
-        const lunar = SolarLunar.solar2lunar(
-            d.getFullYear(),
-            d.getMonth() + 1,
-            d.getDate()
-        );
-
-        const lunarKey = `${String(lunar.lDay).padStart(2,'0')}-${String(lunar.lMonth).padStart(2,'0')}`;
-
-        holidays.forEach(h => {
-
-            if (
-                h.date === solarKey ||     // dương lịch
-                h.lunar === lunarKey       // âm lịch
-            ) {
-                result.push({
-                    name: h.name,
-                    date: d,
-                    type: i === 0 ? "today" : "upcoming"
-                });
-            }
-
-        });
-    }
-
-    return result;
-}
-    
-
 function renderUpcomingJobs(){
 
     const now = new Date();
@@ -3371,37 +3323,6 @@ function renderUpcomingJobs(){
     // sort gần → xa
     list.sort((a,b) => a.date.localeCompare(b.date));
 
-   // ===== HIỂN THỊ NGÀY LỄ =====
-const holidayList = getUpcomingHolidays();
-
-let holidayHTML = "";
-
-if (holidayList.length > 0) {
-
-    holidayList.forEach(h => {
-
-        const dd = String(h.date.getDate()).padStart(2,'0');
-        const mm = String(h.date.getMonth()+1).padStart(2,'0');
-
-        if (h.type === "today") {
-            holidayHTML += `
-                <div style="color:#d93025; font-weight:bold;">
-                    🎉 Hôm nay: ${h.name} (${dd}/${mm})
-                </div>
-            `;
-        } else {
-            holidayHTML += `
-                <div style="color:#d93025; font-weight:bold;">
-                    ⏳ Gần tới: ${h.name} (${dd}/${mm})
-                </div>
-            `;
-        }
-    });
-
-    holidayHTML += `<hr>`;
-}
-
-    
     let html = "";
 
     if(list.length === 0){
@@ -3421,41 +3342,8 @@ if (holidayList.length > 0) {
             `;
         });
     }
-// ===== HOLIDAY RENDER =====
-const holidayList = getUpcomingHolidays();
 
-let holidayHTML = "";
-
-if (holidayList.length > 0) {
-
-    holidayList.forEach(h => {
-
-        const dd = String(h.date.getDate()).padStart(2,'0');
-        const mm = String(h.date.getMonth()+1).padStart(2,'0');
-
-        if (h.type === "today") {
-            holidayHTML += `
-                <div style="color:red; font-weight:bold;">
-                    Hôm nay: ${h.name} (${dd}/${mm})
-                </div>
-            `;
-        } else {
-            holidayHTML += `
-                <div style="color:red; font-weight:bold;">
-                    Gần tới: ${h.name} (${dd}/${mm})
-                </div>
-            `;
-        }
-
-    });
-
-    // 🔥 CHÈN LÊN TRÊN upcomingList
-    document.getElementById("upcomingList").innerHTML =
-        `<div style="background:#fff; padding:6px; margin-bottom:6px;">
-            ${holidayHTML}
-        </div>`;
-}
-    document.getElementById("upcomingList").innerHTML = holidayHTML + html;
+    document.getElementById("upcomingList").innerHTML = html;
 }
 
     
@@ -3889,7 +3777,6 @@ window.exportFilteredJobs = function() {
     <div class="footer">
    @ 04-2026 Developed by Nguyen Thanh Nhan - E/R Outfitting 1
 </div>
-    
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

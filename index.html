@@ -3278,53 +3278,60 @@ window.toggleShipDetail = function(ship) {
 function getUpcomingHolidays() {
 
     const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const future = new Date();
+    future.setDate(now.getDate() + 7);
 
-    let result = [];
-
-    for (let i = 0; i <= 7; i++) {
-
-        let d = new Date(today);
-        d.setDate(today.getDate() + i);
-
-        let dd = d.getDate();
-        let mm = d.getMonth() + 1;
-        let yyyy = d.getFullYear();
-
-        let name = "";
+    const holidays = [
 
         // ===== DƯƠNG LỊCH =====
-        if (dd === 30 && mm === 4) name = "🇻🇳 Giải phóng miền Nam";
-        else if (dd === 1 && mm === 5) name = "👷 Quốc tế Lao động";
-        else if (dd === 2 && mm === 9) name = "🇻🇳 Quốc khánh";
-        else if (dd === 1 && mm === 1) name = "🎉 Tết Dương lịch";
+        { name: "Ngày Giải phóng miền Nam", date: "04-30" },
+        { name: "Quốc tế Lao động", date: "05-01" },
+        { name: "Quốc khánh", date: "09-02" },
+        { name: "Tết Dương lịch", date: "01-01" },
 
-        // ===== ÂM LỊCH (CHUẨN) =====
-        const lunar = getLunarDate(dd, mm, yyyy); // 🔥 dùng hàm bạn đã nâng cấp
+        // ===== ÂM LỊCH (ước lượng - bạn có thể nâng cấp sau) =====
+        { name: "Tết Nguyên Đán", lunar: "01-01" },
+        { name: "Rằm tháng Giêng", lunar: "01-15" },
+        { name: "Giỗ Tổ Hùng Vương", lunar: "03-10" },
+        { name: "Trung Thu", lunar: "08-15" }
+    ];
 
-        if (lunar.day === 1 && lunar.month === 1)
-            name = "🧧 Tết Nguyên Đán";
+    const result = [];
 
-        else if (lunar.day === 15 && lunar.month === 1)
-            name = "🎉 Rằm tháng Giêng";
+    holidays.forEach(h => {
 
-        else if (lunar.day === 10 && lunar.month === 3)
-            name = "🏛️ Giỗ Tổ Hùng Vương";
+        let d;
 
-        else if (lunar.day === 15 && lunar.month === 8)
-            name = "🥮 Trung Thu";
+        // 👉 DƯƠNG LỊCH
+        if (h.date) {
+            const [mm, dd] = h.date.split("-");
+            d = new Date(now.getFullYear(), mm - 1, dd);
+        }
 
-        else if (lunar.day === 15)
-            name = "🌕 Rằm";
+        // 👉 ÂM LỊCH (tạm fix năm 2026 mẫu)
+        if (h.lunar) {
 
-        // 👉 nếu có lễ thì push
-        if (name) {
+            const lunarMap2026 = {
+                "01-01": "2026-02-17",
+                "01-15": "2026-03-03",
+                "03-10": "2026-04-26",
+                "08-15": "2026-09-25"
+            };
+
+            if (lunarMap2026[h.lunar]) {
+                d = new Date(lunarMap2026[h.lunar]);
+            }
+        }
+
+        if (!d) return;
+
+        if (d >= now && d <= future) {
             result.push({
-                name: name,
+                name: h.name,
                 date: d
             });
         }
-    }
+    });
 
     // sort gần → xa
     result.sort((a, b) => a.date - b.date);

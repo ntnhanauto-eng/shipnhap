@@ -3417,8 +3417,6 @@ function getSolarFromLunar(day, month, year) {
 function getUpcomingHolidays() {
 
     const now = new Date();
-    now.setHours(0,0,0,0);
-
     const future = new Date();
     future.setDate(now.getDate() + 7);
 
@@ -3430,7 +3428,7 @@ function getUpcomingHolidays() {
         { name: "Quốc khánh", date: "09-02" },
         { name: "Tết Dương lịch", date: "01-01" },
 
-        // ===== ÂM LỊCH =====
+        // ===== ÂM LỊCH (ước lượng - bạn có thể nâng cấp sau) =====
         { name: "Tết Nguyên Đán", lunar: "01-01" },
         { name: "Rằm tháng Giêng", lunar: "01-15" },
         { name: "Giỗ Tổ Hùng Vương", lunar: "03-10" },
@@ -3443,28 +3441,24 @@ function getUpcomingHolidays() {
 
         let d;
 
-        // ===== DƯƠNG LỊCH =====
+        // 👉 DƯƠNG LỊCH
         if (h.date) {
             const [mm, dd] = h.date.split("-");
             d = new Date(now.getFullYear(), mm - 1, dd);
-
-            // nếu đã qua → lấy năm sau
-            if (d < now) {
-                d.setFullYear(now.getFullYear() + 1);
-            }
         }
 
-        // ===== ÂM LỊCH (AUTO CHUẨN) =====
+        // 👉 ÂM LỊCH (tạm fix năm 2026 mẫu)
         if (h.lunar) {
 
-            const [lm, ld] = h.lunar.split("-").map(Number);
+            const lunarMap2026 = {
+                "01-01": "2026-02-17",
+                "01-15": "2026-03-03",
+                "03-10": "2026-04-26",
+                "08-15": "2026-09-25"
+            };
 
-            // 🔥 năm hiện tại
-            d = getSolarFromLunar(ld, lm, now.getFullYear());
-
-            // nếu đã qua → lấy năm sau
-            if (d < now) {
-                d = getSolarFromLunar(ld, lm, now.getFullYear() + 1);
+            if (lunarMap2026[h.lunar]) {
+                d = new Date(lunarMap2026[h.lunar]);
             }
         }
 
@@ -3478,11 +3472,11 @@ function getUpcomingHolidays() {
         }
     });
 
+    // sort gần → xa
     result.sort((a, b) => a.date - b.date);
 
     return result;
 }
-
 
     
 function renderUpcomingJobs(){

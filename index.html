@@ -3121,110 +3121,6 @@ let checkHTML = `
 `;
 
 document.getElementById("dashboardChecklist").innerHTML = checkHTML; 
-// ===== SỰ KIỆN CHÍNH =====
-const events = Object.values(rawData)
-    .filter(x =>
-        x.ship_id === ship &&
-        x.job &&
-        x.job.toUpperCase().includes("EVENT") &&
-        x.date
-    )
-    .map(x => ({
-        ...x,
-        date: normalizeDate(x.date)
-    }))
-    .sort((a, b) => a.date.localeCompare(b.date));
-        let highlightDate = null;
-
-// có hôm nay
-const hasToday = events.some(e => e.date === todayStr);
-
-if (hasToday) {
-    highlightDate = todayStr;
-} else {
-
-    // tìm ngày gần nhất trước hôm nay
-    for (let i = events.length - 1; i >= 0; i--) {
-        if (events[i].date < todayStr) {
-            highlightDate = events[i].date;
-            break;
-        }
-    }
-
-    // nếu không có quá khứ
-    if (!highlightDate && events.length > 0) {
-        highlightDate = events[0].date;
-    }
-}
-let eventHTML = "";
-
-if (events.length > 0) {
-
-    const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const dd = String(today.getDate()).padStart(2, '0');
-    const todayStr = `${yyyy}-${mm}-${dd}`;
-
-    // ===== TÌM NGÀY HIGHLIGHT =====
-    let highlightDate = null;
-
-    // 1. ưu tiên có hôm nay
-    const hasToday = events.some(e => e.date === todayStr);
-
-    if (hasToday) {
-        highlightDate = todayStr;
-    } else {
-        // 2. nếu không có hôm nay → lấy ngày gần nhất trước hôm nay
-        for (let i = events.length - 1; i >= 0; i--) {
-            if (events[i].date < todayStr) {
-                highlightDate = events[i].date;
-                break;
-            }
-        }
-
-        // 3. nếu không có quá khứ → lấy ngày đầu tiên (future)
-        if (!highlightDate) {
-            highlightDate = events[0].date;
-        }
-    }
-
-    eventHTML = `
-        <div style="margin-top:12px;">
-            <b>📌 SỰ KIỆN CHÍNH</b>
-        </div>
-    `;
-
-    events.forEach(e => {
-
-        let jobText = (e.job || "")
-            .replace(/PLAN:/gi, "")
-            .replace(/\(EVENT\)/gi, "")
-            .trim();
-
-        const isHighlight = e.date === highlightDate;
-
-        eventHTML += `
-            <div style="
-                padding:6px;
-                margin-top:4px;
-                border-radius:6px;
-                background:${isHighlight ? '#fff3cd' : '#f8f9fa'};
-                border:${isHighlight ? '1px solid #f9ab00' : '1px solid #eee'};
-                font-weight:${isHighlight ? 'bold' : 'normal'};
-                box-shadow:${isHighlight ? '0 0 6px rgba(249,171,0,0.3)' : 'none'};
-            ">
-                📅 ${e.date} — ${jobText}
-            </div>
-        `;
-    });
-}
-
-// 👉 append xuống checklist
-document.getElementById("dashboardChecklist").innerHTML += eventHTML;
-
-
-        
         // ===== THÔNG TIN TÀU =====
 
 let totalShips = Object.keys(shipsData).length;
@@ -3379,23 +3275,6 @@ window.toggleShipDetail = function(ship) {
     box.innerHTML = html;
 }
 
-
-function normalizeDate(d) {
-    if (!d) return "";
-
-    if (typeof d === "string" && d.includes("-")) {
-        return d.trim();
-    }
-
-    const date = new Date(d);
-    const yyyy = date.getFullYear();
-    const mm = String(date.getMonth() + 1).padStart(2, '0');
-    const dd = String(date.getDate()).padStart(2, '0');
-
-    return `${yyyy}-${mm}-${dd}`;
-}
-
-    
 // ===== ÂM LỊCH CHUẨN VIỆT NAM (Hồ Ngọc Đức) =====
 function INT(d) { return Math.floor(d); }
 

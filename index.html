@@ -3416,59 +3416,47 @@ function getSolarFromLunar(day, month, year) {
     
 function getUpcomingHolidays() {
     const now = new Date();
-    // Reset về 00:00:00 để so sánh ngày chính xác
+    // Reset về 00:00:00 để so sánh chính xác ngày
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    
     const future = new Date(todayStart);
     future.setDate(todayStart.getDate() + 7);
 
     const currentYear = todayStart.getFullYear();
     const result = [];
 
-    // --- DANH SÁCH LỄ CỐ ĐỊNH (DƯƠNG LỊCH) ---
+    // 1. CÁC NGÀY LỄ DƯƠNG LỊCH CỐ ĐỊNH
     const solarHolidays = [
         { name: "Tết Dương lịch", m: 1, d: 1 },
-        { name: "Ngày Giải phóng miền Nam", m: 4, d: 30 },
+        { name: "Giải phóng miền Nam", m: 4, d: 30 },
         { name: "Quốc tế Lao động", m: 5, d: 1 },
-        { name: "Quốc khánh", m: 9, d: 2 },
+        { name: "Quốc khánh", m: 9, d: 2 }
     ];
 
-    // --- DANH SÁCH LỄ ÂM LỊCH (TỰ ĐỘNG TÍNH) ---
-    const lunarHolidays = [
-        { name: "Tết Nguyên Đán", m: 1, d: 1 },
-        { name: "Rằm tháng Giêng", m: 1, d: 15 },
-        { name: "Giỗ Tổ Hùng Vương", m: 3, d: 10 },
-        { name: "Lễ Vu Lan", m: 7, d: 15 },
-        { name: "Tết Trung Thu", m: 8, d: 15 },
-        { name: "Tết Ông Táo", m: 12, d: 23 },
-    ];
-
-    // Xử lý ngày Dương lịch
     solarHolidays.forEach(h => {
         let d = new Date(currentYear, h.m - 1, h.d);
-        // Nếu đã qua tháng 9 mà tính Tết Dương lịch thì check cho năm sau
-        if (h.m === 1 && now.getMonth() > 9) d.setFullYear(currentYear + 1);
-        
-        if (d >= todayStart && d <= future) {
-            result.push({ name: h.name, date: d });
-        }
+        if (d >= todayStart && d <= future) result.push({ name: h.name, date: d });
     });
 
-    // Xử lý ngày Âm lịch bằng hàm convertLunar2Solar đã có của bạn
+    // 2. CÁC NGÀY LỄ ÂM LỊCH (TỰ ĐỘNG TÍNH TOÀN BỘ)
+    const lunarHolidays = [
+        { name: "Giỗ Tổ Hùng Vương (10/03 AL)", m: 3, d: 10 },
+        { name: "Tết Nguyên Đán (01/01 AL)", m: 1, d: 1 },
+        { name: "Rằm tháng Giêng", m: 1, d: 15 },
+        { name: "Trung Thu", m: 8, d: 15 }
+    ];
+
     lunarHolidays.forEach(h => {
-        // Kiểm tra cho năm hiện tại và năm kế tiếp (đề phòng Tết rơi vào tháng 1 dương)
+        // Kiểm tra lễ âm lịch cho năm nay và năm sau
         [currentYear, currentYear + 1].forEach(y => {
-            const solDateArr = convertLunar2Solar(h.d, h.m, y, 0, 7);
-            if (solDateArr) {
-                const d = new Date(solDateArr[2], solDateArr[1] - 1, solDateArr[0]);
-                if (d >= todayStart && d <= future) {
-                    result.push({ name: h.name, date: d });
-                }
+            // Sử dụng hàm convertLunar2Solar có sẵn trong code của bạn
+            const sol = convertLunar2Solar(h.d, h.m, y, 0, 7); 
+            if (sol) {
+                const d = new Date(sol[2], sol[1] - 1, sol[0]);
+                if (d >= todayStart && d <= future) result.push({ name: h.name, date: d });
             }
         });
     });
 
-    // Sắp xếp và loại bỏ trùng lặp nếu có
     return result.sort((a, b) => a.date - b.date);
 }
 
@@ -3492,76 +3480,40 @@ function renderUpcomingJobs(){
 
     let list = [];
 
-    Object.values(rawData).forEach(x => {
-
-        if(!x.date || !x.ship_id || !x.job) return;
-
-        const jobUpper = x.job.toUpperCase();
-
-        // 🔥 CHỈ LẤY PLAN + EVENT
-        if(!jobUpper.includes("PLAN:") && !jobUpper.includes("(EVENT)")) return;
-
-        if (x.date >= today && x.date <= futureDate){
-
-            let jobText = x.job
-                .replace(/PLAN:/gi, "")
-                .replace(/\(EVENT\)/gi, "")
-                .trim();
-
-            if(jobText){
-                list.push({
-                    date: x.date,
-                    ship: x.ship_id,
-                    job: jobText
-                });
-            }
-        }
-    });
-
-    // sort gần → xa
-    list.sort((a,b) => a.date.localeCompare(b.date));
-
     let html = "";
-// ===== HOLIDAY RENDER =====
-// ===== HOLIDAY RENDER (SỬA LỖI HIỂN THỊ) =====
-const holidayList = getUpcomingHolidays();
-let holidayHTML = "";
 
-if (holidayList.length > 0) {
-    const now = new Date();
-    // Tạo chuỗi so sánh ngày hôm nay dạng YYYY-MM-DD
-    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    // ===== HIỂN THỊ NGÀY LỄ TỰ ĐỘNG =====
+    const holidayList = getUpcomingHolidays();
+    if (holidayList.length > 0) {
+        const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        let holidayHTML = "";
 
-    holidayList.forEach(h => {
-        const yyyy = h.date.getFullYear();
-        const mm = String(h.date.getMonth() + 1).padStart(2, '0');
-        const dd = String(h.date.getDate()).padStart(2, '0');
-        const dStr = `${yyyy}-${mm}-${dd}`;
+        holidayList.forEach(h => {
+            const dStr = `${h.date.getFullYear()}-${String(h.date.getMonth() + 1).padStart(2, '0')}-${String(h.date.getDate()).padStart(2, '0')}`;
+            const isToday = (dStr === todayStr);
+            const dd = String(h.date.getDate()).padStart(2, '0');
+            const mm = String(h.date.getMonth() + 1).padStart(2, '0');
 
-        // SO SÁNH CHUỖI ĐỂ CHÍNH XÁC TUYỆT ĐỐI
-        const isToday = (dStr === todayStr);
-        
-        const label = isToday
-            ? `🔴 HÔM NAY: ${h.name} (${dd}/${mm})`
-            : `🔵 Sắp tới: ${h.name} (${dd}/${mm})`;
+            holidayHTML += `
+            <div style="
+                color: ${isToday ? '#d93025' : '#1a73e8'};
+                background: ${isToday ? '#fff3cd' : '#fff'};
+                padding: 10px 15px;
+                margin-bottom: 8px;
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: bold;
+                border: 2px solid ${isToday ? '#d93025' : '#eee'};
+                display: flex; align-items: center; gap: 10px;
+            ">
+                <span>${isToday ? '🔴 HÔM NAY:' : '🔵 Sắp tới:'}</span>
+                <span>${h.name} (${dd}/${mm})</span>
+            </div>`;
+        });
+        html = holidayHTML + html;
+    }
 
-        holidayHTML += `
-        <div style="
-            color: ${isToday ? '#d93025' : '#1a73e8'};
-            background: ${isToday ? '#fff3cd' : '#fff'};
-            padding: 8px 12px;
-            margin-bottom: 6px;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: bold;
-            border: 1px solid ${isToday ? '#ffeeba' : '#eee'};
-            box-shadow: ${isToday ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'};
-        ">
-            ${label}
-        </div>`;
-    });
-    html = `<div style="margin-bottom:12px;">${holidayHTML}</div>` + html;
-}
+    // Sau đó mới đến đoạn if(list.length === 0) ...
     if(list.length === 0){
         html = `<div class="upcoming-empty">Không có công việc</div>`;
     } else {

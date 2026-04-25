@@ -3423,7 +3423,7 @@ function getLeapMonthOffset(a11) {
 
     
 function getUpcomingHolidays() {
-
+  console.log("RUN HOLIDAY");
     const now = new Date();
     now.setHours(0,0,0,0);
 
@@ -3480,7 +3480,7 @@ function getUpcomingHolidays() {
 
     
 function renderUpcomingJobs(){
-
+    console.log(getUpcomingHolidays());
     const now = new Date();
 
     const formatDate = (d) => {

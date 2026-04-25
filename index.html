@@ -3129,8 +3129,33 @@ const events = Object.values(rawData)
         x.job.toUpperCase().includes("EVENT") &&
         x.date
     )
+    .map(x => ({
+        ...x,
+        date: normalizeDate(x.date)
+    }))
     .sort((a, b) => a.date.localeCompare(b.date));
+        let highlightDate = null;
 
+// có hôm nay
+const hasToday = events.some(e => e.date === todayStr);
+
+if (hasToday) {
+    highlightDate = todayStr;
+} else {
+
+    // tìm ngày gần nhất trước hôm nay
+    for (let i = events.length - 1; i >= 0; i--) {
+        if (events[i].date < todayStr) {
+            highlightDate = events[i].date;
+            break;
+        }
+    }
+
+    // nếu không có quá khứ
+    if (!highlightDate && events.length > 0) {
+        highlightDate = events[0].date;
+    }
+}
 let eventHTML = "";
 
 if (events.length > 0) {
@@ -3354,6 +3379,23 @@ window.toggleShipDetail = function(ship) {
     box.innerHTML = html;
 }
 
+
+function normalizeDate(d) {
+    if (!d) return "";
+
+    if (typeof d === "string" && d.includes("-")) {
+        return d.trim();
+    }
+
+    const date = new Date(d);
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+
+    return `${yyyy}-${mm}-${dd}`;
+}
+
+    
 // ===== ÂM LỊCH CHUẨN VIỆT NAM (Hồ Ngọc Đức) =====
 function INT(d) { return Math.floor(d); }
 

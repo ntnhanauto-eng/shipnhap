@@ -3415,67 +3415,61 @@ function getSolarFromLunar(day, month, year) {
 
     
 function getUpcomingHolidays() {
-
     const now = new Date();
-    const future = new Date();
-    future.setDate(now.getDate() + 7);
+    // Reset về 00:00:00 để so sánh ngày chính xác
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    const future = new Date(todayStart);
+    future.setDate(todayStart.getDate() + 7);
 
-    const holidays = [
-
-        // ===== DƯƠNG LỊCH =====
-        { name: "Ngày Giải phóng miền Nam", date: "04-30" },
-        { name: "Quốc tế Lao động", date: "05-01" },
-        { name: "Quốc khánh", date: "09-02" },
-        { name: "Tết Dương lịch", date: "01-01" },
-
-        // ===== ÂM LỊCH (ước lượng - bạn có thể nâng cấp sau) =====
-        { name: "Tết Nguyên Đán", lunar: "01-01" },
-        { name: "Rằm tháng Giêng", lunar: "01-15" },
-        { name: "Giỗ Tổ Hùng Vương 10/03AL", lunar: "03-10" },
-        { name: "Trung Thu", lunar: "08-15" }
-    ];
-
+    const currentYear = todayStart.getFullYear();
     const result = [];
 
-    holidays.forEach(h => {
+    // --- DANH SÁCH LỄ CỐ ĐỊNH (DƯƠNG LỊCH) ---
+    const solarHolidays = [
+        { name: "Tết Dương lịch", m: 1, d: 1 },
+        { name: "Ngày Giải phóng miền Nam", m: 4, d: 30 },
+        { name: "Quốc tế Lao động", m: 5, d: 1 },
+        { name: "Quốc khánh", m: 9, d: 2 },
+    ];
 
-        let d;
+    // --- DANH SÁCH LỄ ÂM LỊCH (TỰ ĐỘNG TÍNH) ---
+    const lunarHolidays = [
+        { name: "Tết Nguyên Đán", m: 1, d: 1 },
+        { name: "Rằm tháng Giêng", m: 1, d: 15 },
+        { name: "Giỗ Tổ Hùng Vương", m: 3, d: 10 },
+        { name: "Lễ Vu Lan", m: 7, d: 15 },
+        { name: "Tết Trung Thu", m: 8, d: 15 },
+        { name: "Tết Ông Táo", m: 12, d: 23 },
+    ];
 
-        // 👉 DƯƠNG LỊCH
-        if (h.date) {
-            const [mm, dd] = h.date.split("-");
-            d = new Date(now.getFullYear(), mm - 1, dd);
-        }
-
-        // 👉 ÂM LỊCH (tạm fix năm 2026 mẫu)
-        if (h.lunar) {
-
-            const lunarMap2026 = {
-                "01-01": "2026-02-17",
-                "01-15": "2026-03-03",
-                "03-10": "2026-04-26",
-                "08-15": "2026-09-25"
-            };
-
-            if (lunarMap2026[h.lunar]) {
-                d = new Date(lunarMap2026[h.lunar]);
-            }
-        }
-
-        if (!d) return;
-
-        if (d >= now && d <= future) {
-            result.push({
-                name: h.name,
-                date: d
-            });
+    // Xử lý ngày Dương lịch
+    solarHolidays.forEach(h => {
+        let d = new Date(currentYear, h.m - 1, h.d);
+        // Nếu đã qua tháng 9 mà tính Tết Dương lịch thì check cho năm sau
+        if (h.m === 1 && now.getMonth() > 9) d.setFullYear(currentYear + 1);
+        
+        if (d >= todayStart && d <= future) {
+            result.push({ name: h.name, date: d });
         }
     });
 
-    // sort gần → xa
-    result.sort((a, b) => a.date - b.date);
+    // Xử lý ngày Âm lịch bằng hàm convertLunar2Solar đã có của bạn
+    lunarHolidays.forEach(h => {
+        // Kiểm tra cho năm hiện tại và năm kế tiếp (đề phòng Tết rơi vào tháng 1 dương)
+        [currentYear, currentYear + 1].forEach(y => {
+            const solDateArr = convertLunar2Solar(h.d, h.m, y, 0, 7);
+            if (solDateArr) {
+                const d = new Date(solDateArr[2], solDateArr[1] - 1, solDateArr[0]);
+                if (d >= todayStart && d <= future) {
+                    result.push({ name: h.name, date: d });
+                }
+            }
+        });
+    });
 
-    return result;
+    // Sắp xếp và loại bỏ trùng lặp nếu có
+    return result.sort((a, b) => a.date - b.date);
 }
 
     
@@ -3529,43 +3523,44 @@ function renderUpcomingJobs(){
 
     let html = "";
 // ===== HOLIDAY RENDER =====
+// ===== HOLIDAY RENDER (SỬA LỖI HIỂN THỊ) =====
 const holidayList = getUpcomingHolidays();
-
 let holidayHTML = "";
 
 if (holidayList.length > 0) {
-
-    const todayStr = now.toISOString().slice(0,10);
+    const now = new Date();
+    // Tạo chuỗi so sánh ngày hôm nay dạng YYYY-MM-DD
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
     holidayList.forEach(h => {
-
         const yyyy = h.date.getFullYear();
-        const mm = String(h.date.getMonth()+1).padStart(2,'0');
-        const dd = String(h.date.getDate()).padStart(2,'0');
-
+        const mm = String(h.date.getMonth() + 1).padStart(2, '0');
+        const dd = String(h.date.getDate()).padStart(2, '0');
         const dStr = `${yyyy}-${mm}-${dd}`;
 
-        const label = (dStr === todayStr)
-            ? `🔴 Hôm nay: ${h.name} (${dd}/${mm})`
-            : `🔴 Sắp tới: ${h.name} (${dd}/${mm})`;
+        // SO SÁNH CHUỖI ĐỂ CHÍNH XÁC TUYỆT ĐỐI
+        const isToday = (dStr === todayStr);
+        
+        const label = isToday
+            ? `🔴 HÔM NAY: ${h.name} (${dd}/${mm})`
+            : `🔵 Sắp tới: ${h.name} (${dd}/${mm})`;
 
         holidayHTML += `
         <div style="
-            color:#d93025;
-            background:#fff;
-            padding:6px 10px;
-            margin-bottom:4px;
-            border-radius:6px;
-            font-size:13px;
-            font-weight:500;
-            border:1px solid #eee;
+            color: ${isToday ? '#d93025' : '#1a73e8'};
+            background: ${isToday ? '#fff3cd' : '#fff'};
+            padding: 8px 12px;
+            margin-bottom: 6px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            border: 1px solid ${isToday ? '#ffeeba' : '#eee'};
+            box-shadow: ${isToday ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'};
         ">
             ${label}
         </div>`;
     });
-
-    // 👉 chèn lên đầu
-    html += `<div style="margin-bottom:8px;">${holidayHTML}</div>`;
+    html = `<div style="margin-bottom:12px;">${holidayHTML}</div>` + html;
 }
     if(list.length === 0){
         html = `<div class="upcoming-empty">Không có công việc</div>`;

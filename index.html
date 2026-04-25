@@ -3318,7 +3318,23 @@ const TIME_ZONE = 7.0;
 
 // ===== LẤY NGÀY DƯƠNG TỪ ÂM =====
 function getSolarFromLunar(dd, mm, yy) {
-    return jdToDate(getLunarDate(dd, mm, yy));
+
+    let a11 = getLunarMonth11(yy);
+    let b11 = getLunarMonth11(yy + 1);
+
+    let k = INT(0.5 + (a11 - 2415021.076998695) / 29.530588853);
+
+    let off = mm - 11;
+    if (off < 0) off += 12;
+
+    if (b11 - a11 > 365) {
+        let leapOff = getLeapMonthOffset(a11);
+        if (off >= leapOff) off++;
+    }
+
+    let monthStart = getNewMoonDay(k + off);
+
+    return jdToDate(monthStart + dd - 1);
 }
 
 // ===== CORE =====

@@ -1276,6 +1276,7 @@ button {
     <button id="btnChecklist" class="admin-only" onclick="handleButton('checklist')">Q.lý mục kiểm tra</button>
     <button id="btnExtra" onclick="handleButton('extra')">📦 Vật tư - Ghi chú</button>
     <button id="btnJobs" onclick="handleButton('jobs')">📋 Công việc remain</button>
+    <button id="btnComment" onclick="handleButton('comment')">💬 COMMENT</button>
 </div>
         
      <div id="functionContentArea">
@@ -1456,6 +1457,48 @@ button {
          
 </div>
 
+    <div id="commentBox" class="card" style="display:none; margin-top:15px;">
+    <h4>💬 QUẢN LÝ PHẢN HỒI / COMMENT</h4>
+
+    <div class="admin-only" style="background: #fff5f5; padding: 15px; border-radius: 10px; margin-bottom: 15px; border: 1px solid #ffcdd2;">
+        <p style="margin-top:0; font-weight:bold; color: #d32f2f;">➕ Thêm/Sửa Comment:</p>
+        <div class="flex">
+            <select id="cmtShip"><option value="">-- Chọn tàu --</option></select>
+            <input type="text" id="cmtLocation" placeholder="Vị trí (Ví dụ: Block 102)">
+            <input type="text" id="cmtContent" placeholder="Nội dung phản hồi">
+            <select id="cmtStatus">
+                <option value="pending">🔴 Chưa làm</option>
+                <option value="doing">🟡 Đang làm</option>
+                <option value="done">🟢 Đã xong</option>
+            </select>
+        </div>
+        <div class="date-row" style="margin-top:10px;">
+            <div class="date-field">
+                <label>Ngày hoàn thành (nếu có)</label>
+                <input type="date" id="cmtDoneDate">
+            </div>
+        </div>
+        <button onclick="saveCommentData()" id="btnSaveCmt" style="background: #d32f2f; margin-top: 10px;">💾 Lưu dữ liệu</button>
+    </div>
+
+    <div class="table-wrap">
+        <table id="commentTable" style="min-width: 800px;">
+            <thead>
+                <tr>
+                    <th style="width: 50px; text-align: center;">STT</th>
+                    <th style="width: 100px;">Tàu</th>
+                    <th style="width: 150px;">Vị trí</th>
+                    <th>Nội dung</th>
+                    <th style="width: 130px;">Trạng thái</th>
+                    <th style="width: 110px; text-align: center;">Ngày xong</th>
+                    <th class="admin-inline" style="width: 80px; text-align: center;">Sửa</th>
+                </tr>
+            </thead>
+            <tbody id="commentListContent"></tbody>
+        </table>
+    </div>
+</div>
+
 <script type="module">
 
     
@@ -1505,6 +1548,25 @@ document.getElementById("date").value = `${yyyy}-${mm}-${dd}`;
     let isFirstLoad = true;
     let jobsData = {}; // Lưu trữ danh sách công việc
     let editJobId = null; // Dùng khi sửa
+    // ... các biến có sẵn của bạn ...
+let jobsData = {}; // Lưu trữ danh sách công việc
+let editJobId = null; // Dùng khi sửa
+
+// --- CHÈN ĐOẠN NÀY VÀO ĐÂY ---
+let commentsData = {};
+let editCmtId = null;
+
+// Lắng nghe dữ liệu Comment từ Firebase
+onValue(ref(db, "comments"), snapshot => {
+    commentsData = snapshot.val() || {};
+    if(document.getElementById("commentBox").style.display === "block") {
+        renderCommentList();
+    }
+});
+// -----------------------------
+
+onValue(ref(db, "jobs"), snapshot => {
+// ...
     
     onValue(ref(db, "jobs"), snapshot => {
     jobsData = snapshot.val() || {};
@@ -2497,7 +2559,8 @@ document.querySelectorAll("input, select").forEach(el => {
         progress: document.getElementById("progressBox"),
         checklist: document.getElementById("checklistBox"),
         extra: document.getElementById("extraBox"),
-        jobs: document.getElementById("jobManagerBox") // Box mới thêm
+        jobs: document.getElementById("jobManagerBox"),
+        comment: document.getElementById("commentBox")
     };
 
     // 2. Lấy tất cả các nút bấm tương ứng
@@ -2508,7 +2571,8 @@ document.querySelectorAll("input, select").forEach(el => {
         progress: document.getElementById("btnProgress"),
         checklist: document.getElementById("btnChecklist"),
         extra: document.getElementById("btnExtra"),
-        jobs: document.getElementById("btnJobs") // Nút mới thêm
+        jobs: document.getElementById("btnJobs"),
+        comment: document.getElementById("btnComment")
     };
 
     // Xử lý riêng cho nút Xuất Excel
@@ -2543,7 +2607,8 @@ document.querySelectorAll("input, select").forEach(el => {
     if (type === "progress") renderProgressInputs();
     if (type === "checklist") renderChecklistInputs();
     if (type === "extra") renderExtraSelect();
-    if (type === "jobs") renderJobList(); // Load bảng công việc tồn đọng
+    if (type === "jobs") renderJobList(); 
+    if (type === "comment") renderCommentList();
 };
 
 function renderPagination() {
@@ -3998,7 +4063,14 @@ window.exportFilteredJobs = function() {
         URL.revokeObjectURL(url);
     }, 500);
 };
-    
+ window.exportFilteredJobs = function() {
+    // ... nội dung hàm export ...
+}; // <--- Tìm dấu đóng này
+
+// --- DÁN TẤT CẢ CÁC HÀM COMMENT (Lưu, Sửa, Xóa, Render) VÀO ĐÂY ---
+window.renderCommentList = function() { ... };
+window.saveCommentData = function() { ... };
+// ... vv ...   
 
     
 </script>

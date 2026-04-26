@@ -4139,6 +4139,9 @@ window.renderCommentList = function() {
         if (filtered.length === 0) {
             html = `<tr><td colspan='7' style='text-align:center; padding:20px;'>Tàu <b>${selectedShip}</b> chưa có comment.</td></tr>`;
         } else {
+            // Xác định xem người dùng có phải Admin không
+            const disabledAttr = isAdmin ? "" : "disabled";
+
             filtered.forEach(([id, c]) => {
                 const status = c.status || "pending";
                 let bgColor = "";
@@ -4153,14 +4156,20 @@ window.renderCommentList = function() {
                     <td>${c.pos || "-"}</td>
                     <td style="white-space: normal; word-break: break-word;">${c.content}</td>
                     <td>
-                        <select onchange="updateCmtStatus('${id}', this.value)" 
-                            style="width: 100%; padding: 5px; border-radius: 5px; border: 1px solid rgba(0,0,0,0.1); background: rgba(255,255,255,0.5); cursor: pointer;">
+                        <select onchange="updateCmtStatus('${id}', this.value)" ${disabledAttr}
+                            style="width: 100%; padding: 5px; border-radius: 5px; border: 1px solid rgba(0,0,0,0.1); background: ${isAdmin ? 'rgba(255,255,255,0.8)' : 'transparent'}; cursor: ${isAdmin ? 'pointer' : 'default'};">
                             <option value="pending" ${status === "pending" ? "selected" : ""}>🔴 Chưa làm</option>
                             <option value="doing" ${status === "doing" ? "selected" : ""}>🟡 Đang làm</option>
                             <option value="done" ${status === "done" ? "selected" : ""}>🟢 Đã xong</option>
                         </select>
                     </td>
-                    <td style="text-align:center;">${c.doneDate || "-"}</td>
+                    <td style="text-align:center;">
+                        <input type="date" 
+                               value="${c.doneDate || ''}" 
+                               onchange="updateCmtDate('${id}', this.value)" 
+                               ${disabledAttr}
+                               style="width: 100%; padding: 4px; border-radius: 5px; border: ${isAdmin ? '1px solid #ccc' : 'none'}; background: ${isAdmin ? '#fff' : 'transparent'}; color: #000;">
+                    </td>
                     <td class="admin-inline" style="text-align:center;">
                         <div class="action-buttons">
                             <button onclick="editCmt('${id}')" class="btn-edit">✏️</button>
@@ -4227,12 +4236,12 @@ window.updateCmtStatus = function(id, newStatus) {
 // 4. Hàm cập nhật ngày xong nhanh từ bảng
 window.updateCmtDate = function(id, newDate) {
     if (!isAdmin) {
-        alert("Bạn cần quyền Admin để cập nhật ngày!");
+        alert("Bạn không có quyền chỉnh sửa!");
         renderCommentList();
         return;
     }
     update(ref(db, "comments/" + id), { doneDate: newDate })
-    .catch(err => alert("Lỗi: " + err.message));
+    .catch(err => alert("Lỗi cập nhật ngày: " + err.message));
 };
 
 // 5. Hàm lưu dữ liệu từ Form nhập (Admin)

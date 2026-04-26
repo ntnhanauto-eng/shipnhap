@@ -1468,10 +1468,17 @@ button {
                 <option value="doing">🟡 Đang làm</option>
                 <option value="done">🟢 Đã xong</option>
             </select>
-            <label><b>Ngày hoàn thành:</b></label>
-            <input type="date" id="cmtDoneDate">
-        </div>
-        <button onclick="saveCommentData()" id="btnSaveCmt" style="background: #d32f2f; margin-top: 10px;">💾 Lưu Comment</button>
+            
+           
+            <div style="margin-top: 10px; max-width: 250px;"> 
+    <div class="date-field">
+        <label for="cmtDoneDate" style="font-size: 13px; color: #d32f2f; font-weight: bold; display: block; margin-bottom: 3px;">
+            📅 Ngày hoàn thành:
+        </label>
+        <input type="date" id="cmtDoneDate" style="margin-top: 0;">
+    </div>
+</div>
+<button onclick="saveCommentData()" id="btnSaveCmt" style="background: #d32f2f; margin-top: 15px;">💾 Lưu Comment</button>
     </div>
 
     <div style="margin-bottom: 10px;">

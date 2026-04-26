@@ -4100,45 +4100,34 @@ window.saveCommentData = function() {
 };
 
 // Hàm hiển thị danh sách Comment
+// Hàm hiển thị danh sách Comment
 window.renderCommentList = function() {
     const viewSelect = document.getElementById("viewCmtByShip");
     const inputSelect = document.getElementById("cmtShip");
     
     if (!viewSelect || !inputSelect) return;
 
-    // Lưu lại giá trị đang chọn để không bị nhảy khi render lại
     const currentView = viewSelect.value;
     const currentInput = inputSelect.value;
 
-    // 1. TẠO DANH SÁCH OPTION CHO Ô XEM (Hiện tất cả để xem lại lịch sử)
     let viewOptions = '<option value="">-- Chọn tàu để xem --</option>';
-    
-    // 2. TẠO DANH SÁCH OPTION CHO Ô NHẬP (Chỉ hiện tàu chưa bàn giao)
     let inputOptions = '<option value="">-- Chọn tàu để nhập --</option>';
 
     if (shipsData && Object.keys(shipsData).length > 0) {
         Object.keys(shipsData).sort().forEach(shipId => {
             const ship = shipsData[shipId];
-            
-            // Ô XEM: Luôn thêm tất cả tàu
             viewOptions += `<option value="${shipId}">${shipId}</option>`;
-
-            // Ô NHẬP: Chỉ thêm nếu tàu chưa bàn giao (status khác "done")
             if (ship.status !== "done") {
                 inputOptions += `<option value="${shipId}">${shipId}</option>`;
             }
         });
     }
 
-    // Đổ dữ liệu vào các ô tương ứng
     viewSelect.innerHTML = viewOptions;
     inputSelect.innerHTML = inputOptions;
-
-    // Trả lại giá trị cũ đã chọn
     viewSelect.value = currentView;
     inputSelect.value = currentInput;
 
-    // --- PHẦN VẼ BẢNG (Giữ nguyên logic màu sắc bạn đã làm ở bước trước) ---
     let html = "";
     let index = 1;
     const selectedShip = viewSelect.value;
@@ -4150,49 +4139,50 @@ window.renderCommentList = function() {
         if (filtered.length === 0) {
             html = `<tr><td colspan='7' style='text-align:center; padding:20px;'>Tàu <b>${selectedShip}</b> chưa có comment.</td></tr>`;
         } else {
-           filtered.forEach(([id, c]) => {
-    const status = c.status || "pending";
-    
-    // Xác định màu nền dựa trên trạng thái (giống Remain Jobs)
-    let bgColor = "";
-    if (status === "pending") bgColor = "#F8BBD0";   // Hồng
-    else if (status === "doing") bgColor = "#FFF59D"; // Vàng
-    else if (status === "done") bgColor = "#B2DFDB";  // Xanh lá
+            filtered.forEach(([id, c]) => {
+                const status = c.status || "pending";
+                let bgColor = "";
+                if (status === "pending") bgColor = "#F8BBD0";
+                else if (status === "doing") bgColor = "#FFF59D";
+                else if (status === "done") bgColor = "#B2DFDB";
 
-    html += `
-    <tr style="background: ${bgColor};">
-        <td style="text-align:center;">${index++}</td>
-        <td>${c.ship}</td>
-        <td>${c.pos || "-"}</td>
-        <td style="white-space: normal; word-break: break-word;">${c.content}</td>
-        
-        <td>
-            <select onchange="updateCmtStatus('${id}', this.value)" 
-                style="width: 100%; padding: 5px; border-radius: 5px; border: 1px solid rgba(0,0,0,0.1); background: rgba(255,255,255,0.5); cursor: pointer;">
-                <option value="pending" ${status === "pending" ? "selected" : ""}>🔴 Chưa làm</option>
-                <option value="doing" ${status === "doing" ? "selected" : ""}>🟡 Đang làm</option>
-                <option value="done" ${status === "done" ? "selected" : ""}>🟢 Đã xong</option>
-            </select>
-        </td>
+                html += `
+                <tr style="background: ${bgColor};">
+                    <td style="text-align:center;">${index++}</td>
+                    <td>${c.ship}</td>
+                    <td>${c.pos || "-"}</td>
+                    <td style="white-space: normal; word-break: break-word;">${c.content}</td>
+                    <td>
+                        <select onchange="updateCmtStatus('${id}', this.value)" 
+                            style="width: 100%; padding: 5px; border-radius: 5px; border: 1px solid rgba(0,0,0,0.1); background: rgba(255,255,255,0.5); cursor: pointer;">
+                            <option value="pending" ${status === "pending" ? "selected" : ""}>🔴 Chưa làm</option>
+                            <option value="doing" ${status === "doing" ? "selected" : ""}>🟡 Đang làm</option>
+                            <option value="done" ${status === "done" ? "selected" : ""}>🟢 Đã xong</option>
+                        </select>
+                    </td>
+                    <td style="text-align:center;">${c.doneDate || "-"}</td>
+                    <td class="admin-inline" style="text-align:center;">
+                        <div class="action-buttons">
+                            <button onclick="editCmt('${id}')" class="btn-edit">✏️</button>
+                            <button onclick="deleteCmt('${id}')" class="btn-delete">🗑️</button>
+                        </div>
+                    </td>
+                </tr>`;
+            });
+        }
+    }
+    document.getElementById("commentListContent").innerHTML = html;
+};
 
-        <td style="text-align:center;">${c.doneDate || "-"}</td>
-        <td class="admin-inline" style="text-align:center;">
-            <div class="action-buttons">
-                <button onclick="editCmt('${id}')" class="btn-edit">✏️</button>
-                <button onclick="deleteCmt('${id}')" class="btn-delete">🗑️</button>
-            </div>
-        </td>
-    </tr>`;
-});
-
-// ➕ Thêm hàm cập nhật trạng thái nhanh (nếu chưa có)
+// Hàm cập nhật trạng thái nhanh
 window.updateCmtStatus = function(id, newStatus) {
-    if(!isAdmin) return;
+    if (!isAdmin) {
+        alert("Bạn cần quyền Admin để thay đổi trạng thái!");
+        renderCommentList();
+        return;
+    }
     update(ref(db, "comments/" + id), { status: newStatus })
-    .then(() => {
-        // renderCommentList() sẽ tự chạy lại nhờ listener onValue
-    })
-    .catch(err => alert("Lỗi: " + err.message));
+    .catch(err => alert("Lỗi cập nhật: " + err.message));
 };
 
 window.editCmt = function(id) {
@@ -4205,6 +4195,19 @@ window.editCmt = function(id) {
     editCmtId = id;
     document.getElementById("btnSaveCmt").innerText = "💾 Cập nhật";
 };
+
+window.deleteCmt = function(id) {
+    if(confirm("Xác nhận xóa comment này?")) remove(ref(db, "comments/" + id));
+};
+
+function clearCmtForm() {
+    ["cmtPos", "cmtContent", "cmtDoneDate"].forEach(id => {
+        const el = document.getElementById(id);
+        if(el) el.value = "";
+    });
+}
+// Kết thúc thẻ script chuẩn
+
 
 window.deleteCmt = function(id) {
     if(confirm("Xác nhận xóa comment này?")) remove(ref(db, "comments/" + id));

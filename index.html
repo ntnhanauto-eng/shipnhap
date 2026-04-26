@@ -1619,6 +1619,9 @@ onValue(ref(db, "comments"), snapshot => {
 onValue(ref(db, "ships"), snapshot => {
     shipsData = snapshot.val() || {};
     renderShipSelects(); 
+    if(document.getElementById("commentBox").style.display === "block") {
+        renderCommentList();
+    }
     
     // Kiểm tra nếu khung quản lý tàu đang mở thì vẽ lại bảng
     const shipBox = document.getElementById("shipManagerBox");

@@ -4295,36 +4295,65 @@ window.saveCommentData = function() {
 };
 
 window.exportCommentToExcel = function() {
-    const selectedShip = document.getElementById("viewCmtByShip").value;
-    if (!selectedShip) return alert("Hãy chọn tàu trước khi xuất Excel!");
+    const viewSelect = document.getElementById("viewCmtByShip");
+    const selectedShip = viewSelect.value;
 
-    const rows = [["STT", "TÀU", "VỊ TRÍ", "NỘI DUNG COMMENT", "TRẠNG THÁI", "NGÀY XONG"]];
-    const tbodyRows = document.querySelectorAll("#commentListContent tr");
-
-    if (tbodyRows.length === 0 || tbodyRows[0].innerText.includes("chọn tàu") || tbodyRows[0].innerText.includes("chưa có")) {
-        return alert("Không có dữ liệu để xuất!");
+    if (!selectedShip) {
+        alert("Vui lòng chọn một tàu để xuất dữ liệu!");
+        return;
     }
 
+    // 1. Lấy tất cả các hàng trong bảng hiện tại
+    const tbodyRows = document.querySelectorAll("#commentListContent tr");
+    
+    if (tbodyRows.length === 0 || tbodyRows[0].innerText.includes("chọn tàu") || tbodyRows[0].innerText.includes("chưa có")) {
+        alert("Không có dữ liệu để xuất!");
+        return;
+    }
+
+    // 2. Định nghĩa tiêu đề cột cho file Excel (Phải khớp với Header của bảng)
+    const rows = [
+        ["STT", "TÀU", "COMMENT NO", "VỊ TRÍ", "NỘI DUNG COMMENT", "TRẠNG THÁI", "NGÀY XONG"]
+    ];
+
+    // 3. Duyệt qua từng dòng của bảng để lấy dữ liệu
     tbodyRows.forEach((tr) => {
         const cells = tr.querySelectorAll("td");
-        if (cells.length < 6) return;
-        
+        if (cells.length < 7) return; // Kiểm tra nếu dòng không đủ cột thì bỏ qua
+
         const rowData = [
-            cells[0].innerText, // STT
-            cells[1].innerText, // Tàu
-            cells[2].innerText, // Vị trí
-            cells[3].innerText, // Nội dung
-            cells[4].querySelector("select") ? cells[4].querySelector("select").options[cells[4].querySelector("select").selectedIndex].text : cells[4].innerText,
-            cells[5].querySelector("input") ? cells[5].querySelector("input").value : cells[5].innerText
+            cells[0].innerText.trim(), // STT
+            cells[1].innerText.trim(), // Tàu
+            cells[2].innerText.trim(), // COMMENT NO (Cột mới thêm)
+            cells[3].innerText.trim(), // Vị trí
+            cells[4].innerText.trim(), // Nội dung Comment
+            // Lấy text từ ô Select (🔴 Chưa làm, ...)
+            cells[5].querySelector("select") ? cells[5].querySelector("select").options[cells[5].querySelector("select").selectedIndex].text : cells[5].innerText.trim(),
+            // Lấy giá trị từ ô Input Date
+            cells[6].querySelector("input") ? cells[6].querySelector("input").value : cells[6].innerText.trim()
         ];
         rows.push(rowData);
     });
 
+    // 4. Khởi tạo Workbook và Sheet
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols'] = [{wch: 5}, {wch: 10}, {wch: 20}, {wch: 50}, {wch: 15}, {wch: 15}];
+
+    // 5. Cài đặt độ rộng cột để file Excel đẹp hơn
+    const wscols = [
+        {wch: 5},  // STT
+        {wch: 12}, // Tàu
+        {wch: 15}, // COMMENT NO
+        {wch: 20}, // Vị trí
+        {wch: 55}, // Nội dung (Cột này rộng nhất)
+        {wch: 15}, // Trạng thái
+        {wch: 15}  // Ngày xong
+    ];
+    ws['!cols'] = wscols;
+
+    // 6. Xuất file
     XLSX.utils.book_append_sheet(wb, ws, "Comments");
-    XLSX.writeFile(wb, `Comment_${selectedShip}.xlsx`);
+    XLSX.writeFile(wb, `Comment_Tau_${selectedShip}.xlsx`);
 };
 
 

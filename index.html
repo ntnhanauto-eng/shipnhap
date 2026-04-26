@@ -1707,7 +1707,7 @@ onValue(ref(db, "ships"), snapshot => {
     if(document.getElementById("commentBox").style.display === "block") {
         renderCommentList();
     }
-    
+    if(document.getElementById("reviseBox").style.display === "block") renderReviseList();
     // Kiểm tra nếu khung quản lý tàu đang mở thì vẽ lại bảng
     const shipBox = document.getElementById("shipManagerBox");
     if(shipBox && shipBox.style.display === "block") {
@@ -2690,6 +2690,7 @@ document.querySelectorAll("input, select").forEach(el => {
     if (type === "extra") renderExtraSelect();
     if (type === "jobs") renderJobList(); 
     if (type === "comment") renderCommentList();
+    if (type === "revise") renderReviseList();
 
 };
 

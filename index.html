@@ -1455,13 +1455,14 @@ button {
 </div>
 
 </div>
- <div id="commentBox" class="card" style="display:none; margin-top:15px;">
+<div id="commentBox" class="card" style="display:none; margin-top:15px;">
     <h4>💬 QUẢN LÝ COMMENT</h4>
+    
     <div class="admin-only" style="background: #fdf2f2; padding: 10px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #ffcdd2;">
         <p style="margin-top:0; font-weight:bold; color: #d32f2f;">➕ Thêm Comment mới:</p>
         <div class="flex">
             <select id="cmtShip"><option value="">-- Chọn tàu --</option></select>
-            <input type="text" id="cmtNo" placeholder="COMMENT NO (Ví dụ: S001...)">
+            <input type="text" id="cmtNo" placeholder="COMMENT NO">
             <input type="text" id="cmtPos" placeholder="Vị trí...">
             <input type="text" id="cmtContent" placeholder="Nội dung comment">
             <select id="cmtStatus">
@@ -1470,11 +1471,10 @@ button {
                 <option value="done">🟢 Đã xong</option>
             </select>
             <div class="date-field">
-                <label style="font-size: 13px; color: #d32f2f; font-weight: bold;">📅 Ngày hoàn thành:</label>
                 <input type="date" id="cmtDoneDate">
             </div>
         </div>
-        <button onclick="saveCommentData()" id="btnSaveCmt" style="background: #d32f2f; margin-top: 15px;">💾 Lưu Comment</button>
+        <button onclick="saveCommentData()" id="btnSaveCmt" style="background: #d32f2f; margin-top: 10px;">💾 Lưu Comment</button>
     </div>
 
     <div style="margin-bottom: 10px;">
@@ -1483,25 +1483,22 @@ button {
             <option value="">-- Chọn tàu --</option>
         </select>
     </div>
-
-    <div style="margin-bottom: 15px; display: flex; justify-content: flex-start;">
-        <button onclick="exportCommentToExcel()" style="width: auto; background: #188038; padding: 8px 20px; font-size: 14px; display: flex; align-items: center; gap: 8px;">
-            📤 Xuất Excel Comment
-        </button>
+    <div style="margin-bottom: 15px;">
+        <button onclick="exportCommentToExcel()" style="width: auto; background: #188038; padding: 8px 20px;">📤 Xuất Excel Comment</button>
     </div>
     
     <div class="table-wrap">
         <table id="commentTable" style="width: 100%; min-width: 1000px; table-layout: auto;">
             <thead>
                 <tr>
-                    <th style="width: 50px; text-align: center;">STT</th>
+                    <th style="width: 50px;">STT</th>
                     <th style="width: 90px;">TÀU</th>
                     <th style="width: 100px;">COMMENT NO</th>
                     <th style="width: 130px;">VỊ TRÍ</th>
-                    <th style="width: auto;">NỘI DUNG COMMENT</th> 
+                    <th>NỘI DUNG COMMENT</th> 
                     <th style="width: 120px;">TRẠNG THÁI</th>
-                    <th style="width: 140px; text-align: center;">NGÀY XONG</th>
-                    <th class="admin-inline" style="width: 70px; text-align: center;">Sửa</th>
+                    <th style="width: 140px;">NGÀY XONG</th>
+                    <th class="admin-inline" style="width: 70px;">Sửa</th>
                 </tr>
             </thead>
             <tbody id="commentListContent"></tbody>
@@ -1509,12 +1506,13 @@ button {
     </div>
 </div> <div id="reviseBox" class="card" style="display:none; margin-top:15px;">
     <h4>📐 QUẢN LÝ BẢN VẼ REVISE</h4>
+
     <div class="admin-only" style="background: #e3f2fd; padding: 10px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #90caf9;">
         <p style="margin-top:0; font-weight:bold; color: #1565c0;">➕ Thêm Bản vẽ Revise:</p>
         <div class="flex">
             <select id="revShip"><option value="">-- Chọn tàu --</option></select>
-            <input type="text" id="revPos" placeholder="Vị trí (Ví dụ: Deck 1...)">
-            <input type="text" id="revNo" placeholder="Số Revise (Ví dụ: Rev 01...)">
+            <input type="text" id="revPos" placeholder="Vị trí...">
+            <input type="text" id="revNo" placeholder="SỐ REVISE">
             <input type="text" id="revContent" placeholder="Nội dung revise">
             <select id="revStatus">
                 <option value="pending">🔴 Chưa làm</option>
@@ -1522,35 +1520,34 @@ button {
                 <option value="done">🟢 Đã xong</option>
             </select>
             <div class="date-field">
-                <label style="font-size: 13px; color: #1565c0; font-weight: bold;">📅 Ngày hoàn thành:</label>
                 <input type="date" id="revDoneDate">
             </div>
         </div>
-        <button onclick="saveReviseData()" id="btnSaveRev" style="background: #1565c0; margin-top: 15px;">💾 Lưu Bản vẽ</button>
+        <button onclick="saveReviseData()" id="btnSaveRev" style="background: #1565c0; margin-top: 10px;">💾 Lưu Bản vẽ</button>
     </div>
 
-    <div style="margin-bottom: 10px; display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
-        <div style="flex: 1; min-width: 200px;">
-            <label><b>🔍 Xem theo tàu:</b></label>
-            <select id="viewRevByShip" onchange="renderReviseList()">
-                <option value="">-- Chọn tàu --</option>
-            </select>
-        </div>
-        <button onclick="exportReviseToExcel()" style="width: auto; background: #188038; padding: 10px 20px;">📤 Xuất Excel Revise</button>
+    <div style="margin-bottom: 10px;">
+        <label><b>🔍 Xem theo tàu:</b></label>
+        <select id="viewRevByShip" onchange="renderReviseList()">
+            <option value="">-- Chọn tàu --</option>
+        </select>
+    </div>
+    <div style="margin-bottom: 15px;">
+        <button onclick="exportReviseToExcel()" style="width: auto; background: #188038; padding: 8px 20px;">📤 Xuất Excel Revise</button>
     </div>
 
     <div class="table-wrap">
         <table id="reviseTable" style="width: 100%; min-width: 1000px; table-layout: auto;">
             <thead>
                 <tr style="background: #e3f2fd;">
-                    <th style="width: 50px; text-align: center;">STT</th>
+                    <th style="width: 50px;">STT</th>
                     <th style="width: 90px;">TÀU</th>
                     <th style="width: 130px;">VỊ TRÍ</th>
                     <th style="width: 120px;">SỐ REVISE</th>
-                    <th style="width: auto;">NỘI DUNG REVISE</th> 
+                    <th>NỘI DUNG REVISE</th> 
                     <th style="width: 120px;">TRẠNG THÁI</th>
-                    <th style="width: 130px; text-align: center;">NGÀY XONG</th>
-                    <th class="admin-inline" style="width: 70px; text-align: center;">Sửa</th>
+                    <th style="width: 130px;">NGÀY XONG</th>
+                    <th class="admin-inline" style="width: 70px;">Sửa</th>
                 </tr>
             </thead>
             <tbody id="reviseListContent"></tbody>

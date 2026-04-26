@@ -4139,40 +4139,41 @@ window.renderCommentList = function() {
         if (filtered.length === 0) {
             html = `<tr><td colspan='7' style='text-align:center; padding:20px;'>Tàu <b>${selectedShip}</b> chưa có comment.</td></tr>`;
         } else {
-            filtered.forEach(([id, c]) => {
-                const status = c.status || "pending";
-                let bgColor = "";
-                if (status === "pending") bgColor = "#F8BBD0";
-                else if (status === "doing") bgColor = "#FFF59D";
-                else if (status === "done") bgColor = "#B2DFDB";
+           filtered.forEach(([id, c]) => {
+    const status = c.status || "pending";
+    let bgColor = "";
+    if (status === "pending") bgColor = "#F8BBD0";
+    else if (status === "doing") bgColor = "#FFF59D";
+    else if (status === "done") bgColor = "#B2DFDB";
 
-                html += `
-                <tr style="background: ${bgColor};">
-                    <td style="text-align:center;">${index++}</td>
-                    <td>${c.ship}</td>
-                    <td>${c.pos || "-"}</td>
-                    <td style="white-space: normal; word-break: break-word;">${c.content}</td>
-                    <td>
-                        <select onchange="updateCmtStatus('${id}', this.value)" 
-                            style="width: 100%; padding: 5px; border-radius: 5px; border: 1px solid rgba(0,0,0,0.1); background: rgba(255,255,255,0.5); cursor: pointer;">
-                            <option value="pending" ${status === "pending" ? "selected" : ""}>🔴 Chưa làm</option>
-                            <option value="doing" ${status === "doing" ? "selected" : ""}>🟡 Đang làm</option>
-                            <option value="done" ${status === "done" ? "selected" : ""}>🟢 Đã xong</option>
-                        </select>
-                    </td>
-                    <td style="text-align:center;">${c.doneDate || "-"}</td>
-                    <td class="admin-inline" style="text-align:center;">
-                        <div class="action-buttons">
-                            <button onclick="editCmt('${id}')" class="btn-edit">✏️</button>
-                            <button onclick="deleteCmt('${id}')" class="btn-delete">🗑️</button>
-                        </div>
-                    </td>
-                </tr>`;
-            });
-        }
-    }
-    document.getElementById("commentListContent").innerHTML = html;
-};
+    html += `
+    <tr style="background: ${bgColor};">
+        <td style="text-align:center;">${index++}</td>
+        <td>${c.ship}</td>
+        <td>${c.pos || "-"}</td>
+        <td style="white-space: normal; word-break: break-word;">${c.content}</td>
+        <td>
+            <select onchange="updateCmtStatus('${id}', this.value)" 
+                    style="width: 100%; padding: 5px; border-radius: 5px; border: 1px solid rgba(0,0,0,0.1); background: rgba(255,255,255,0.5); cursor: pointer;">
+                <option value="pending" ${status === "pending" ? "selected" : ""}>🔴 Chưa làm</option>
+                <option value="doing" ${status === "doing" ? "selected" : ""}>🟡 Đang làm</option>
+                <option value="done" ${status === "done" ? "selected" : ""}>🟢 Đã xong</option>
+            </select>
+        </td>
+        <td style="text-align:center;">
+            <input type="date" 
+                   value="${c.doneDate || ''}" 
+                   onchange="updateCmtDate('${id}', this.value)"
+                   style="width: 100%; padding: 4px; border-radius: 5px; border: 1px solid rgba(0,0,0,0.1); font-size: 12px; background: rgba(255,255,255,0.6);">
+        </td>
+        <td class="admin-inline" style="text-align:center;">
+            <div class="action-buttons">
+                <button onclick="editCmt('${id}')" class="btn-edit">✏️</button>
+                <button onclick="deleteCmt('${id}')" class="btn-delete">🗑️</button>
+            </div>
+        </td>
+    </tr>`;
+});
 
 // Hàm cập nhật trạng thái nhanh
 window.updateCmtStatus = function(id, newStatus) {
@@ -4228,13 +4229,16 @@ window.updateCmtStatus = function(id, newStatus) {
 window.updateCmtDate = function(id, newDate) {
     if (!isAdmin) {
         alert("Bạn cần quyền Admin để cập nhật ngày!");
-        renderCommentList();
+        renderCommentList(); // Vẽ lại để reset giá trị
         return;
     }
+    // Cập nhật trường doneDate lên Firebase
     update(ref(db, "comments/" + id), { doneDate: newDate })
-    .catch(err => alert("Lỗi: " + err.message));
+    .then(() => {
+        console.log("Đã cập nhật ngày hoàn thành cho comment:", id);
+    })
+    .catch(err => alert("Lỗi cập nhật ngày: " + err.message));
 };
-
 // 5. Hàm lưu dữ liệu từ Form nhập (Admin)
 window.saveCommentData = function() {
     if(!isAdmin) return;

@@ -1455,9 +1455,8 @@ button {
 </div>
 
 </div>
-  <div id="commentBox" class="card" style="display:none; margin-top:15px;">
+ <div id="commentBox" class="card" style="display:none; margin-top:15px;">
     <h4>💬 QUẢN LÝ COMMENT</h4>
-
     <div class="admin-only" style="background: #fdf2f2; padding: 10px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #ffcdd2;">
         <p style="margin-top:0; font-weight:bold; color: #d32f2f;">➕ Thêm Comment mới:</p>
         <div class="flex">
@@ -1478,11 +1477,38 @@ button {
         <button onclick="saveCommentData()" id="btnSaveCmt" style="background: #d32f2f; margin-top: 15px;">💾 Lưu Comment</button>
     </div>
 
+    <div style="margin-bottom: 10px;">
+        <label><b>🔍 Xem theo tàu:</b></label>
+        <select id="viewCmtByShip" onchange="renderCommentList()">
+            <option value="">-- Chọn tàu --</option>
+        </select>
+    </div>
 
-
-      <div id="reviseBox" class="card" style="display:none; margin-top:15px;">
+    <div style="margin-bottom: 15px; display: flex; justify-content: flex-start;">
+        <button onclick="exportCommentToExcel()" style="width: auto; background: #188038; padding: 8px 20px; font-size: 14px; display: flex; align-items: center; gap: 8px;">
+            📤 Xuất Excel Comment
+        </button>
+    </div>
+    
+    <div class="table-wrap">
+        <table id="commentTable" style="width: 100%; min-width: 1000px; table-layout: auto;">
+            <thead>
+                <tr>
+                    <th style="width: 50px; text-align: center;">STT</th>
+                    <th style="width: 90px;">TÀU</th>
+                    <th style="width: 100px;">COMMENT NO</th>
+                    <th style="width: 130px;">VỊ TRÍ</th>
+                    <th style="width: auto;">NỘI DUNG COMMENT</th> 
+                    <th style="width: 120px;">TRẠNG THÁI</th>
+                    <th style="width: 140px; text-align: center;">NGÀY XONG</th>
+                    <th class="admin-inline" style="width: 70px; text-align: center;">Sửa</th>
+                </tr>
+            </thead>
+            <tbody id="commentListContent"></tbody>
+        </table>
+    </div>
+</div> <div id="reviseBox" class="card" style="display:none; margin-top:15px;">
     <h4>📐 QUẢN LÝ BẢN VẼ REVISE</h4>
-
     <div class="admin-only" style="background: #e3f2fd; padding: 10px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #90caf9;">
         <p style="margin-top:0; font-weight:bold; color: #1565c0;">➕ Thêm Bản vẽ Revise:</p>
         <div class="flex">
@@ -2629,8 +2655,7 @@ document.querySelectorAll("input, select").forEach(el => {
 
 });
 
-   window.handleButton = function(type) {
-    // 1. Lấy tất cả các vùng nội dung (Boxes)
+  window.handleButton = function(type) {
     const boxes = {
         summary: document.getElementById("summary"),
         hours: document.getElementById("workHoursBox"),
@@ -2638,12 +2663,11 @@ document.querySelectorAll("input, select").forEach(el => {
         progress: document.getElementById("progressBox"),
         checklist: document.getElementById("checklistBox"),
         extra: document.getElementById("extraBox"),
-        jobs: document.getElementById("jobManagerBox"), // Box mới thêm
+        jobs: document.getElementById("jobManagerBox"),
         comment: document.getElementById("commentBox"),
         revise: document.getElementById("reviseBox")
     };
 
-    // 2. Lấy tất cả các nút bấm tương ứng
     const btns = {
         summary: document.getElementById("btnSummary"),
         hours: document.getElementById("btnWorkHours"),
@@ -2651,37 +2675,28 @@ document.querySelectorAll("input, select").forEach(el => {
         progress: document.getElementById("btnProgress"),
         checklist: document.getElementById("btnChecklist"),
         extra: document.getElementById("btnExtra"),
-        jobs: document.getElementById("btnJobs"), // Nút mới thêm
+        jobs: document.getElementById("btnJobs"),
         comment: document.getElementById("btnComment"),
         revise: document.getElementById("btnRevise")
     };
 
-    // Xử lý riêng cho nút Xuất Excel
-    if (type === 'export') {
-        exportExcel();
-        return;
-    }
+    if (type === 'export') { exportExcel(); return; }
 
     const targetBox = boxes[type];
     const targetBtn = btns[type];
-
     if (!targetBox) return;
 
-    // Kiểm tra trạng thái: Nếu đang mở thì bấm lần nữa sẽ đóng
     const isAlreadyOpen = targetBox.style.display === "block";
 
-    // BƯỚC 1: ẨN TẤT CẢ các box và xóa màu xanh (active) của các nút
     Object.values(boxes).forEach(box => { if(box) box.style.display = "none"; });
     Object.values(btns).forEach(btn => { if(btn) btn.classList.remove("btn-active"); });
 
-    // BƯỚC 2: Nếu cái vừa bấm đang mở -> Thoát (vì đã ẩn ở bước 1 rồi)
     if (isAlreadyOpen) return;
 
-    // BƯỚC 3: Nếu nó đang tắt -> Mở lên và load dữ liệu
     targetBox.style.display = "block";
     targetBtn.classList.add("btn-active");
 
-    // BƯỚC 4: Load dữ liệu đặc thù cho từng loại
+    // Kích hoạt load dữ liệu tương ứng
     if (type === "summary") { showSummary(); showGeneralSummaryReport(); }
     if (type === "hours") renderWorkHoursInputs();
     if (type === "ships") renderShipManagerList();
@@ -2690,8 +2705,7 @@ document.querySelectorAll("input, select").forEach(el => {
     if (type === "extra") renderExtraSelect();
     if (type === "jobs") renderJobList(); 
     if (type === "comment") renderCommentList();
-    if (type === "revise") renderReviseList();
-
+    if (type === "revise") renderReviseList(); // QUAN TRỌNG
 };
 
 function renderPagination() {
@@ -4534,7 +4548,32 @@ window.editRev = (id) => {
     editRevId = id;
     document.getElementById("btnSaveRev").innerText = "💾 Cập nhật Bản vẽ";
 };
+window.exportReviseToExcel = function() {
+    const selectedShip = document.getElementById("viewRevByShip").value;
+    if (!selectedShip) return alert("Vui lòng chọn tàu!");
+    const tbodyRows = document.querySelectorAll("#reviseListContent tr");
+    if (tbodyRows.length === 0 || tbodyRows[0].innerText.includes("Chọn tàu")) return alert("Không có dữ liệu!");
 
+    const rows = [["STT", "TÀU", "VỊ TRÍ", "SỐ REVISE", "NỘI DUNG REVISE", "TRẠNG THÁI", "NGÀY XONG"]];
+    tbodyRows.forEach((tr, index) => {
+        const cells = tr.querySelectorAll("td");
+        if (cells.length < 7) return;
+        const rowData = [
+            index + 1,
+            cells[1].innerText,
+            cells[2].innerText,
+            cells[3].innerText,
+            cells[4].innerText,
+            cells[5].querySelector("select").options[cells[5].querySelector("select").selectedIndex].text,
+            cells[6].querySelector("input").value
+        ];
+        rows.push(rowData);
+    });
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    XLSX.utils.book_append_sheet(wb, ws, "Revise");
+    XLSX.writeFile(wb, `Revise_${selectedShip}.xlsx`);
+};
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

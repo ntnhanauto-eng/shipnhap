@@ -1625,6 +1625,8 @@ document.getElementById("date").value = `${yyyy}-${mm}-${dd}`;
     let editJobId = null; // Dùng khi sửa
     let commentsData = {};
     let editCmtId = null;
+    let reviseData = {};
+    let editRevId = null;
 
 // Lắng nghe dữ liệu Comment từ Firebase
 onValue(ref(db, "comments"), snapshot => {
@@ -1633,6 +1635,14 @@ onValue(ref(db, "comments"), snapshot => {
         renderCommentList();
     }
 });
+onValue(ref(db, "revises"), snapshot => {
+    reviseData = snapshot.val() || {};
+    // Nếu bảng revise đang mở thì vẽ lại dữ liệu mới nhất
+    if(document.getElementById("reviseBox") && document.getElementById("reviseBox").style.display === "block") {
+        renderReviseList();
+    }
+});
+
     
     onValue(ref(db, "jobs"), snapshot => {
     jobsData = snapshot.val() || {};
@@ -2629,7 +2639,8 @@ document.querySelectorAll("input, select").forEach(el => {
         checklist: document.getElementById("checklistBox"),
         extra: document.getElementById("extraBox"),
         jobs: document.getElementById("jobManagerBox"), // Box mới thêm
-        comment: document.getElementById("commentBox")
+        comment: document.getElementById("commentBox"),
+        revise: document.getElementById("reviseBox")
     };
 
     // 2. Lấy tất cả các nút bấm tương ứng
@@ -2641,7 +2652,8 @@ document.querySelectorAll("input, select").forEach(el => {
         checklist: document.getElementById("btnChecklist"),
         extra: document.getElementById("btnExtra"),
         jobs: document.getElementById("btnJobs"), // Nút mới thêm
-        comment: document.getElementById("btnComment")
+        comment: document.getElementById("btnComment"),
+        revise: document.getElementById("btnRevise")
     };
 
     // Xử lý riêng cho nút Xuất Excel
@@ -4419,6 +4431,108 @@ window.exportCommentToExcel = function() {
     XLSX.writeFile(wb, `Comment_Tau_${selectedShip}.xlsx`);
 };
 
+window.saveReviseData = function() {
+    if(!isAdmin) return;
+    const ship = document.getElementById("revShip").value;
+    const content = document.getElementById("revContent").value;
+    if(!ship || !content) return alert("Vui lòng chọn Tàu và nhập Nội dung!");
+
+    const data = {
+        ship: ship,
+        pos: document.getElementById("revPos").value,
+        revNo: document.getElementById("revNo").value,
+        content: content,
+        status: document.getElementById("revStatus").value,
+        doneDate: document.getElementById("revDoneDate").value,
+        createdAt: Date.now()
+    };
+
+    if(editRevId) {
+        update(ref(db, "revises/" + editRevId), data).then(() => {
+            editRevId = null;
+            document.getElementById("btnSaveRev").innerText = "💾 Lưu Bản vẽ";
+            clearRevForm();
+            alert("Đã cập nhật!");
+        });
+    } else {
+        push(ref(db, "revises"), data).then(() => {
+            clearRevForm();
+            alert("Đã thêm mới!");
+        });
+    }
+};
+
+function clearRevForm() {
+    ["revPos", "revNo", "revContent", "revDoneDate"].forEach(id => {
+        document.getElementById(id).value = "";
+    });
+}
+
+    window.renderReviseList = function() {
+    const viewSelect = document.getElementById("viewRevByShip");
+    const inputSelect = document.getElementById("revShip");
+    
+    // Cập nhật danh sách tàu
+    let options = '<option value="">-- Chọn tàu --</option>';
+    Object.keys(shipsData).sort().forEach(id => options += `<option value="${id}">${id}</option>`);
+    viewSelect.innerHTML = options;
+    if(inputSelect) inputSelect.innerHTML = options;
+
+    const selectedShip = viewSelect.value;
+    let html = "";
+    if (!selectedShip) {
+        html = "<tr><td colspan='8' style='text-align:center; padding:20px; color:#888;'>👉 Chọn tàu để xem bản vẽ revise.</td></tr>";
+    } else {
+        const filtered = Object.entries(reviseData).filter(([id, r]) => r.ship === selectedShip);
+        const disabledAttr = isAdmin ? "" : "disabled";
+
+        filtered.forEach(([id, r], index) => {
+            const status = r.status || "pending";
+            let bgColor = status === "done" ? "#B2DFDB" : (status === "doing" ? "#FFF59D" : "#F8BBD0");
+
+            html += `
+            <tr style="background: ${bgColor};">
+                <td style="text-align:center;">${index + 1}</td>
+                <td>${r.ship}</td>
+                <td>${r.pos || "-"}</td>
+                <td style="font-weight:bold; text-align:center;">${r.revNo || "-"}</td>
+                <td style="white-space: pre-wrap;">${r.content}</td>
+                <td>
+                    <select onchange="updateRevStatus('${id}', this.value)" ${disabledAttr} style="width:100%; background:transparent;">
+                        <option value="pending" ${status==="pending"?"selected":""}>🔴 Chưa làm</option>
+                        <option value="doing" ${status==="doing"?"selected":""}>🟡 Đang làm</option>
+                        <option value="done" ${status==="done"?"selected":""}>🟢 Đã xong</option>
+                    </select>
+                </td>
+                <td>
+                    <input type="date" value="${r.doneDate || ''}" onchange="updateRevDate('${id}', this.value)" ${disabledAttr} style="width:100%; border:none; background:transparent;">
+                </td>
+                <td class="admin-inline">
+                    <div class="action-buttons">
+                        <button onclick="editRev('${id}')">✏️</button>
+                        <button onclick="deleteRev('${id}')">🗑️</button>
+                    </div>
+                </td>
+            </tr>`;
+        });
+    }
+    document.getElementById("reviseListContent").innerHTML = html;
+};
+
+window.updateRevStatus = (id, s) => update(ref(db, "revises/" + id), { status: s });
+window.updateRevDate = (id, d) => update(ref(db, "revises/" + id), { doneDate: d });
+window.deleteRev = (id) => confirm("Xóa bản vẽ này?") && remove(ref(db, "revises/" + id));
+window.editRev = (id) => {
+    const r = reviseData[id];
+    document.getElementById("revShip").value = r.ship;
+    document.getElementById("revPos").value = r.pos;
+    document.getElementById("revNo").value = r.revNo;
+    document.getElementById("revContent").value = r.content;
+    document.getElementById("revStatus").value = r.status;
+    document.getElementById("revDoneDate").value = r.doneDate;
+    editRevId = id;
+    document.getElementById("btnSaveRev").innerText = "💾 Cập nhật Bản vẽ";
+};
 
     
 </script>

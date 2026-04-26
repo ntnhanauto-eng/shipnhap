@@ -2601,7 +2601,9 @@ document.querySelectorAll("input, select").forEach(el => {
     if (type === "progress") renderProgressInputs();
     if (type === "checklist") renderChecklistInputs();
     if (type === "extra") renderExtraSelect();
-    if (type === "jobs") renderJobList(); // Load bảng công việc tồn đọng
+    if (type === "jobs") renderJobList(); 
+    if (type === "comment") renderCommentList();
+
 };
 
 function renderPagination() {
@@ -4094,35 +4096,42 @@ window.renderCommentList = function() {
     const viewSelect = document.getElementById("viewCmtByShip");
     const inputSelect = document.getElementById("cmtShip");
     
-    // Lưu lại tàu đang chọn để không bị nhảy khi render lại
+    if (!viewSelect || !inputSelect) return; // Bảo vệ nếu không tìm thấy ID
+
+    // 1. Tạo danh sách Option từ dữ liệu tàu hiện có
+    let options = '<option value="">-- Chọn tàu --</option>';
+    
+    // Kiểm tra xem shipsData có dữ liệu không
+    console.log("Dữ liệu tàu hiện tại:", shipsData); 
+
+    if (shipsData && Object.keys(shipsData).length > 0) {
+        Object.keys(shipsData).sort().forEach(shipId => {
+            options += `<option value="${shipId}">${shipId}</option>`;
+        });
+    }
+
+    // 2. Đổ dữ liệu vào cả 2 ô chọn (Ô nhập và Ô xem)
     const currentView = viewSelect.value;
     const currentInput = inputSelect.value;
-
-    // 🚀 ĐỔ DỮ LIỆU TÀU VÀO CÁC Ô CHỌN
-    let options = '<option value="">-- Chọn tàu --</option>';
-    Object.keys(shipsData).sort().forEach(shipId => {
-        // Chỉ hiện các tàu chưa bàn giao (hoặc hiện tất cả tùy bạn)
-        options += `<option value="${shipId}">${shipId}</option>`;
-    });
-
+    
     viewSelect.innerHTML = options;
     inputSelect.innerHTML = options;
 
-    // Trả lại giá trị cũ đã chọn
-    viewSelect.value = currentView;
-    inputSelect.value = currentInput;
+    // Giữ lại giá trị đang chọn
+    if (currentView) viewSelect.value = currentView;
+    if (currentInput) inputSelect.value = currentInput;
 
-    // --- PHẦN LOGIC HIỂN THỊ BẢNG (giữ nguyên như cũ) ---
+    // --- PHẦN VẼ BẢNG ---
     let html = "";
     let index = 1;
     const selectedShip = viewSelect.value;
 
     if (!selectedShip) {
-        html = "<tr><td colspan='7' style='text-align:center; padding:20px; color:#888;'>👉 Vui lòng chọn một tàu để xem Comment.</td></tr>";
+        html = "<tr><td colspan='7' style='text-align:center; padding:20px; color:#888;'>👉 Vui lòng chọn tàu để xem comment.</td></tr>";
     } else {
         const filtered = Object.entries(commentsData).filter(([id, c]) => c.ship === selectedShip);
         if (filtered.length === 0) {
-            html = `<tr><td colspan='7' style='text-align:center; padding:20px;'>Tàu <b>${selectedShip}</b> chưa có comment nào.</td></tr>`;
+            html = `<tr><td colspan='7' style='text-align:center; padding:20px;'>Tàu <b>${selectedShip}</b> chưa có comment.</td></tr>`;
         } else {
             filtered.forEach(([id, c]) => {
                 let statusLabel = c.status === "done" ? "🟢 Đã xong" : (c.status === "doing" ? "🟡 Đang làm" : "🔴 Chưa làm");

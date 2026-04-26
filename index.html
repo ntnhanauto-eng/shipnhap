@@ -1481,8 +1481,15 @@ button {
         <select id="viewCmtByShip" onchange="renderCommentList()">
             <option value="">-- Chọn tàu --</option>
         </select>
+             
     </div>
 
+      <div style="margin-bottom: 15px; display: flex; justify-content: flex-start;">
+    <button onclick="exportCommentToExcel()" style="width: auto; background: #188038; padding: 8px 20px; font-size: 14px; display: flex; align-items: center; gap: 8px;">
+        📤 Xuất Excel Comment
+    </button>
+</div>
+      
     <div class="table-wrap">
         <table id="commentTable" style="width: 100%; min-width: 800px; table-layout: fixed;">
             <thead>
@@ -4278,6 +4285,42 @@ window.saveCommentData = function() {
         });
     }
 };
+
+window.exportCommentToExcel = function() {
+    const selectedShip = document.getElementById("viewCmtByShip").value;
+    if (!selectedShip) return alert("Hãy chọn tàu trước khi xuất Excel!");
+
+    const rows = [["STT", "TÀU", "VỊ TRÍ", "NỘI DUNG COMMENT", "TRẠNG THÁI", "NGÀY XONG"]];
+    const tbodyRows = document.querySelectorAll("#commentListContent tr");
+
+    if (tbodyRows.length === 0 || tbodyRows[0].innerText.includes("chọn tàu") || tbodyRows[0].innerText.includes("chưa có")) {
+        return alert("Không có dữ liệu để xuất!");
+    }
+
+    tbodyRows.forEach((tr) => {
+        const cells = tr.querySelectorAll("td");
+        if (cells.length < 6) return;
+        
+        const rowData = [
+            cells[0].innerText, // STT
+            cells[1].innerText, // Tàu
+            cells[2].innerText, // Vị trí
+            cells[3].innerText, // Nội dung
+            cells[4].querySelector("select") ? cells[4].querySelector("select").options[cells[4].querySelector("select").selectedIndex].text : cells[4].innerText,
+            cells[5].querySelector("input") ? cells[5].querySelector("input").value : cells[5].innerText
+        ];
+        rows.push(rowData);
+    });
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = [{wch: 5}, {wch: 10}, {wch: 20}, {wch: 50}, {wch: 15}, {wch: 15}];
+    XLSX.utils.book_append_sheet(wb, ws, "Comments");
+    XLSX.writeFile(wb, `Comment_${selectedShip}.xlsx`);
+};
+
+
+    
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
     

@@ -1439,7 +1439,7 @@ button {
                 
     
                 <th style="width: 300px;">TÊN VẬT TƯ</th>
-                <th style="width: 60px;">QUANTITY</th>
+                <th style="width: 60px;">SỐ LƯỢNG</th>
                 <th style="width: 120px;">LOẠI</th>
                 <th style="width: 100px; text-align: center;">VẬT TƯ VỀ</th>
                 <th style="width: 120px; text-align: center;">NGÀY XONG</th>
@@ -1461,6 +1461,7 @@ button {
         <p style="margin-top:0; font-weight:bold; color: #d32f2f;">➕ Thêm Comment mới:</p>
         <div class="flex">
             <select id="cmtShip"><option value="">-- Chọn tàu --</option></select>
+            <input type="text" id="cmtNo" placeholder="COMMENT NO (Ví dụ: S001...)">
             <input type="text" id="cmtPos" placeholder="Vị trí...">
             <input type="text" id="cmtContent" placeholder="Nội dung comment">
             <select id="cmtStatus">
@@ -1496,6 +1497,7 @@ button {
                 <tr>
                     <th style="width: 50px; text-align: center;">STT</th>
                     <th style="width: 90px;">TÀU</th>
+                    <th style="width: 100px;">COMMENT NO</th>
                     <th style="width: 130px;">VỊ TRÍ</th>
                     <th style="width: auto;">NỘI DUNG COMMENT</th> 
                     <th style="width: 120px;">TRẠNG THÁI</th>
@@ -4157,34 +4159,37 @@ window.renderCommentList = function() {
                 else if (status === "doing") bgColor = "#FFF59D";
                 else if (status === "done") bgColor = "#B2DFDB";
 
-                html += `
-                <tr style="background: ${bgColor};">
-                    <td style="text-align:center;">${index++}</td>
-                    <td>${c.ship}</td>
-                    <td>${c.pos || "-"}</td>
-                    <td style="white-space: normal; word-break: break-word;">${c.content}</td>
-                    <td>
-                        <select onchange="updateCmtStatus('${id}', this.value)" ${disabledAttr}
-                            style="width: 100%; padding: 5px; border-radius: 5px; border: 1px solid rgba(0,0,0,0.1); background: transparent;">
-                            <option value="pending" ${status === "pending" ? "selected" : ""}>🔴 Chưa làm</option>
-                            <option value="doing" ${status === "doing" ? "selected" : ""}>🟡 Đang làm</option>
-                            <option value="done" ${status === "done" ? "selected" : ""}>🟢 Đã xong</option>
-                        </select>
-                    </td>
-                    <td style="text-align:center;">
-                        <input type="date" 
-                               value="${c.doneDate || ''}" 
-                               onchange="updateCmtDate('${id}', this.value)" 
-                               ${disabledAttr}
-                               style="width: 100%; padding: 4px; border: ${isAdmin ? '1px solid #ccc' : 'none'}; background: transparent; color: #000;">
-                    </td>
-                    <td class="admin-inline" style="text-align:center;">
-                        <div class="action-buttons">
-                            <button onclick="editCmt('${id}')" class="btn-edit">✏️</button>
-                            <button onclick="deleteCmt('${id}')" class="btn-delete">🗑️</button>
-                        </div>
-                    </td>
-                </tr>`;
+               html += `
+<tr style="background: ${bgColor};">
+    <td style="text-align:center;">${index++}</td>
+    <td>${c.ship}</td>
+    
+    <td style="font-weight: bold; text-align: center; color: #d32f2f;">${c.cmtNo || "-"}</td> 
+    
+    <td>${c.pos || "-"}</td>
+    <td style="white-space: normal; word-break: break-word;">${c.content}</td>
+    <td>
+        <select onchange="updateCmtStatus('${id}', this.value)" ${disabledAttr}
+            style="width: 100%; padding: 5px; border-radius: 5px; border: 1px solid rgba(0,0,0,0.1); background: transparent;">
+            <option value="pending" ${status === "pending" ? "selected" : ""}>🔴 Chưa làm</option>
+            <option value="doing" ${status === "doing" ? "selected" : ""}>🟡 Đang làm</option>
+            <option value="done" ${status === "done" ? "selected" : ""}>🟢 Đã xong</option>
+        </select>
+    </td>
+    <td style="text-align:center;">
+        <input type="date" 
+               value="${c.doneDate || ''}" 
+               onchange="updateCmtDate('${id}', this.value)" 
+               ${disabledAttr}
+               style="width: 100%; padding: 4px; border: ${isAdmin ? '1px solid #ccc' : 'none'}; background: transparent; color: #000;">
+    </td>
+    <td class="admin-inline" style="text-align:center;">
+        <div class="action-buttons">
+            <button onclick="editCmt('${id}')" class="btn-edit">✏️</button>
+            <button onclick="deleteCmt('${id}')" class="btn-delete">🗑️</button>
+        </div>
+    </td>
+</tr>`;
             });
         }
     }
@@ -4206,6 +4211,7 @@ window.updateCmtStatus = function(id, newStatus) {
 window.editCmt = function(id) {
     const c = commentsData[id];
     document.getElementById("cmtShip").value = c.ship;
+    document.getElementById("cmtNo").value = c.cmtNo || ""; // Thêm dòng này
     document.getElementById("cmtPos").value = c.pos;
     document.getElementById("cmtContent").value = c.content;
     document.getElementById("cmtStatus").value = c.status;
@@ -4225,7 +4231,8 @@ window.deleteCmt = function(id) {
 
 // 2. Hàm xóa trắng form nhập
 function clearCmtForm() {
-    ["cmtPos", "cmtContent", "cmtDoneDate"].forEach(id => {
+    // Thêm cmtNo vào danh sách xóa trắng
+    ["cmtNo", "cmtPos", "cmtContent", "cmtDoneDate"].forEach(id => {
         const el = document.getElementById(id);
         if(el) el.value = "";
     });
@@ -4264,6 +4271,7 @@ window.saveCommentData = function() {
 
     const data = {
         ship: ship,
+        cmtNo: document.getElementById("cmtNo").value, // Lưu thêm số comment
         pos: document.getElementById("cmtPos").value,
         content: content,
         status: document.getElementById("cmtStatus").value,
@@ -4276,12 +4284,12 @@ window.saveCommentData = function() {
             editCmtId = null;
             document.getElementById("btnSaveCmt").innerText = "💾 Lưu Comment";
             clearCmtForm();
-            alert("Đã cập nhật Comment!");
+            alert("Đã cập nhật!");
         });
     } else {
         push(ref(db, "comments"), data).then(() => {
             clearCmtForm();
-            alert("Đã thêm Comment mới!");
+            alert("Đã thêm mới!");
         });
     }
 };

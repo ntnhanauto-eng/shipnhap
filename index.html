@@ -4110,13 +4110,17 @@ window.renderCommentList = function() {
     const currentView = viewSelect.value;
     const currentInput = inputSelect.value;
 
+    // Khách xem được TẤT CẢ các tàu, Admin nhập thì chỉ hiện tàu đang làm
     let viewOptions = '<option value="">-- Chọn tàu để xem --</option>';
     let inputOptions = '<option value="">-- Chọn tàu để nhập --</option>';
 
     if (shipsData && Object.keys(shipsData).length > 0) {
         Object.keys(shipsData).sort().forEach(shipId => {
             const ship = shipsData[shipId];
+            // Khách luôn thấy tàu này trong mục "Xem"
             viewOptions += `<option value="${shipId}">${shipId}</option>`;
+            
+            // Chỉ hiện ở mục "Nhập" nếu tàu chưa bàn giao
             if (ship.status !== "done") {
                 inputOptions += `<option value="${shipId}">${shipId}</option>`;
             }
@@ -4125,8 +4129,10 @@ window.renderCommentList = function() {
 
     viewSelect.innerHTML = viewOptions;
     inputSelect.innerHTML = inputOptions;
+    
+    // Giữ nguyên lựa chọn cũ
     viewSelect.value = currentView;
-    inputSelect.value = currentInput;
+    if (isAdmin) inputSelect.value = currentInput;
 
     let html = "";
     let index = 1;
@@ -4139,7 +4145,7 @@ window.renderCommentList = function() {
         if (filtered.length === 0) {
             html = `<tr><td colspan='7' style='text-align:center; padding:20px;'>Tàu <b>${selectedShip}</b> chưa có comment.</td></tr>`;
         } else {
-            // Xác định xem người dùng có phải Admin không
+            // Khóa mọi thứ nếu không phải Admin
             const disabledAttr = isAdmin ? "" : "disabled";
 
             filtered.forEach(([id, c]) => {
@@ -4157,7 +4163,7 @@ window.renderCommentList = function() {
                     <td style="white-space: normal; word-break: break-word;">${c.content}</td>
                     <td>
                         <select onchange="updateCmtStatus('${id}', this.value)" ${disabledAttr}
-                            style="width: 100%; padding: 5px; border-radius: 5px; border: 1px solid rgba(0,0,0,0.1); background: ${isAdmin ? 'rgba(255,255,255,0.8)' : 'transparent'}; cursor: ${isAdmin ? 'pointer' : 'default'};">
+                            style="width: 100%; padding: 5px; border-radius: 5px; border: 1px solid rgba(0,0,0,0.1); background: transparent;">
                             <option value="pending" ${status === "pending" ? "selected" : ""}>🔴 Chưa làm</option>
                             <option value="doing" ${status === "doing" ? "selected" : ""}>🟡 Đang làm</option>
                             <option value="done" ${status === "done" ? "selected" : ""}>🟢 Đã xong</option>
@@ -4168,7 +4174,7 @@ window.renderCommentList = function() {
                                value="${c.doneDate || ''}" 
                                onchange="updateCmtDate('${id}', this.value)" 
                                ${disabledAttr}
-                               style="width: 100%; padding: 4px; border-radius: 5px; border: ${isAdmin ? '1px solid #ccc' : 'none'}; background: ${isAdmin ? '#fff' : 'transparent'}; color: #000;">
+                               style="width: 100%; padding: 4px; border: ${isAdmin ? '1px solid #ccc' : 'none'}; background: transparent; color: #000;">
                     </td>
                     <td class="admin-inline" style="text-align:center;">
                         <div class="action-buttons">

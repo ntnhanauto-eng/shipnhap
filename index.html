@@ -1548,6 +1548,16 @@ document.getElementById("date").value = `${yyyy}-${mm}-${dd}`;
     let isFirstLoad = true;
     let jobsData = {}; // Lưu trữ danh sách công việc
     let editJobId = null; // Dùng khi sửa
+    let commentsData = {};
+    let editCmtId = null;
+
+// Lắng nghe dữ liệu Comment từ Firebase
+onValue(ref(db, "comments"), snapshot => {
+    commentsData = snapshot.val() || {};
+    if(document.getElementById("commentBox").style.display === "block") {
+        renderCommentList();
+    }
+});
     
     onValue(ref(db, "jobs"), snapshot => {
     jobsData = snapshot.val() || {};

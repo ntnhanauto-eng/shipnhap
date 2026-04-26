@@ -2550,7 +2550,8 @@ document.querySelectorAll("input, select").forEach(el => {
         progress: document.getElementById("progressBox"),
         checklist: document.getElementById("checklistBox"),
         extra: document.getElementById("extraBox"),
-        jobs: document.getElementById("jobManagerBox") // Box mới thêm
+        jobs: document.getElementById("jobManagerBox"), // Box mới thêm
+        comment: document.getElementById("commentBox")
     };
 
     // 2. Lấy tất cả các nút bấm tương ứng
@@ -2561,7 +2562,8 @@ document.querySelectorAll("input, select").forEach(el => {
         progress: document.getElementById("btnProgress"),
         checklist: document.getElementById("btnChecklist"),
         extra: document.getElementById("btnExtra"),
-        jobs: document.getElementById("btnJobs") // Nút mới thêm
+        jobs: document.getElementById("btnJobs"), // Nút mới thêm
+        comment: document.getElementById("btnComment")
     };
 
     // Xử lý riêng cho nút Xuất Excel
@@ -4052,7 +4054,100 @@ window.exportFilteredJobs = function() {
     }, 500);
 };
     
+// Hàm lưu dữ liệu Comment
+window.saveCommentData = function() {
+    if(!isAdmin) return;
+    const ship = document.getElementById("cmtShip").value;
+    const content = document.getElementById("cmtContent").value;
+    
+    if(!ship || !content) return alert("Vui lòng chọn Tàu và nhập Nội dung!");
 
+    const data = {
+        ship: ship,
+        pos: document.getElementById("cmtPos").value,
+        content: content,
+        status: document.getElementById("cmtStatus").value,
+        doneDate: document.getElementById("cmtDoneDate").value,
+        createdAt: Date.now()
+    };
+
+    if(editCmtId) {
+        update(ref(db, "comments/" + editCmtId), data).then(() => {
+            editCmtId = null;
+            document.getElementById("btnSaveCmt").innerText = "💾 Lưu Comment";
+            clearCmtForm();
+            alert("Đã cập nhật Comment!");
+        });
+    } else {
+        push(ref(db, "comments"), data).then(() => {
+            clearCmtForm();
+            alert("Đã thêm Comment mới!");
+        });
+    }
+};
+
+// Hàm hiển thị danh sách Comment
+window.renderCommentList = function() {
+    const viewSelect = document.getElementById("viewCmtByShip");
+    const inputSelect = document.getElementById("cmtShip");
+    const currentView = viewSelect.value;
+
+    // Cập nhật danh sách tàu vào Select
+    let options = '<option value="">-- Chọn tàu --</option>';
+    Object.keys(shipsData).sort().forEach(id => {
+        options += `<option value="${id}">${id}</option>`;
+    });
+    viewSelect.innerHTML = options;
+    inputSelect.innerHTML = options;
+    viewSelect.value = currentView;
+
+    let html = "";
+    let index = 1;
+    const selectedShip = viewSelect.value;
+
+    if (!selectedShip) {
+        html = "<tr><td colspan='7' style='text-align:center; padding:20px;'>👉 Chọn tàu để xem Comment</td></tr>";
+    } else {
+        const filtered = Object.entries(commentsData).filter(([id, c]) => c.ship === selectedShip);
+        
+        filtered.forEach(([id, c]) => {
+            let statusLabel = c.status === "done" ? "🟢 Đã xong" : (c.status === "doing" ? "🟡 Đang làm" : "🔴 Chưa làm");
+            html += `
+            <tr>
+                <td style="text-align:center;">${index++}</td>
+                <td>${c.ship}</td>
+                <td>${c.pos || "-"}</td>
+                <td>${c.content}</td>
+                <td>${statusLabel}</td>
+                <td>${c.doneDate || "-"}</td>
+                <td class="admin-inline" style="text-align:center;">
+                    <button onclick="editCmt('${id}')" style="width:30px; background:#ffc107; padding:2px;">✏️</button>
+                    <button onclick="deleteCmt('${id}')" style="width:30px; background:#dc3545; padding:2px;">🗑️</button>
+                </td>
+            </tr>`;
+        });
+    }
+    document.getElementById("commentListContent").innerHTML = html;
+};
+
+window.editCmt = function(id) {
+    const c = commentsData[id];
+    document.getElementById("cmtShip").value = c.ship;
+    document.getElementById("cmtPos").value = c.pos;
+    document.getElementById("cmtContent").value = c.content;
+    document.getElementById("cmtStatus").value = c.status;
+    document.getElementById("cmtDoneDate").value = c.doneDate;
+    editCmtId = id;
+    document.getElementById("btnSaveCmt").innerText = "💾 Cập nhật";
+};
+
+window.deleteCmt = function(id) {
+    if(confirm("Xác nhận xóa comment này?")) remove(ref(db, "comments/" + id));
+};
+
+function clearCmtForm() {
+    ["cmtPos", "cmtContent", "cmtDoneDate"].forEach(id => document.getElementById(id).value = "");
+}
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

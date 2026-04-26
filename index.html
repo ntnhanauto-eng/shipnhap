@@ -4206,34 +4206,47 @@ function clearCmtForm() {
         if(el) el.value = "";
     });
 }
-// Kết thúc thẻ script chuẩn
+
 
 
 window.deleteCmt = function(id) {
-    if(confirm("Xác nhận xóa comment này?")) remove(ref(db, "comments/" + id));
+    if(confirm("Xác nhận xóa comment này?")) {
+        remove(ref(db, "comments/" + id));
+    }
 };
 
+// Hàm xóa trắng form nhập Comment
 function clearCmtForm() {
-    ["cmtPos", "cmtContent", "cmtDoneDate"].forEach(id => document.getElementById(id).value = "");
+    ["cmtPos", "cmtContent", "cmtDoneDate"].forEach(id => {
+        const el = document.getElementById(id);
+        if(el) el.value = "";
+    });
 }
 
-
+// Hàm cập nhật trạng thái nhanh từ bảng
 window.updateCmtStatus = function(id, newStatus) {
     if (!isAdmin) {
         alert("Bạn cần quyền Admin để thay đổi trạng thái!");
-        renderCommentList(); // Vẽ lại để reset lựa chọn về cũ
+        renderCommentList(); 
         return;
     }
-
-    // Cập nhật trạng thái mới lên Firebase
     update(ref(db, "comments/" + id), { 
         status: newStatus 
     })
-    .then(() => {
-        // Không cần làm gì thêm, onValue sẽ tự nạp lại bảng và đổi màu nền
-        console.log("Đã cập nhật trạng thái mới: " + newStatus);
+    .catch(err => alert("Lỗi: " + err.message));
+};
+
+// Hàm cập nhật ngày xong nhanh từ bảng
+window.updateCmtDate = function(id, newDate) {
+    if (!isAdmin) {
+        alert("Bạn cần quyền Admin để cập nhật ngày!");
+        renderCommentList();
+        return;
+    }
+    update(ref(db, "comments/" + id), { 
+        doneDate: newDate 
     })
-    .catch(err => alert("Lỗi cập nhật: " + err.message));
+    .catch(err => alert("Lỗi: " + err.message));
 };
 
 

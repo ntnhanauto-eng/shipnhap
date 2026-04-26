@@ -4150,36 +4150,40 @@ window.renderCommentList = function() {
         if (filtered.length === 0) {
             html = `<tr><td colspan='7' style='text-align:center; padding:20px;'>Tàu <b>${selectedShip}</b> chưa có comment.</td></tr>`;
         } else {
-            filtered.forEach(([id, c]) => {
-                const status = c.status || "pending";
-                let bgColor = status === "done" ? "#B2DFDB" : (status === "doing" ? "#FFF59D" : "#F8BBD0");
-                
-                html += `
-                <tr style="background: ${bgColor};">
-                    <td style="text-align:center;">${index++}</td>
-                    <td>${c.ship}</td>
-                    <td>${c.pos || "-"}</td>
-                    <td style="white-space: normal; word-break: break-word; line-height: 1.4;">${c.content}</td>
-                    <td>
-                        <select onchange="updateCmtStatus('${id}', this.value)" style="width: 100%; padding: 4px; border: none; background: transparent;">
-                            <option value="pending" ${status === "pending" ? "selected" : ""}>🔴 Chưa làm</option>
-                            <option value="doing" ${status === "doing" ? "selected" : ""}>🟡 Đang làm</option>
-                            <option value="done" ${status === "done" ? "selected" : ""}>🟢 Đã xong</option>
-                        </select>
-                    </td>
-                    <td style="text-align:center;">${c.doneDate || "-"}</td>
-                    <td class="admin-inline" style="text-align:center;">
-                        <div class="action-buttons">
-                            <button onclick="editCmt('${id}')" class="btn-edit">✏️</button>
-                            <button onclick="deleteCmt('${id}')" class="btn-delete">🗑️</button>
-                        </div>
-                    </td>
-                </tr>`;
-            });
-        }
-    }
-    document.getElementById("commentListContent").innerHTML = html;
-};
+           filtered.forEach(([id, c]) => {
+    const status = c.status || "pending";
+    
+    // Xác định màu nền dựa trên trạng thái (giống Remain Jobs)
+    let bgColor = "";
+    if (status === "pending") bgColor = "#F8BBD0";   // Hồng
+    else if (status === "doing") bgColor = "#FFF59D"; // Vàng
+    else if (status === "done") bgColor = "#B2DFDB";  // Xanh lá
+
+    html += `
+    <tr style="background: ${bgColor};">
+        <td style="text-align:center;">${index++}</td>
+        <td>${c.ship}</td>
+        <td>${c.pos || "-"}</td>
+        <td style="white-space: normal; word-break: break-word;">${c.content}</td>
+        
+        <td>
+            <select onchange="updateCmtStatus('${id}', this.value)" 
+                style="width: 100%; padding: 5px; border-radius: 5px; border: 1px solid rgba(0,0,0,0.1); background: rgba(255,255,255,0.5); cursor: pointer;">
+                <option value="pending" ${status === "pending" ? "selected" : ""}>🔴 Chưa làm</option>
+                <option value="doing" ${status === "doing" ? "selected" : ""}>🟡 Đang làm</option>
+                <option value="done" ${status === "done" ? "selected" : ""}>🟢 Đã xong</option>
+            </select>
+        </td>
+
+        <td style="text-align:center;">${c.doneDate || "-"}</td>
+        <td class="admin-inline" style="text-align:center;">
+            <div class="action-buttons">
+                <button onclick="editCmt('${id}')" class="btn-edit">✏️</button>
+                <button onclick="deleteCmt('${id}')" class="btn-delete">🗑️</button>
+            </div>
+        </td>
+    </tr>`;
+});
 
 // ➕ Thêm hàm cập nhật trạng thái nhanh (nếu chưa có)
 window.updateCmtStatus = function(id, newStatus) {
@@ -4209,7 +4213,28 @@ window.deleteCmt = function(id) {
 function clearCmtForm() {
     ["cmtPos", "cmtContent", "cmtDoneDate"].forEach(id => document.getElementById(id).value = "");
 }
-    
+
+
+window.updateCmtStatus = function(id, newStatus) {
+    if (!isAdmin) {
+        alert("Bạn cần quyền Admin để thay đổi trạng thái!");
+        renderCommentList(); // Vẽ lại để reset lựa chọn về cũ
+        return;
+    }
+
+    // Cập nhật trạng thái mới lên Firebase
+    update(ref(db, "comments/" + id), { 
+        status: newStatus 
+    })
+    .then(() => {
+        // Không cần làm gì thêm, onValue sẽ tự nạp lại bảng và đổi màu nền
+        console.log("Đã cập nhật trạng thái mới: " + newStatus);
+    })
+    .catch(err => alert("Lỗi cập nhật: " + err.message));
+};
+
+
+            
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
     

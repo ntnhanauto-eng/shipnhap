@@ -4135,21 +4135,22 @@ window.renderCommentList = function() {
         } else {
             filtered.forEach(([id, c]) => {
                 let statusLabel = c.status === "done" ? "🟢 Đã xong" : (c.status === "doing" ? "🟡 Đang làm" : "🔴 Chưa làm");
-                html += `
-                <tr>
-                    <td style="text-align:center;">${index++}</td>
-                    <td>${c.ship}</td>
-                    <td>${c.pos || "-"}</td>
-                    <td>${c.content}</td>
-                    <td>${statusLabel}</td>
-                    <td>${c.doneDate || "-"}</td>
-                    <td class="admin-inline" style="text-align:center;">
-                        <div class="action-buttons">
-                            <button onclick="editCmt('${id}')" class="btn-edit">✏️</button>
-                            <button onclick="deleteCmt('${id}')" class="btn-delete">🗑️</button>
-                        </div>
-                    </td>
-                </tr>`;
+              // Tìm dòng này trong hàm renderCommentList và thay thế:
+html += `
+<tr>
+    <td style="text-align:center;">${index++}</td>
+    <td>${c.ship}</td>
+    <td>${c.pos || "-"}</td>
+    <td style="white-space: normal; word-break: break-word; line-height: 1.4;">${c.content}</td>
+    <td>${statusLabel}</td>
+    <td style="text-align:center;">${c.doneDate || "-"}</td>
+    <td class="admin-inline" style="text-align:center;">
+        <div class="action-buttons">
+            <button onclick="editCmt('${id}')" class="btn-edit" style="width:30px; height:30px;">✏️</button>
+            <button onclick="deleteCmt('${id}')" class="btn-delete" style="width:30px; height:30px;">🗑️</button>
+        </div>
+    </td>
+</tr>`;
             });
         }
     }

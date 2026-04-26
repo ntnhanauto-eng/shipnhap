@@ -1455,30 +1455,25 @@ button {
 
 </div>
   <div id="commentBox" class="card" style="display:none; margin-top:15px;">
-    <h4>💬 QUẢN COMMENT</h4>
+    <h4>💬 QUẢN LÝ GHI CHÚ / COMMENT</h4>
 
     <div class="admin-only" style="background: #fdf2f2; padding: 10px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #ffcdd2;">
         <p style="margin-top:0; font-weight:bold; color: #d32f2f;">➕ Thêm Comment mới:</p>
         <div class="flex">
             <select id="cmtShip"><option value="">-- Chọn tàu --</option></select>
-            <input type="text" id="cmtPos" placeholder="Vị trí (Ví dụ: Deck 1, Engine Room...)">
+            <input type="text" id="cmtPos" placeholder="Vị trí...">
             <input type="text" id="cmtContent" placeholder="Nội dung comment">
             <select id="cmtStatus">
                 <option value="pending">🔴 Chưa làm</option>
                 <option value="doing">🟡 Đang làm</option>
                 <option value="done">🟢 Đã xong</option>
             </select>
-            
-           
-            <div style="margin-top: 10px; max-width: 250px;"> 
-    <div class="date-field">
-        <label for="cmtDoneDate" style="font-size: 13px; color: #d32f2f; font-weight: bold; display: block; margin-bottom: 3px;">
-            📅 Ngày hoàn thành:
-        </label>
-        <input type="date" id="cmtDoneDate" style="margin-top: 0;">
-    </div>
-</div>
-<button onclick="saveCommentData()" id="btnSaveCmt" style="background: #d32f2f; margin-top: 15px;">💾 Lưu Comment</button>
+            <div class="date-field">
+                <label style="font-size: 13px; color: #d32f2f; font-weight: bold;">📅 Ngày hoàn thành:</label>
+                <input type="date" id="cmtDoneDate">
+            </div>
+        </div>
+        <button onclick="saveCommentData()" id="btnSaveCmt" style="background: #d32f2f; margin-top: 15px;">💾 Lưu Comment</button>
     </div>
 
     <div style="margin-bottom: 10px;">
@@ -1489,23 +1484,23 @@ button {
     </div>
 
     <div class="table-wrap">
-       <table id="commentTable" style="width: 100%; min-width: 800px; table-layout: fixed;">
-    <thead>
-        <tr>
-            <th style="width: 50px; text-align: center;">STT</th>
-            <th style="width: 90px;">TÀU</th>
-            <th style="width: 130px;">VỊ TRÍ</th>
-            <th style="width: auto;">NỘI DUNG COMMENT</th> 
-            <th style="width: 120px;">TRẠNG THÁI</th>
-            <th style="width: 130px; text-align: center;">NGÀY XONG</th>
-            <th class="admin-inline" style="width: 70px; text-align: center;">Sửa</th>
-        </tr>
-    </thead>
-    <tbody id="commentListContent"></tbody>
-</table>
+        <table id="commentTable" style="width: 100%; min-width: 800px; table-layout: fixed;">
+            <thead>
+                <tr>
+                    <th style="width: 50px; text-align: center;">STT</th>
+                    <th style="width: 90px;">TÀU</th>
+                    <th style="width: 130px;">VỊ TRÍ</th>
+                    <th style="width: auto;">NỘI DUNG COMMENT</th> 
+                    <th style="width: 120px;">TRẠNG THÁI</th>
+                    <th style="width: 130px; text-align: center;">NGÀY XONG</th>
+                    <th class="admin-inline" style="width: 70px; text-align: center;">Sửa</th>
+                </tr>
+            </thead>
+            <tbody id="commentListContent"></tbody>
+        </table>
     </div>
-</div>       
 </div>
+
 
 <script type="module">
 
@@ -4244,13 +4239,14 @@ window.updateCmtStatus = function(id, newStatus) {
 window.updateCmtDate = function(id, newDate) {
     if (!isAdmin) {
         alert("Bạn không có quyền chỉnh sửa!");
-        renderCommentList();
+        renderCommentList(); // Tải lại để mất ngày vừa chọn
         return;
     }
     update(ref(db, "comments/" + id), { doneDate: newDate })
-    .catch(err => alert("Lỗi cập nhật ngày: " + err.message));
+    .catch(err => alert("Lỗi cập nhật: " + err.message));
 };
 
+    
 // 5. Hàm lưu dữ liệu từ Form nhập (Admin)
 window.saveCommentData = function() {
     if(!isAdmin) return;

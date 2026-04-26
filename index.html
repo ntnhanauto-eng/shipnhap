@@ -4090,42 +4090,56 @@ window.saveCommentData = function() {
 window.renderCommentList = function() {
     const viewSelect = document.getElementById("viewCmtByShip");
     const inputSelect = document.getElementById("cmtShip");
+    
+    // Lưu lại tàu đang chọn để không bị nhảy khi render lại
     const currentView = viewSelect.value;
+    const currentInput = inputSelect.value;
 
-    // Cập nhật danh sách tàu vào Select
+    // 🚀 ĐỔ DỮ LIỆU TÀU VÀO CÁC Ô CHỌN
     let options = '<option value="">-- Chọn tàu --</option>';
-    Object.keys(shipsData).sort().forEach(id => {
-        options += `<option value="${id}">${id}</option>`;
+    Object.keys(shipsData).sort().forEach(shipId => {
+        // Chỉ hiện các tàu chưa bàn giao (hoặc hiện tất cả tùy bạn)
+        options += `<option value="${shipId}">${shipId}</option>`;
     });
+
     viewSelect.innerHTML = options;
     inputSelect.innerHTML = options;
-    viewSelect.value = currentView;
 
+    // Trả lại giá trị cũ đã chọn
+    viewSelect.value = currentView;
+    inputSelect.value = currentInput;
+
+    // --- PHẦN LOGIC HIỂN THỊ BẢNG (giữ nguyên như cũ) ---
     let html = "";
     let index = 1;
     const selectedShip = viewSelect.value;
 
     if (!selectedShip) {
-        html = "<tr><td colspan='7' style='text-align:center; padding:20px;'>👉 Chọn tàu để xem Comment</td></tr>";
+        html = "<tr><td colspan='7' style='text-align:center; padding:20px; color:#888;'>👉 Vui lòng chọn một tàu để xem Comment.</td></tr>";
     } else {
         const filtered = Object.entries(commentsData).filter(([id, c]) => c.ship === selectedShip);
-        
-        filtered.forEach(([id, c]) => {
-            let statusLabel = c.status === "done" ? "🟢 Đã xong" : (c.status === "doing" ? "🟡 Đang làm" : "🔴 Chưa làm");
-            html += `
-            <tr>
-                <td style="text-align:center;">${index++}</td>
-                <td>${c.ship}</td>
-                <td>${c.pos || "-"}</td>
-                <td>${c.content}</td>
-                <td>${statusLabel}</td>
-                <td>${c.doneDate || "-"}</td>
-                <td class="admin-inline" style="text-align:center;">
-                    <button onclick="editCmt('${id}')" style="width:30px; background:#ffc107; padding:2px;">✏️</button>
-                    <button onclick="deleteCmt('${id}')" style="width:30px; background:#dc3545; padding:2px;">🗑️</button>
-                </td>
-            </tr>`;
-        });
+        if (filtered.length === 0) {
+            html = `<tr><td colspan='7' style='text-align:center; padding:20px;'>Tàu <b>${selectedShip}</b> chưa có comment nào.</td></tr>`;
+        } else {
+            filtered.forEach(([id, c]) => {
+                let statusLabel = c.status === "done" ? "🟢 Đã xong" : (c.status === "doing" ? "🟡 Đang làm" : "🔴 Chưa làm");
+                html += `
+                <tr>
+                    <td style="text-align:center;">${index++}</td>
+                    <td>${c.ship}</td>
+                    <td>${c.pos || "-"}</td>
+                    <td>${c.content}</td>
+                    <td>${statusLabel}</td>
+                    <td>${c.doneDate || "-"}</td>
+                    <td class="admin-inline" style="text-align:center;">
+                        <div class="action-buttons">
+                            <button onclick="editCmt('${id}')" class="btn-edit">✏️</button>
+                            <button onclick="deleteCmt('${id}')" class="btn-delete">🗑️</button>
+                        </div>
+                    </td>
+                </tr>`;
+            });
+        }
     }
     document.getElementById("commentListContent").innerHTML = html;
 };

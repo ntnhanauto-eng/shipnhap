@@ -1276,6 +1276,7 @@ button {
     <button id="btnChecklist" class="admin-only" onclick="handleButton('checklist')">Q.lý mục kiểm tra</button>
     <button id="btnExtra" onclick="handleButton('extra')">📦 Vật tư - Ghi chú</button>
     <button id="btnJobs" onclick="handleButton('jobs')">📋 Công việc remain</button>
+    <button id="btnComment" onclick="handleButton('comment')">💬 COMMENT</button>
 </div>
         
      <div id="functionContentArea">
@@ -1453,7 +1454,49 @@ button {
 </div>
 
 </div>
-         
+  <div id="commentBox" class="card" style="display:none; margin-top:15px;">
+    <h4>💬 QUẢN LÝ GHI CHÚ / COMMENT</h4>
+
+    <div class="admin-only" style="background: #fdf2f2; padding: 10px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #ffcdd2;">
+        <p style="margin-top:0; font-weight:bold; color: #d32f2f;">➕ Thêm Comment mới:</p>
+        <div class="flex">
+            <select id="cmtShip"><option value="">-- Chọn tàu --</option></select>
+            <input type="text" id="cmtPos" placeholder="Vị trí (Ví dụ: Deck 1, Engine Room...)">
+            <input type="text" id="cmtContent" placeholder="Nội dung comment">
+            <select id="cmtStatus">
+                <option value="pending">🔴 Chưa làm</option>
+                <option value="doing">🟡 Đang làm</option>
+                <option value="done">🟢 Đã xong</option>
+            </select>
+            <input type="date" id="cmtDoneDate">
+        </div>
+        <button onclick="saveCommentData()" id="btnSaveCmt" style="background: #d32f2f; margin-top: 10px;">💾 Lưu Comment</button>
+    </div>
+
+    <div style="margin-bottom: 10px;">
+        <label><b>🔍 Xem theo tàu:</b></label>
+        <select id="viewCmtByShip" onchange="renderCommentList()">
+            <option value="">-- Chọn tàu --</option>
+        </select>
+    </div>
+
+    <div class="table-wrap">
+        <table id="commentTable">
+            <thead>
+                <tr>
+                    <th style="width: 50px; text-align: center;">STT</th>
+                    <th style="width: 100px;">TÀU</th>
+                    <th style="width: 150px;">VỊ TRÍ</th>
+                    <th>NỘI DUNG</th>
+                    <th style="width: 120px;">TRẠNG THÁI</th>
+                    <th style="width: 110px;">NGÀY XONG</th>
+                    <th class="admin-inline" style="width: 80px; text-align: center;">Sửa</th>
+                </tr>
+            </thead>
+            <tbody id="commentListContent"></tbody>
+        </table>
+    </div>
+</div>       
 </div>
 
 <script type="module">

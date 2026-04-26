@@ -4122,7 +4122,7 @@ window.renderCommentList = function() {
     if (currentInput) inputSelect.value = currentInput;
 
     // --- PHẦN VẼ BẢNG ---
-    let html = "";
+   let html = "";
     let index = 1;
     const selectedShip = viewSelect.value;
 
@@ -4130,31 +4130,64 @@ window.renderCommentList = function() {
         html = "<tr><td colspan='7' style='text-align:center; padding:20px; color:#888;'>👉 Vui lòng chọn tàu để xem comment.</td></tr>";
     } else {
         const filtered = Object.entries(commentsData).filter(([id, c]) => c.ship === selectedShip);
+        
         if (filtered.length === 0) {
             html = `<tr><td colspan='7' style='text-align:center; padding:20px;'>Tàu <b>${selectedShip}</b> chưa có comment.</td></tr>`;
         } else {
             filtered.forEach(([id, c]) => {
-                let statusLabel = c.status === "done" ? "🟢 Đã xong" : (c.status === "doing" ? "🟡 Đang làm" : "🔴 Chưa làm");
-              // Tìm dòng này trong hàm renderCommentList và thay thế:
-html += `
-<tr>
-    <td style="text-align:center;">${index++}</td>
-    <td>${c.ship}</td>
-    <td>${c.pos || "-"}</td>
-    <td style="white-space: normal; word-break: break-word; line-height: 1.4;">${c.content}</td>
-    <td>${statusLabel}</td>
-    <td style="text-align:center;">${c.doneDate || "-"}</td>
-    <td class="admin-inline" style="text-align:center;">
-        <div class="action-buttons">
-            <button onclick="editCmt('${id}')" class="btn-edit" style="width:30px; height:30px;">✏️</button>
-            <button onclick="deleteCmt('${id}')" class="btn-delete" style="width:30px; height:30px;">🗑️</button>
-        </div>
-    </td>
-</tr>`;
+                const status = c.status || "pending";
+                
+                // 🎨 XÁC ĐỊNH MÀU NỀN DỰA TRÊN TRẠNG THÁI
+                let bgColor = "";
+                let statusLabel = "";
+                
+                if (status === "pending") {
+                    bgColor = "#F8BBD0";   // Hồng (Chưa làm)
+                    statusLabel = "🔴 Chưa làm";
+                } else if (status === "doing") {
+                    bgColor = "#FFF59D";   // Vàng (Đang làm)
+                    statusLabel = "🟡 Đang làm";
+                } else if (status === "done") {
+                    bgColor = "#B2DFDB";   // Xanh lá nhạt (Đã xong)
+                    statusLabel = "🟢 Đã xong";
+                }
+
+                // Vẽ dòng <tr> với màu nền bgColor
+                html += `
+                <tr style="background: ${bgColor};">
+                    <td style="text-align:center;">${index++}</td>
+                    <td>${c.ship}</td>
+                    <td>${c.pos || "-"}</td>
+                    <td style="white-space: normal; word-break: break-word; line-height: 1.4;">${c.content}</td>
+                    <td>
+                        <select onchange="updateCmtStatus('${id}', this.value)" style="width: 100%; padding: 4px; border: none; background: transparent;">
+                            <option value="pending" ${status === "pending" ? "selected" : ""}>🔴 Chưa làm</option>
+                            <option value="doing" ${status === "doing" ? "selected" : ""}>🟡 Đang làm</option>
+                            <option value="done" ${status === "done" ? "selected" : ""}>🟢 Đã xong</option>
+                        </select>
+                    </td>
+                    <td style="text-align:center;">${c.doneDate || "-"}</td>
+                    <td class="admin-inline" style="text-align:center;">
+                        <div class="action-buttons">
+                            <button onclick="editCmt('${id}')" class="btn-edit" style="width:30px; height:30px;">✏️</button>
+                            <button onclick="deleteCmt('${id}')" class="btn-delete" style="width:30px; height:30px;">🗑️</button>
+                        </div>
+                    </td>
+                </tr>`;
             });
         }
     }
     document.getElementById("commentListContent").innerHTML = html;
+};
+
+// ➕ Thêm hàm cập nhật trạng thái nhanh (nếu chưa có)
+window.updateCmtStatus = function(id, newStatus) {
+    if(!isAdmin) return;
+    update(ref(db, "comments/" + id), { status: newStatus })
+    .then(() => {
+        // renderCommentList() sẽ tự chạy lại nhờ listener onValue
+    })
+    .catch(err => alert("Lỗi: " + err.message));
 };
 
 window.editCmt = function(id) {

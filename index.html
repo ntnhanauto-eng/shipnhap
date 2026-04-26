@@ -4096,33 +4096,42 @@ window.renderCommentList = function() {
     const viewSelect = document.getElementById("viewCmtByShip");
     const inputSelect = document.getElementById("cmtShip");
     
-    if (!viewSelect || !inputSelect) return; // Bảo vệ nếu không tìm thấy ID
+    if (!viewSelect || !inputSelect) return;
 
-    // 1. Tạo danh sách Option từ dữ liệu tàu hiện có
-    let options = '<option value="">-- Chọn tàu --</option>';
+    // Lưu lại giá trị đang chọn để không bị nhảy khi render lại
+    const currentView = viewSelect.value;
+    const currentInput = inputSelect.value;
+
+    // 1. TẠO DANH SÁCH OPTION CHO Ô XEM (Hiện tất cả để xem lại lịch sử)
+    let viewOptions = '<option value="">-- Chọn tàu để xem --</option>';
     
-    // Kiểm tra xem shipsData có dữ liệu không
-    console.log("Dữ liệu tàu hiện tại:", shipsData); 
+    // 2. TẠO DANH SÁCH OPTION CHO Ô NHẬP (Chỉ hiện tàu chưa bàn giao)
+    let inputOptions = '<option value="">-- Chọn tàu để nhập --</option>';
 
     if (shipsData && Object.keys(shipsData).length > 0) {
         Object.keys(shipsData).sort().forEach(shipId => {
-            options += `<option value="${shipId}">${shipId}</option>`;
+            const ship = shipsData[shipId];
+            
+            // Ô XEM: Luôn thêm tất cả tàu
+            viewOptions += `<option value="${shipId}">${shipId}</option>`;
+
+            // Ô NHẬP: Chỉ thêm nếu tàu chưa bàn giao (status khác "done")
+            if (ship.status !== "done") {
+                inputOptions += `<option value="${shipId}">${shipId}</option>`;
+            }
         });
     }
 
-    // 2. Đổ dữ liệu vào cả 2 ô chọn (Ô nhập và Ô xem)
-    const currentView = viewSelect.value;
-    const currentInput = inputSelect.value;
-    
-    viewSelect.innerHTML = options;
-    inputSelect.innerHTML = options;
+    // Đổ dữ liệu vào các ô tương ứng
+    viewSelect.innerHTML = viewOptions;
+    inputSelect.innerHTML = inputOptions;
 
-    // Giữ lại giá trị đang chọn
-    if (currentView) viewSelect.value = currentView;
-    if (currentInput) inputSelect.value = currentInput;
+    // Trả lại giá trị cũ đã chọn
+    viewSelect.value = currentView;
+    inputSelect.value = currentInput;
 
-    // --- PHẦN VẼ BẢNG ---
-   let html = "";
+    // --- PHẦN VẼ BẢNG (Giữ nguyên logic màu sắc bạn đã làm ở bước trước) ---
+    let html = "";
     let index = 1;
     const selectedShip = viewSelect.value;
 
@@ -4130,29 +4139,13 @@ window.renderCommentList = function() {
         html = "<tr><td colspan='7' style='text-align:center; padding:20px; color:#888;'>👉 Vui lòng chọn tàu để xem comment.</td></tr>";
     } else {
         const filtered = Object.entries(commentsData).filter(([id, c]) => c.ship === selectedShip);
-        
         if (filtered.length === 0) {
             html = `<tr><td colspan='7' style='text-align:center; padding:20px;'>Tàu <b>${selectedShip}</b> chưa có comment.</td></tr>`;
         } else {
             filtered.forEach(([id, c]) => {
                 const status = c.status || "pending";
+                let bgColor = status === "done" ? "#B2DFDB" : (status === "doing" ? "#FFF59D" : "#F8BBD0");
                 
-                // 🎨 XÁC ĐỊNH MÀU NỀN DỰA TRÊN TRẠNG THÁI
-                let bgColor = "";
-                let statusLabel = "";
-                
-                if (status === "pending") {
-                    bgColor = "#F8BBD0";   // Hồng (Chưa làm)
-                    statusLabel = "🔴 Chưa làm";
-                } else if (status === "doing") {
-                    bgColor = "#FFF59D";   // Vàng (Đang làm)
-                    statusLabel = "🟡 Đang làm";
-                } else if (status === "done") {
-                    bgColor = "#B2DFDB";   // Xanh lá nhạt (Đã xong)
-                    statusLabel = "🟢 Đã xong";
-                }
-
-                // Vẽ dòng <tr> với màu nền bgColor
                 html += `
                 <tr style="background: ${bgColor};">
                     <td style="text-align:center;">${index++}</td>
@@ -4169,8 +4162,8 @@ window.renderCommentList = function() {
                     <td style="text-align:center;">${c.doneDate || "-"}</td>
                     <td class="admin-inline" style="text-align:center;">
                         <div class="action-buttons">
-                            <button onclick="editCmt('${id}')" class="btn-edit" style="width:30px; height:30px;">✏️</button>
-                            <button onclick="deleteCmt('${id}')" class="btn-delete" style="width:30px; height:30px;">🗑️</button>
+                            <button onclick="editCmt('${id}')" class="btn-edit">✏️</button>
+                            <button onclick="deleteCmt('${id}')" class="btn-delete">🗑️</button>
                         </div>
                     </td>
                 </tr>`;

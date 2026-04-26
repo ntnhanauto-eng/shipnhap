@@ -4215,7 +4215,7 @@ window.deleteCmt = function(id) {
     }
 };
 
-// Hàm xóa trắng form nhập Comment
+
 function clearCmtForm() {
     ["cmtPos", "cmtContent", "cmtDoneDate"].forEach(id => {
         const el = document.getElementById(id);
@@ -4248,9 +4248,6 @@ window.updateCmtDate = function(id, newDate) {
     })
     .catch(err => alert("Lỗi: " + err.message));
 };
-
-</script>
-            
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
     

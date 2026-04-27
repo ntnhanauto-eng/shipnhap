@@ -1640,27 +1640,28 @@ onValue(ref(db, "ships"), snapshot => {
 
 // 2. Hàm tự động điền tên tàu vào các ô Select
 function renderShipSelects() {
-    const shipSelect = document.getElementById("ship");
-    const filterSelect = document.getElementById("shipFilter");
+    const shipSelect = document.getElementById("ship");       // Ô nhập liệu (Admin)
+    const filterSelect = document.getElementById("shipFilter"); // Ô tìm kiếm (Khách)
     
-    let options = `<option value="all">-- Chọn Tàu --</option>`;
+    let inputOptions = `<option value="all">-- Chọn Tàu --</option>`;
     let filterOptions = `<option value="all">Tất cả tàu</option>`;
     
     // Sắp xếp tên tàu theo bảng chữ cái
     Object.keys(shipsData).sort().forEach(shipId => {
         const ship = shipsData[shipId];
 
-        // 1. Chỉ hiện tàu CHƯA bàn giao (active) ở ô nhập liệu
+        // 1. Ô NHẬP LIỆU: Chỉ hiện tàu ĐANG THI CÔNG (active)
         if (ship.status !== "done") {
-            options += `<option value="${shipId}">${shipId}</option>`;
+            inputOptions += `<option value="${shipId}">${shipId}</option>`;
         }
 
-        // 2. Ô tìm kiếm (Filter) thì vẫn hiện tất cả để xem lại lịch sử
+        // 2. Ô TÌM KIẾM (FILTER): Hiện TẤT CẢ các tàu (bao gồm cả tàu đã bàn giao)
         filterOptions += `<option value="${shipId}">${shipId}</option>`;
     });
     
-    shipSelect.innerHTML = options;
-    filterSelect.innerHTML = filterOptions;
+    // Đổ dữ liệu vào các ô Select tương ứng
+    if (shipSelect) shipSelect.innerHTML = inputOptions;
+    if (filterSelect) filterSelect.innerHTML = filterOptions;
 }
 
 // 3. Hàm Đóng/Mở khung quản lý tàu

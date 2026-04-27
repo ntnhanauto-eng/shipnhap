@@ -1178,96 +1178,12 @@ button {
 
 
     
-    <div class="card admin-only">
-        <h3>Nhập Dữ Liệu</h3>
-         <div class="date-row">
-    <div class="date-field">
-        <label for="date">Chọn ngày</label>
-        <input type="date" id="date">
-    </div>
-
-    <div class="date-field">
-        <label for="ship">Chọn tàu</label>
-        <select id="ship">
-            <option value="all">-- Chọn Tàu --</option>
-        </select>
-    </div>
-</div>
-        <div class="flex">
-            <input type="number" id="workers" placeholder="Số người thực hiện">
-            <input type="text" id="job" placeholder="Nội dung công việc">
-         <select id="chosePlans"> <option value="">-- Không chọn --</option>
-    <option value="PLAN">PLAN</option>
-    <option value="EVENT">EVENT</option>
-    <option value="PLAN_EVENT">PLAN + EVENT</option>
-</select>
-        </div>
-        <button class="btn-save" onclick="saveLog()">💾 Lưu Thông Tin</button>
-    </div>
-
-    
    
-    
-    
-  <div class="card">
-    <div style="margin-bottom: 15px;">
-        <label for="shipFilter" style="font-weight:bold; display:block; margin-bottom:5px;">🚢 Tìm kiếm Dữ liệu:</label>
-        <select id="shipFilter">
-            <option value="all">Tất cả tàu</option>
-        </select>
-    </div>
-
-    <h3 style="cursor:pointer; color:#1a73e8; margin:0; font-size:16px;" onclick="toggleAdvancedSearch()">
-        🔍 Tìm kiếm nâng cao ▾
-    </h3>
-    
-    <div id="advancedSearch" style="display: none; margin-top: 15px;">
-        <div class="date-row">
-            <div class="date-field">
-                <label for="fromDate">Từ ngày</label>
-                <input type="date" id="fromDate">
-            </div>
-            <div class="date-field">
-                <label for="toDate">Đến ngày</label>
-                <input type="date" id="toDate">
-            </div>
-        </div>
-
-        <div class="flex" style="margin-top: 10px;">
-            <input type="text" id="jobFilter" placeholder="Tìm tên công việc...">
-        </div>
-
-        <div class="filter-row" style="margin-top: 10px;">
-    
-    <select id="groupFilter">
-        <option value="all">Tất cả nhóm</option>
-        <option value="EO1">EO1</option>
-        <option value="EO2">EO2</option>
-    </select>
-
-    <select id="sortType">
-        <option value="desc">📅 Mới nhất trước</option>
-        <option value="asc">📅 Cũ nhất trước</option>
-    </select>
-
-</div>
-                
-        </div>
-    </div>
-</div>
-
-   <div class="card">
-
-    <h3 class="table-title">KẾ HOẠCH và NHÂN LỰC THỰC TẾ</h3>
-
-    <div class="table-wrap">
-        <div id="tableContainer"></div>
-        <div id="pagination" class="pagination"></div>
-    </div>
-</div>
 
     <div class="card">
-       <div class="btn-grid">
+      <div class="btn-grid">
+    <button id="btnDataEntry" onclick="handleButton('dataEntry')">📝 NHẬP DỮ LIỆU</button>
+    
     <button id="btnExport" class="admin-only" onclick="handleButton('export')">📥 Xuất dữ liệu</button>
     <button id="btnSummary" onclick="handleButton('summary')">📊 BÁO CÁO</button>
     <button id="btnManageShips" class="admin-only" onclick="handleButton('ships')">Q.lý D.sách Tàu</button>
@@ -1280,6 +1196,59 @@ button {
 </div>
         
      <div id="functionContentArea">
+         <div id="dataEntryBox" class="card" style="display:none; margin-top:15px;">
+        <div class="admin-only">
+            <h3 style="color: #1a73e8;">➕ Nhập Dữ Liệu Mới</h3>
+            <div class="date-row">
+                <div class="date-field">
+                    <label>Ngày</label>
+                    <input type="date" id="date">
+                </div>
+                <div class="date-field">
+                    <label>Tàu</label>
+                    <select id="ship"><option value="all">-- Chọn Tàu --</option></select>
+                </div>
+            </div>
+            <div class="flex">
+                <input type="number" id="workers" placeholder="Số người thực hiện">
+                <input type="text" id="job" placeholder="Nội dung công việc">
+                <select id="chosePlans">
+                    <option value="">-- Loại hình --</option>
+                    <option value="PLAN">PLAN</option>
+                    <option value="EVENT">EVENT</option>
+                    <option value="PLAN_EVENT">PLAN + EVENT</option>
+                </select>
+            </div>
+            <button class="btn-save" onclick="saveLog()">💾 Lưu Thông Tin</button>
+            <hr style="border: 0.5px solid #eee; margin: 20px 0;">
+        </div>
+
+        <h3 style="color: #1a73e8;">🔍 Tìm Kiếm & Lọc Dữ Liệu</h3>
+        <div class="flex">
+            <select id="shipFilter" onchange="applyFilter()"><option value="all">Tất cả tàu</option></select>
+            <input type="text" id="jobFilter" placeholder="Tìm tên công việc..." oninput="applyFilter()">
+        </div>
+        
+        <div id="advancedSearch" style="margin-top: 10px;">
+            <div class="date-row">
+                <div class="date-field">
+                    <label>Từ ngày</label>
+                    <input type="date" id="fromDate" onchange="applyFilter()">
+                </div>
+                <div class="date-field">
+                    <label>Đến ngày</label>
+                    <input type="date" id="toDate" onchange="applyFilter()">
+                </div>
+            </div>
+        </div>
+
+        <h3 style="margin-top:20px; color: #1a73e8;">📋 Kết Quả Hiển Thị</h3>
+        <div class="table-wrap" style="max-height: 400px;"> <div id="tableContainer"></div>
+            <div id="pagination" class="pagination"></div>
+        </div>
+        
+        <button onclick="exportExcel()" style="background:#28a745; margin-top:15px; width: auto; padding: 10px 25px;">📥 Xuất Excel (Kết quả lọc)</button>
+    </div>
 
     <div id="summary" class="card" style="display:none; margin-top:15px;">
         <div id="summaryStats" style="margin-bottom: 20px;"></div>

@@ -1495,7 +1495,7 @@ button {
                     <th style="width: auto;">NỘI DUNG COMMENT</th> 
                     <th style="width: 120px;">TRẠNG THÁI</th>
                     <th style="width: 140px; text-align: center;">NGÀY XONG</th>
-                   <th style="width: 200px;">GHI CHÚ</th> <th class="admin-inline" style="width: 70px; text-align: center;">Sửa</th>
+                    <th class="admin-inline" style="width: 70px; text-align: center;">Sửa</th>
                 </tr>
             </thead>
             <tbody id="commentListContent"></tbody>
@@ -4100,7 +4100,7 @@ window.saveCommentData = function() {
     }
 };
 
-
+// Hàm hiển thị danh sách Comment
 // Hàm hiển thị danh sách Comment
 window.renderCommentList = function() {
     const viewSelect = document.getElementById("viewCmtByShip");
@@ -4156,38 +4156,37 @@ window.renderCommentList = function() {
                 else if (status === "doing") bgColor = "#FFF59D";
                 else if (status === "done") bgColor = "#B2DFDB";
 
-             // Tìm đoạn vòng lặp filtered.forEach và thêm cột ghi chú vào trước cột nút Sửa
-html += `
-    <tr style="background: ${bgColor};">
-        <td style="text-align:center;">${index++}</td>
-        <td>${c.ship}</td>
-        <td style="font-weight: bold; text-align: center; color: #d32f2f;">${c.cmtNo || "-"}</td> 
-        <td>${c.pos || "-"}</td>
-        <td style="white-space: normal; word-break: break-word;">${c.content}</td>
-        <td>
-            <select onchange="updateCmtStatus('${id}', this.value)" ${disabledAttr} style="...">
-                </select>
-        </td>
-        <td style="text-align:center;">
-            <input type="date" value="${c.doneDate || ''}" onchange="updateCmtDate('${id}', this.value)" ${disabledAttr} style="...">
-        </td>
-
-        <td>
-            <textarea 
-                onchange="updateCmtNote('${id}', this.value)" 
-                ${!isAdmin ? 'readonly' : ''} 
-                style="width: 100%; min-width: 180px; font-size: 13px; background: transparent; border: ${isAdmin ? '1px solid #ccc' : 'none'}; border-radius: 4px; padding: 5px; resize: vertical; line-height: 1.4;"
-                rows="2"
-                placeholder="${isAdmin ? 'Nhập ghi chú...' : ''}"
-            >${c.note || ""}</textarea>
-        </td>
-        <td class="admin-inline" style="text-align:center;">
-            <div class="action-buttons">
-                <button onclick="editCmt('${id}')" class="btn-edit">✏️</button>
-                <button onclick="deleteCmt('${id}')" class="btn-delete">🗑️</button>
-            </div>
-        </td>
-    </tr>`;
+               html += `
+<tr style="background: ${bgColor};">
+    <td style="text-align:center;">${index++}</td>
+    <td>${c.ship}</td>
+    
+    <td style="font-weight: bold; text-align: center; color: #d32f2f;">${c.cmtNo || "-"}</td> 
+    
+    <td>${c.pos || "-"}</td>
+    <td style="white-space: normal; word-break: break-word;">${c.content}</td>
+    <td>
+        <select onchange="updateCmtStatus('${id}', this.value)" ${disabledAttr}
+            style="width: 100%; padding: 5px; border-radius: 5px; border: 1px solid rgba(0,0,0,0.1); background: transparent;">
+            <option value="pending" ${status === "pending" ? "selected" : ""}>🔴 Chưa làm</option>
+            <option value="doing" ${status === "doing" ? "selected" : ""}>🟡 Đang làm</option>
+            <option value="done" ${status === "done" ? "selected" : ""}>🟢 Đã xong</option>
+        </select>
+    </td>
+    <td style="text-align:center;">
+        <input type="date" 
+               value="${c.doneDate || ''}" 
+               onchange="updateCmtDate('${id}', this.value)" 
+               ${disabledAttr}
+               style="width: 100%; padding: 4px; border: ${isAdmin ? '1px solid #ccc' : 'none'}; background: transparent; color: #000;">
+    </td>
+    <td class="admin-inline" style="text-align:center;">
+        <div class="action-buttons">
+            <button onclick="editCmt('${id}')" class="btn-edit">✏️</button>
+            <button onclick="deleteCmt('${id}')" class="btn-delete">🗑️</button>
+        </div>
+    </td>
+</tr>`;
             });
         }
     }
@@ -4214,9 +4213,6 @@ window.editCmt = function(id) {
     document.getElementById("cmtContent").value = c.content;
     document.getElementById("cmtStatus").value = c.status;
     document.getElementById("cmtDoneDate").value = c.doneDate;
-    if(document.getElementById("cmtNote")) {
-        document.getElementById("cmtNote").value = c.note || "";
-    }
     editCmtId = id;
     document.getElementById("btnSaveCmt").innerText = "💾 Cập nhật";
 };
@@ -4260,13 +4256,7 @@ window.updateCmtDate = function(id, newDate) {
     update(ref(db, "comments/" + id), { doneDate: newDate })
     .catch(err => alert("Lỗi cập nhật: " + err.message));
 };
-// 5. Hàm ghi chú trong COMMENT
-window.updateCmtNote = function(id, newNote) {
-    if (!isAdmin) return;
-    update(ref(db, "comments/" + id), { note: newNote })
-    .catch(err => alert("Lỗi cập nhật ghi chú: " + err.message));
-};
-    
+
     
 // 5. Hàm lưu dữ liệu từ Form nhập (Admin)
 window.saveCommentData = function() {
@@ -4277,15 +4267,14 @@ window.saveCommentData = function() {
     if(!ship || !content) return alert("Vui lòng chọn Tàu và nhập Nội dung!");
 
     const data = {
-    ship: ship,
-    cmtNo: document.getElementById("cmtNo").value,
-    pos: document.getElementById("cmtPos").value,
-    content: content,
-    status: document.getElementById("cmtStatus").value,
-    doneDate: document.getElementById("cmtDoneDate").value,
-    note: "", // Khởi tạo rỗng khi thêm mới hoặc bạn có thể thêm input vào form admin nếu muốn
-    createdAt: Date.now()
-};
+        ship: ship,
+        cmtNo: document.getElementById("cmtNo").value, // Lưu thêm số comment
+        pos: document.getElementById("cmtPos").value,
+        content: content,
+        status: document.getElementById("cmtStatus").value,
+        doneDate: document.getElementById("cmtDoneDate").value,
+        createdAt: Date.now()
+    };
 
     if(editCmtId) {
         update(ref(db, "comments/" + editCmtId), data).then(() => {
@@ -4320,25 +4309,26 @@ window.exportCommentToExcel = function() {
     }
 
     // 2. Định nghĩa tiêu đề cột cho file Excel (Phải khớp với Header của bảng)
-   const rows = [
-    ["STT", "TÀU", "COMMENT NO", "VỊ TRÍ", "NỘI DUNG COMMENT", "TRẠNG THÁI", "NGÀY XONG", "GHI CHÚ"]
-];
+    const rows = [
+        ["STT", "TÀU", "COMMENT NO", "VỊ TRÍ", "NỘI DUNG COMMENT", "TRẠNG THÁI", "NGÀY XONG"]
+    ];
 
     // 3. Duyệt qua từng dòng của bảng để lấy dữ liệu
     tbodyRows.forEach((tr) => {
         const cells = tr.querySelectorAll("td");
         if (cells.length < 7) return; // Kiểm tra nếu dòng không đủ cột thì bỏ qua
 
-       const rowData = [
-    cells[0].innerText.trim(),
-    cells[1].innerText.trim(),
-    cells[2].innerText.trim(),
-    cells[3].innerText.trim(),
-    cells[4].innerText.trim(),
-    cells[5].querySelector("select") ? cells[5].querySelector("select").options[cells[5].querySelector("select").selectedIndex].text : cells[5].innerText.trim(),
-    cells[6].querySelector("input") ? cells[6].querySelector("input").value : cells[6].innerText.trim(),
-    cells[7].querySelector("input") ? cells[7].querySelector("input").value : cells[7].innerText.trim() // Lấy cột ghi chú
-];
+        const rowData = [
+            cells[0].innerText.trim(), // STT
+            cells[1].innerText.trim(), // Tàu
+            cells[2].innerText.trim(), // COMMENT NO (Cột mới thêm)
+            cells[3].innerText.trim(), // Vị trí
+            cells[4].innerText.trim(), // Nội dung Comment
+            // Lấy text từ ô Select (🔴 Chưa làm, ...)
+            cells[5].querySelector("select") ? cells[5].querySelector("select").options[cells[5].querySelector("select").selectedIndex].text : cells[5].innerText.trim(),
+            // Lấy giá trị từ ô Input Date
+            cells[6].querySelector("input") ? cells[6].querySelector("input").value : cells[6].innerText.trim()
+        ];
         rows.push(rowData);
     });
 

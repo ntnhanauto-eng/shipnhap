@@ -1178,6 +1178,25 @@ button {
 
 
     
+    
+
+    <div class="card">
+       <div class="btn-grid">
+    <button id="btnDataEntry" onclick="handleButton('dataEntry')">📂 DỮ LIỆU</button>
+    <button id="btnExport" class="admin-only" onclick="handleButton('export')">📥 Xuất dữ liệu</button>
+    <button id="btnSummary" onclick="handleButton('summary')">📊 BÁO CÁO</button>
+    <button id="btnManageShips" class="admin-only" onclick="handleButton('ships')">Q.lý D.sách Tàu</button>
+    <button id="btnWorkHours" class="admin-only" onclick="handleButton('hours')">Q.lý giờ công</button>
+    <button id="btnProgress" class="admin-only" onclick="handleButton('progress')">Q.lý tiến độ tàu</button>
+    <button id="btnChecklist" class="admin-only" onclick="handleButton('checklist')">Q.lý mục kiểm tra</button>
+    <button id="btnExtra" onclick="handleButton('extra')">📦 Vật tư - Ghi chú</button>
+    <button id="btnJobs" onclick="handleButton('jobs')">📋 Công việc remain</button>
+    <button id="btnComment" onclick="handleButton('comment')">💬 COMMENT</button>
+</div>
+        
+     <div id="functionContentArea">
+
+
     <div class="card admin-only">
         <h3>Nhập Dữ Liệu</h3>
          <div class="date-row">
@@ -1266,21 +1285,11 @@ button {
     </div>
 </div>
 
-    <div class="card">
-       <div class="btn-grid">
-    <button id="btnExport" class="admin-only" onclick="handleButton('export')">📥 Xuất dữ liệu</button>
-    <button id="btnSummary" onclick="handleButton('summary')">📊 BÁO CÁO</button>
-    <button id="btnManageShips" class="admin-only" onclick="handleButton('ships')">Q.lý D.sách Tàu</button>
-    <button id="btnWorkHours" class="admin-only" onclick="handleButton('hours')">Q.lý giờ công</button>
-    <button id="btnProgress" class="admin-only" onclick="handleButton('progress')">Q.lý tiến độ tàu</button>
-    <button id="btnChecklist" class="admin-only" onclick="handleButton('checklist')">Q.lý mục kiểm tra</button>
-    <button id="btnExtra" onclick="handleButton('extra')">📦 Vật tư - Ghi chú</button>
-    <button id="btnJobs" onclick="handleButton('jobs')">📋 Công việc remain</button>
-    <button id="btnComment" onclick="handleButton('comment')">💬 COMMENT</button>
-</div>
-        
-     <div id="functionContentArea">
 
+
+
+
+         
     <div id="summary" class="card" style="display:none; margin-top:15px;">
         <div id="summaryStats" style="margin-bottom: 20px;"></div>
         <div class="flex" style="grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
@@ -2559,6 +2568,7 @@ document.querySelectorAll("input, select").forEach(el => {
    window.handleButton = function(type) {
     // 1. Lấy tất cả các vùng nội dung (Boxes)
     const boxes = {
+        dataEntry: document.getElementById("dataEntryBox"),
         summary: document.getElementById("summary"),
         hours: document.getElementById("workHoursBox"),
         ships: document.getElementById("shipManagerBox"),
@@ -2571,6 +2581,7 @@ document.querySelectorAll("input, select").forEach(el => {
 
     // 2. Lấy tất cả các nút bấm tương ứng
     const btns = {
+        dataEntry: document.getElementById("btnDataEntry"),
         summary: document.getElementById("btnSummary"),
         hours: document.getElementById("btnWorkHours"),
         ships: document.getElementById("btnManageShips"),

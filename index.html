@@ -4214,6 +4214,9 @@ window.editCmt = function(id) {
     document.getElementById("cmtContent").value = c.content;
     document.getElementById("cmtStatus").value = c.status;
     document.getElementById("cmtDoneDate").value = c.doneDate;
+    if(document.getElementById("cmtNote")) {
+        document.getElementById("cmtNote").value = c.note || "";
+    }
     editCmtId = id;
     document.getElementById("btnSaveCmt").innerText = "💾 Cập nhật";
 };

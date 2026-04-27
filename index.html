@@ -2528,6 +2528,7 @@ document.querySelectorAll("input, select").forEach(el => {
    window.handleButton = function(type) {
     // 1. Lấy tất cả các vùng nội dung (Boxes)
     const boxes = {
+        dataEntry: document.getElementById("dataEntryBox"),
         summary: document.getElementById("summary"),
         hours: document.getElementById("workHoursBox"),
         ships: document.getElementById("shipManagerBox"),
@@ -2540,6 +2541,7 @@ document.querySelectorAll("input, select").forEach(el => {
 
     // 2. Lấy tất cả các nút bấm tương ứng
     const btns = {
+        dataEntry: document.getElementById("btnDataEntry"),
         summary: document.getElementById("btnSummary"),
         hours: document.getElementById("btnWorkHours"),
         ships: document.getElementById("btnManageShips"),

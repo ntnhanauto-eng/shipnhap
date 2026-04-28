@@ -4073,6 +4073,7 @@ window.exportFilteredJobs = function() {
 // Hàm lưu dữ liệu Comment
 window.saveCommentData = function() {
     if(!isAdmin) return;
+
     const ship = document.getElementById("cmtShip").value;
     const content = document.getElementById("cmtContent").value;
     
@@ -4080,9 +4081,10 @@ window.saveCommentData = function() {
 
     const data = {
         ship: ship,
+        cmtNo: document.getElementById("cmtNo").value,
         pos: document.getElementById("cmtPos").value,
         content: content,
-         note: document.getElementById("cmtNote").value,
+        note: document.getElementById("cmtNote")?.value || "", // 🔥 QUAN TRỌNG
         status: document.getElementById("cmtStatus").value,
         doneDate: document.getElementById("cmtDoneDate").value,
         createdAt: Date.now()
@@ -4093,12 +4095,12 @@ window.saveCommentData = function() {
             editCmtId = null;
             document.getElementById("btnSaveCmt").innerText = "💾 Lưu Comment";
             clearCmtForm();
-            alert("Đã cập nhật Comment!");
+            alert("Đã cập nhật!");
         });
     } else {
         push(ref(db, "comments"), data).then(() => {
             clearCmtForm();
-            alert("Đã thêm Comment mới!");
+            alert("Đã thêm mới!");
         });
     }
 };

@@ -4059,7 +4059,7 @@ window.exportFilteredJobs = function() {
     let date = now.toISOString().slice(0, 10);
     let time = now.toTimeString().slice(0, 8).replace(/:/g, "-");
 
-    a.download = `Job_Filter_${date}_${time}.xlsx`;
+    a.download = `Remain_Jobs_${date}_${time}.xlsx`;
 
     document.body.appendChild(a);
     a.click();

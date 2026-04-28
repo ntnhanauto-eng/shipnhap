@@ -1176,8 +1176,7 @@ button {
     <button id="btnChecklist" class="admin-only" onclick="handleButton('checklist')">Q.lý mục kiểm tra</button>
     <button id="btnExtra" onclick="handleButton('extra')">📦 Vật tư - Ghi chú</button>
     <button id="btnJobs" onclick="handleButton('jobs')">📋 Công việc remain</button>
-    <button id="btnRevise" onclick="openRevise()">📐 BẢN VẼ REVISE</button>
-    <button onclick="openRevise()">📐 BẢN VẼ REVISE</button>
+    <button id="btnComment" onclick="handleButton('comment')">💬 COMMENT</button>
 </div>
         
      <div id="functionContentArea">
@@ -1506,36 +1505,6 @@ button {
     </div>
 </div>
 
-
-<div id="revisePanel" style="display:none; padding:10px;">
-
-    <h3>📐 QUẢN LÝ BẢN VẼ REVISE</h3>
-
-    <table style="width:100%;">
-        <thead>
-            <tr>
-                <th>STT</th>
-                <th>TÀU</th>
-                <th>REVISE NO</th>
-                <th>REVISE CODE</th>
-                <th>DRAWING NAME</th>
-                <th>NỘI DUNG</th>
-                <th>GHI CHÚ</th>
-                <th>TRẠNG THÁI</th>
-                <th>NGÀY XONG</th>
-                <th class="admin-inline">⚙️</th>
-            </tr>
-        </thead>
-
-        <tbody id="reviseTableBody"></tbody>
-    </table>
-
-</div>
-
-
-
-
-        
 
 <script type="module">
 
@@ -4205,20 +4174,17 @@ window.renderCommentList = function() {
     document.getElementById("commentListContent").innerHTML = html;
 };
 
-function openRevise() {
 
-    // Ẩn tất cả các panel khác (nếu bạn có)
-    document.getElementById("dashboardPanel").style.display = "none";
-    document.getElementById("jobPanel").style.display = "none";
-    document.getElementById("commentPanel").style.display = "none";
-
-    // Hiện panel revise
-    document.getElementById("revisePanel").style.display = "block";
-
-    // Render dữ liệu
-    renderReviseList();
-}
-
+// Hàm cập nhật trạng thái nhanh
+window.updateCmtStatus = function(id, newStatus) {
+    if (!isAdmin) {
+        alert("Bạn cần quyền Admin để thay đổi trạng thái!");
+        renderCommentList();
+        return;
+    }
+    update(ref(db, "comments/" + id), { status: newStatus })
+    .catch(err => alert("Lỗi cập nhật: " + err.message));
+};
 
 window.editCmt = function(id) {
     const c = commentsData[id];
@@ -4271,17 +4237,6 @@ window.updateCmtDate = function(id, newDate) {
     }
     update(ref(db, "comments/" + id), { doneDate: newDate })
     .catch(err => alert("Lỗi cập nhật: " + err.message));
-};
-window.updateReviseStatus = function(id, status){
-    if (!isAdmin) return alert("Bạn không có quyền!");
-
-    update(ref(db, "revise/" + id), { status: status });
-};
-
-window.updateReviseDate = function(id, date){
-    if (!isAdmin) return alert("Bạn không có quyền!");
-
-    update(ref(db, "revise/" + id), { doneDate: date });
 };
 
     
@@ -4393,58 +4348,7 @@ window.exportCommentToExcel = function() {
     XLSX.writeFile(wb, `Comment_Tau_${selectedShip}.xlsx`);
 };
 
-function renderReviseList() {
 
-    let html = "";
-    let index = 1;
-
-    Object.entries(reviseData || {}).forEach(([id, r]) => {
-
-        let status = r.status || "pending";
-
-        // 🎨 màu giống COMMENT
-        let bgColor = "";
-        if (status === "pending") bgColor = "#F8BBD0";   // 🔴 hồng
-        if (status === "doing") bgColor = "#FFF59D";     // 🟡 vàng
-        if (status === "done") bgColor = "#B2DFDB";      // 🟢 xanh
-
-        html += `
-<tr style="background:${bgColor}">
-    <td>${index++}</td>
-    <td>${r.ship || ""}</td>
-    <td>${r.reviseNo || ""}</td>
-    <td>${r.reviseCode || ""}</td>
-    <td>${r.drawingName || ""}</td>
-    <td>${r.content || ""}</td>
-    <td>${r.note || ""}</td>
-
-    <!-- 🔥 TRẠNG THÁI -->
-    <td>
-        <select onchange="updateReviseStatus('${id}', this.value)" ${isAdmin ? "" : "disabled"}>
-            <option value="pending" ${status==="pending"?"selected":""}>🔴 Chưa làm</option>
-            <option value="doing" ${status==="doing"?"selected":""}>🟡 Đang làm</option>
-            <option value="done" ${status==="done"?"selected":""}>🟢 Đã xong</option>
-        </select>
-    </td>
-
-    <!-- 📅 NGÀY -->
-    <td>
-        <input type="date"
-            value="${r.doneDate || ""}"
-            onchange="updateReviseDate('${id}', this.value)"
-            ${isAdmin ? "" : "disabled"}>
-    </td>
-
-    <!-- ⚙️ ADMIN -->
-    <td class="admin-inline">
-        <button onclick="editRevise('${id}')">✏️</button>
-        <button onclick="deleteRevise('${id}')">🗑️</button>
-    </td>
-</tr>`;
-    });
-
-    document.getElementById("reviseTableBody").innerHTML = html;
-}
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

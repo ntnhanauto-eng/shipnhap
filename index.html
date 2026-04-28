@@ -3886,6 +3886,7 @@ const filteredJobs = Object.entries(jobsData).filter(([id, j]) => {
    filteredJobs.forEach(([id, j]) => {
 
     let status = j.status || "pending";
+    const disabledAttr = isAdmin ? "" : "disabled";
 
     // 🎨 màu dòng
     let bgColor = "";

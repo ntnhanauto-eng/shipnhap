@@ -1102,7 +1102,19 @@ button {
 .upcoming-empty{
     padding: 6px;
     color: #888;
-}     
+} 
+/* Định nghĩa lại cho nút lưu comment cụ thể */
+#btnSaveCmt {
+    width: auto !important;      /* Bỏ chiếm 100% chiều ngang */
+    display: block;              /* Để có thể canh giữa */
+    margin: 15px auto 5px auto;  /* Canh giữa nút (trên 15px, dưới 5px) */
+    padding: 8px 30px;           /* Thu nhỏ chiều cao, kéo dài chiều ngang nút */
+    font-size: 14px;             /* Chữ vừa phải */
+    min-width: 150px;            /* Độ rộng tối thiểu để nút không quá bé */
+}
+
+
+        
     </style>
 </head>
 <body id="mainBody">

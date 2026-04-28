@@ -4070,40 +4070,7 @@ window.exportFilteredJobs = function() {
     }, 500);
 };
     
-// Hàm lưu dữ liệu Comment
-window.saveCommentData = function() {
-    if(!isAdmin) return;
 
-    const ship = document.getElementById("cmtShip").value;
-    const content = document.getElementById("cmtContent").value;
-    
-    if(!ship || !content) return alert("Vui lòng chọn Tàu và nhập Nội dung!");
-
-    const data = {
-        ship: ship,
-        cmtNo: document.getElementById("cmtNo").value,
-        pos: document.getElementById("cmtPos").value,
-        content: content,
-        note: document.getElementById("cmtNote")?.value || "", // 🔥 QUAN TRỌNG
-        status: document.getElementById("cmtStatus").value,
-        doneDate: document.getElementById("cmtDoneDate").value,
-        createdAt: Date.now()
-    };
-
-    if(editCmtId) {
-        update(ref(db, "comments/" + editCmtId), data).then(() => {
-            editCmtId = null;
-            document.getElementById("btnSaveCmt").innerText = "💾 Lưu Comment";
-            clearCmtForm();
-            alert("Đã cập nhật!");
-        });
-    } else {
-        push(ref(db, "comments"), data).then(() => {
-            clearCmtForm();
-            alert("Đã thêm mới!");
-        });
-    }
-};
 
 // Hàm hiển thị danh sách Comment
 // Hàm hiển thị danh sách Comment
@@ -4276,32 +4243,46 @@ window.updateCmtDate = function(id, newDate) {
 // 5. Hàm lưu dữ liệu từ Form nhập (Admin)
 window.saveCommentData = function() {
     if(!isAdmin) return;
+
+    const noteEl = document.getElementById("cmtNote");
+
+    if (!noteEl) {
+        alert("❌ Không tìm thấy ô GHI CHÚ (cmtNote)!");
+        return;
+    }
+
     const ship = document.getElementById("cmtShip").value;
     const content = document.getElementById("cmtContent").value;
-    
-    if(!ship || !content) return alert("Vui lòng chọn Tàu và nhập Nội dung!");
+
+    if(!ship || !content) {
+        alert("Vui lòng nhập đủ!");
+        return;
+    }
 
     const data = {
         ship: ship,
-        cmtNo: document.getElementById("cmtNo").value, // Lưu thêm số comment
+        cmtNo: document.getElementById("cmtNo").value,
         pos: document.getElementById("cmtPos").value,
         content: content,
+        note: noteEl.value, // 🔥 CHẮC CHẮN LẤY ĐƯỢC
         status: document.getElementById("cmtStatus").value,
         doneDate: document.getElementById("cmtDoneDate").value,
         createdAt: Date.now()
     };
 
+    console.log("🔥 DATA SAVE:", data); // 👉 DEBUG
+
     if(editCmtId) {
-        update(ref(db, "comments/" + editCmtId), data).then(() => {
-            editCmtId = null;
-            document.getElementById("btnSaveCmt").innerText = "💾 Lưu Comment";
+        update(ref(db, "comments/" + editCmtId), data)
+        .then(() => {
+            alert("✅ Đã cập nhật!");
             clearCmtForm();
-            alert("Đã cập nhật!");
         });
     } else {
-        push(ref(db, "comments"), data).then(() => {
+        push(ref(db, "comments"), data)
+        .then(() => {
+            alert("✅ Đã lưu!");
             clearCmtForm();
-            alert("Đã thêm mới!");
         });
     }
 };

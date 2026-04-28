@@ -3883,46 +3883,46 @@ const filteredJobs = Object.entries(jobsData).filter(([id, j]) => {
             html = `<tr><td colspan='8' style='text-align:center; padding:20px;'>Tàu <b>${selectedShip}</b> hiện không có công việc tồn đọng.</td></tr>`;
         } else {
             
-   filteredJobs.forEach(([id, j]) => {
-
+  // Tìm đoạn code này trong hàm renderJobList của bạn:
+filteredJobs.forEach(([id, j]) => {
     let status = j.status || "pending";
-    const disabledAttr = isAdmin ? "" : "disabled";
+    
+    // 🔥 THÊM DÒNG NÀY ĐỂ KIỂM TRA QUYỀN ADMIN
+    const disabledAttr = isAdmin ? "" : "disabled"; 
 
-    // 🎨 màu dòng
     let bgColor = "";
-    if (status === "pending") bgColor = "#F8BBD0";   // đỏ
-    if (status === "doing") bgColor = "#FFF59D";     // vàng
-    if (status === "done") bgColor = "#B2DFDB";      // xanh
+    if (status === "pending") bgColor = "#F8BBD0";   
+    if (status === "doing") bgColor = "#FFF59D";     
+    if (status === "done") bgColor = "#B2DFDB";      
 
-   html += `
-<tr style="background:${bgColor}">
-    <td>${index++}</td>
-    <td>${j.block || "-"}</td>
-    <td>${j.por || "-"}</td>
-    <td>${j.partNo || "-"}</td>
-    <td style="font-weight:bold;">${j.name}</td>
-    <td>${j.qty || "-"}</td>
-    <td>${j.type || "-"}</td>
-    <td>${j.matDate || "-"}</td>
-    <td>${j.doneDate || "-"}</td>
-    <td>${j.note || ""}</td>
+    html += `
+    <tr style="background:${bgColor}">
+        <td>${index++}</td>
+        <td>${j.block || "-"}</td>
+        <td>${j.por || "-"}</td>
+        <td>${j.partNo || "-"}</td>
+        <td style="font-weight:bold;">${j.name}</td>
+        <td>${j.qty || "-"}</td>
+        <td>${j.type || "-"}</td>
+        <td>${j.matDate || "-"}</td>
+        <td>${j.doneDate || "-"}</td>
+        <td>${j.note || ""}</td>
 
-    <!-- 🔥 TRẠNG THÁI -->
-    <td>
-        <select onchange="updateJobStatus('${id}', this.value)">
-            <option value="pending" ${status==="pending"?"selected":""}>🔴 Chưa làm</option>
-            <option value="doing" ${status==="doing"?"selected":""}>🟡 Đang làm</option>
-            <option value="done" ${status==="done"?"selected":""}>🟢 Đã xong</option>
-        </select>
-    </td>
+        <td>
+            <select onchange="updateJobStatus('${id}', this.value)" ${disabledAttr}>
+                <option value="pending" ${status==="pending"?"selected":""}>🔴 Chưa làm</option>
+                <option value="doing" ${status==="doing"?"selected":""}>🟡 Đang làm</option>
+                <option value="done" ${status==="done"?"selected":""}>🟢 Đã xong</option>
+            </select>
+        </td>
 
-    <td class="admin-inline">
-        <div class="action-buttons">
-            <button onclick="editJob('${id}')">✏️</button>
-            <button onclick="deleteJob('${id}')">🗑️</button>
-        </div>
-    </td>
-</tr>`;
+        <td class="admin-inline">
+            <div class="action-buttons">
+                <button onclick="editJob('${id}')">✏️</button>
+                <button onclick="deleteJob('${id}')">🗑️</button>
+            </div>
+        </td>
+    </tr>`;
 });
       }   
     }

@@ -1451,6 +1451,7 @@ button {
             <input type="text" id="cmtNo" placeholder="COMMENT NO (Ví dụ: S001...)">
             <input type="text" id="cmtPos" placeholder="Vị trí...">
             <input type="text" id="cmtContent" placeholder="Nội dung comment">
+            <input type="text" id="cmtNote" placeholder="Ghi chú">
             <select id="cmtStatus">
                 <option value="pending">🔴 Chưa làm</option>
                 <option value="doing">🟡 Đang làm</option>
@@ -1493,6 +1494,7 @@ button {
                     <th style="width: 100px;">COMMENT NO</th>
                     <th style="width: 130px;">VỊ TRÍ</th>
                     <th style="width: auto;">NỘI DUNG COMMENT</th> 
+                     <th style="width: 400px;">GHI CHÚ</th> 
                     <th style="width: 120px;">TRẠNG THÁI</th>
                     <th style="width: 140px; text-align: center;">NGÀY XONG</th>
                     <th class="admin-inline" style="width: 70px; text-align: center;">Sửa</th>
@@ -4080,6 +4082,7 @@ window.saveCommentData = function() {
         ship: ship,
         pos: document.getElementById("cmtPos").value,
         content: content,
+         note: document.getElementById("cmtNote").value,
         status: document.getElementById("cmtStatus").value,
         doneDate: document.getElementById("cmtDoneDate").value,
         createdAt: Date.now()
@@ -4164,26 +4167,35 @@ window.renderCommentList = function() {
     <td style="font-weight: bold; text-align: center; color: #d32f2f;">${c.cmtNo || "-"}</td> 
     
     <td>${c.pos || "-"}</td>
-    <td style="white-space: normal; word-break: break-word;">${c.content}</td>
+
+    <td style="white-space: normal; word-break: break-word;">
+        ${c.content}
+    </td>
+
+    <!-- 🔥 CỘT GHI CHÚ -->
+    <td style="white-space: normal; word-break: break-word;">
+        ${c.note || ""}
+    </td>
+
     <td>
-        <select onchange="updateCmtStatus('${id}', this.value)" ${disabledAttr}
-            style="width: 100%; padding: 5px; border-radius: 5px; border: 1px solid rgba(0,0,0,0.1); background: transparent;">
+        <select onchange="updateCmtStatus('${id}', this.value)" ${disabledAttr}>
             <option value="pending" ${status === "pending" ? "selected" : ""}>🔴 Chưa làm</option>
             <option value="doing" ${status === "doing" ? "selected" : ""}>🟡 Đang làm</option>
             <option value="done" ${status === "done" ? "selected" : ""}>🟢 Đã xong</option>
         </select>
     </td>
+
     <td style="text-align:center;">
         <input type="date" 
                value="${c.doneDate || ''}" 
                onchange="updateCmtDate('${id}', this.value)" 
-               ${disabledAttr}
-               style="width: 100%; padding: 4px; border: ${isAdmin ? '1px solid #ccc' : 'none'}; background: transparent; color: #000;">
+               ${disabledAttr}>
     </td>
+
     <td class="admin-inline" style="text-align:center;">
         <div class="action-buttons">
-            <button onclick="editCmt('${id}')" class="btn-edit">✏️</button>
-            <button onclick="deleteCmt('${id}')" class="btn-delete">🗑️</button>
+            <button onclick="editCmt('${id}')">✏️</button>
+            <button onclick="deleteCmt('${id}')">🗑️</button>
         </div>
     </td>
 </tr>`;
@@ -4211,6 +4223,7 @@ window.editCmt = function(id) {
     document.getElementById("cmtNo").value = c.cmtNo || ""; // Thêm dòng này
     document.getElementById("cmtPos").value = c.pos;
     document.getElementById("cmtContent").value = c.content;
+     document.getElementById("cmtNote").value = c.note || "";
     document.getElementById("cmtStatus").value = c.status;
     document.getElementById("cmtDoneDate").value = c.doneDate;
     editCmtId = id;
@@ -4310,7 +4323,7 @@ window.exportCommentToExcel = function() {
 
     // 2. Định nghĩa tiêu đề cột cho file Excel (Phải khớp với Header của bảng)
     const rows = [
-        ["STT", "TÀU", "COMMENT NO", "VỊ TRÍ", "NỘI DUNG COMMENT", "TRẠNG THÁI", "NGÀY XONG"]
+        ["STT", "TÀU", "COMMENT NO", "VỊ TRÍ", "NỘI DUNG COMMENT", "GHI CHÚ", "TRẠNG THÁI", "NGÀY XONG"]
     ];
 
     // 3. Duyệt qua từng dòng của bảng để lấy dữ liệu
@@ -4318,17 +4331,16 @@ window.exportCommentToExcel = function() {
         const cells = tr.querySelectorAll("td");
         if (cells.length < 7) return; // Kiểm tra nếu dòng không đủ cột thì bỏ qua
 
-        const rowData = [
-            cells[0].innerText.trim(), // STT
-            cells[1].innerText.trim(), // Tàu
-            cells[2].innerText.trim(), // COMMENT NO (Cột mới thêm)
-            cells[3].innerText.trim(), // Vị trí
-            cells[4].innerText.trim(), // Nội dung Comment
-            // Lấy text từ ô Select (🔴 Chưa làm, ...)
-            cells[5].querySelector("select") ? cells[5].querySelector("select").options[cells[5].querySelector("select").selectedIndex].text : cells[5].innerText.trim(),
-            // Lấy giá trị từ ô Input Date
-            cells[6].querySelector("input") ? cells[6].querySelector("input").value : cells[6].innerText.trim()
-        ];
+       const rowData = [
+    cells[0].innerText.trim(),
+    cells[1].innerText.trim(),
+    cells[2].innerText.trim(),
+    cells[3].innerText.trim(),
+    cells[4].innerText.trim(),
+    cells[5].innerText.trim(), // 🔥 NOTE
+    cells[6].querySelector("select") ? cells[6].querySelector("select").selectedOptions[0].text : cells[6].innerText.trim(),
+    cells[7].querySelector("input") ? cells[7].querySelector("input").value : cells[7].innerText.trim()
+];
         rows.push(rowData);
     });
 

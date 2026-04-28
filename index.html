@@ -1113,7 +1113,16 @@ button {
     min-width: 150px;            /* Độ rộng tối thiểu để nút không quá bé */
 }
 
-
+/* Thu nhỏ và căn giữa cho cả nút Lưu Job và Lưu Comment */
+#btnSaveJob, #btnSaveCmt {
+    width: auto !important;     /* Không cho dài 100% */
+    min-width: 160px;           /* Độ rộng tối thiểu để cân đối */
+    display: block;             /* Để dùng được margin auto */
+    margin: 15px auto !important; /* Căn giữa nút */
+    padding: 10px 30px;         /* Khoảng cách trong nút cho đẹp */
+    font-size: 14px;            /* Cỡ chữ vừa phải */
+    border-radius: 8px;         /* Bo góc đồng bộ */
+}
         
     </style>
 </head>

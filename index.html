@@ -4175,16 +4175,7 @@ window.renderCommentList = function() {
 };
 
 
-// Hàm cập nhật trạng thái nhanh
-window.updateCmtStatus = function(id, newStatus) {
-    if (!isAdmin) {
-        alert("Bạn cần quyền Admin để thay đổi trạng thái!");
-        renderCommentList();
-        return;
-    }
-    update(ref(db, "comments/" + id), { status: newStatus })
-    .catch(err => alert("Lỗi cập nhật: " + err.message));
-};
+
 
 window.editCmt = function(id) {
     const c = commentsData[id];

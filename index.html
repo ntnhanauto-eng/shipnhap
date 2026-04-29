@@ -3268,12 +3268,6 @@ document.getElementById("dashboardInfo").innerHTML = infoHTML;
 let openedChecklistShip = null;
 
 window.toggleChecklistEvent = function(ship){
-    const now = new Date();
-const yyyy = now.getFullYear();
-const mm = String(now.getMonth() + 1).padStart(2,'0');
-const dd = String(now.getDate()).padStart(2,'0');
-
-const today = `${yyyy}-${mm}-${dd}`;
 
     const box = document.getElementById("eventChecklistPanel");
     if(!box) return;
@@ -3295,26 +3289,6 @@ const today = `${yyyy}-${mm}-${dd}`;
         )
         .sort((a,b)=> b.date.localeCompare(a.date));
 
-    // ===== XÁC ĐỊNH NGÀY HIGHLIGHT =====
-
-let highlightDate = null;
-
-// 1. kiểm tra có ngày hôm nay không
-const todayEvents = events.filter(e => e.date === today);
-
-if (todayEvents.length > 0) {
-    highlightDate = today;
-} else {
-    // 2. tìm ngày nhỏ hơn và gần nhất
-    const pastDates = events
-        .map(e => e.date)
-        .filter(d => d < today);
-
-    if (pastDates.length > 0) {
-        highlightDate = pastDates.sort().pop(); // ngày gần nhất
-    }
-}
-
     let html = `<div style="margin-bottom:8px;">
         <b>📌 SỰ KIỆN CHÍNH: ${ship}</b>
     </div>`;
@@ -3322,91 +3296,7 @@ if (todayEvents.length > 0) {
     if(events.length === 0){
         html += `<div class="empty">Không có EVENT</div>`;
     } else {
-      // ===== GROUP THEO NGÀY =====
-let grouped = {};
-
-events.forEach(e => {
-    if (!grouped[e.date]) grouped[e.date] = [];
-    grouped[e.date].push(e);
-});
-
-let dates = Object.keys(grouped).sort().reverse();
-
-// ===== XÁC ĐỊNH TODAY =====
-const now = new Date();
-const yyyy = now.getFullYear();
-const mm = String(now.getMonth() + 1).padStart(2,'0');
-const dd = String(now.getDate()).padStart(2,'0');
-
-const today = `${yyyy}-${mm}-${dd}`;
-
-// ===== XÁC ĐỊNH HIGHLIGHT =====
-let highlightDate = null;
-
-if (dates.includes(today)) {
-    highlightDate = today;
-} else {
-    const pastDates = dates.filter(d => d < today);
-    if (pastDates.length > 0) {
-        highlightDate = pastDates.sort().pop();
-    }
-}
-
-// ===== RENDER TIMELINE =====
-let html = `<div class="timeline">`;
-
-dates.forEach(date => {
-
-    let isToday = date === today;
-    let isHighlight = date === highlightDate && !isToday;
-
-    let color = "#999";
-    let label = "";
-
-    if (isToday) {
-        color = "#d93025";
-        label = "🔥 HÔM NAY";
-    } else if (isHighlight) {
-        color = "#f9ab00";
-        label = "⏳ GẦN NHẤT";
-    }
-
-    html += `
-    <div class="timeline-item">
-        <div class="timeline-left">
-            <div class="dot" style="background:${color}"></div>
-            <div class="line"></div>
-        </div>
-
-        <div class="timeline-content">
-            <div class="timeline-date" style="color:${color}">
-                📅 ${date} ${label}
-            </div>
-    `;
-
-    grouped[date].forEach(e => {
-
-        let jobText = (e.job || "")
-            .replace(/PLAN:/gi, "")
-            .replace(/\(EVENT\)/gi, "")
-            .trim();
-
-        html += `
-            <div class="timeline-job">
-                • ${jobText}
-            </div>
-        `;
-    });
-
-    html += `
-        </div>
-    </div>
-    `;
-});
-
-html += `</div>`;
-
-box.innerHTML = html;
+        events.slice(0,20).forEach(e => {
             let jobText = (e.job || "")
     .replace(/PLAN:/gi, "")
     .replace(/\(EVENT\)/gi, "")   // 🔥 thêm dòng này

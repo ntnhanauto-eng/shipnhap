@@ -1210,7 +1210,7 @@ button {
     <button id="btnExtra" onclick="handleButton('extra')">📦 Vật tư - Ghi chú</button>
     <button id="btnJobs" onclick="handleButton('jobs')">📋 Công việc remain</button>
     <button id="btnComment" onclick="handleButton('comment')">💬 COMMENT</button>
-    <button id="btnRevise" onclick="handleButton('revise')">📐 Bản vẽ REVISE</button>
+   <button id="btnRevise" onclick="handleButton('revise')">📐 Bản vẽ REVISE</button>
 </div>
         
      <div id="functionContentArea">
@@ -2654,65 +2654,58 @@ document.querySelectorAll("input, select").forEach(el => {
 
 });
 
-  window.handleButton = function(type) {
-    // 1. Danh sách tất cả các ID của các vùng nội dung (Boxes)
-    const boxes = {
-        dataEntry: document.getElementById("dataEntryBox"),
-        summary: document.getElementById("summary"),
-        hours: document.getElementById("workHoursBox"),
-        ships: document.getElementById("shipManagerBox"),
-        progress: document.getElementById("progressBox"),
-        checklist: document.getElementById("checklistBox"),
-        extra: document.getElementById("extraBox"),
-        jobs: document.getElementById("jobManagerBox"),
-        comment: document.getElementById("commentBox"),
-        revise: document.getElementById("reviseBox") // Đảm bảo ID này khớp với HTML
-    };
+ window.handleButton = function(type) {
+    // 1. Tự động lấy danh sách tất cả các ID cần xử lý
+    const boxIds = ["dataEntryBox", "summary", "workHoursBox", "shipManagerBox", "progressBox", "checklistBox", "extraBox", "jobManagerBox", "commentBox", "reviseBox"];
+    const btnIds = ["btnDataEntry", "btnSummary", "btnWorkHours", "btnManageShips", "btnProgress", "btnChecklist", "btnExtra", "btnJobs", "btnComment", "btnRevise"];
 
-    // 2. Danh sách tất cả các ID của nút bấm tương ứng
-    const btns = {
-        dataEntry: document.getElementById("btnDataEntry"),
-        summary: document.getElementById("btnSummary"),
-        hours: document.getElementById("btnWorkHours"),
-        ships: document.getElementById("btnManageShips"),
-        progress: document.getElementById("btnProgress"),
-        checklist: document.getElementById("btnChecklist"),
-        extra: document.getElementById("btnExtra"),
-        jobs: document.getElementById("btnJobs"),
-        comment: document.getElementById("btnComment"),
-        revise: document.getElementById("btnRevise") // Đảm bảo ID này khớp với HTML
-    };
+    // 2. Ẩn tất cả các Box và xóa màu các nút
+    boxIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = "none";
+    });
+    btnIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.remove("btn-active");
+    });
 
-    const targetBox = boxes[type];
-    const targetBtn = btns[type];
+    // 3. Xác định Box và Button mục tiêu dựa trên 'type'
+    let targetBoxId = "";
+    let targetBtnId = "";
 
-    if (!targetBox) return;
+    switch(type) {
+        case 'dataEntry': targetBoxId = "dataEntryBox"; targetBtnId = "btnDataEntry"; break;
+        case 'summary': targetBoxId = "summary"; targetBtnId = "btnSummary"; break;
+        case 'hours': targetBoxId = "workHoursBox"; targetBtnId = "btnWorkHours"; break;
+        case 'ships': targetBoxId = "shipManagerBox"; targetBtnId = "btnManageShips"; break;
+        case 'progress': targetBoxId = "progressBox"; targetBtnId = "btnProgress"; break;
+        case 'checklist': targetBoxId = "checklistBox"; targetBtnId = "btnChecklist"; break;
+        case 'extra': targetBoxId = "extraBox"; targetBtnId = "btnExtra"; break;
+        case 'jobs': targetBoxId = "jobManagerBox"; targetBtnId = "btnJobs"; break;
+        case 'comment': targetBoxId = "commentBox"; targetBtnId = "btnComment"; break;
+        case 'revise': targetBoxId = "reviseBox"; targetBtnId = "btnRevise"; break;
+    }
 
-    // Kiểm tra trạng thái hiện tại
-    const isAlreadyOpen = targetBox.style.display === "block";
+    const targetBox = document.getElementById(targetBoxId);
+    const targetBtn = document.getElementById(targetBtnId);
 
-    // BƯỚC 1: ẨN TẤT CẢ các box và xóa class active của các nút
-    Object.values(boxes).forEach(box => { if(box) box.style.display = "none"; });
-    Object.values(btns).forEach(btn => { if(btn) btn.classList.remove("btn-active"); });
-
-    // BƯỚC 2: Nếu đang mở rồi thì ẩn đi (đã ẩn ở bước 1), nếu chưa mở thì mới xử lý tiếp
-    if (isAlreadyOpen) return;
-
-    // BƯỚC 3: Hiển thị box mục tiêu và đánh dấu nút đang chọn
-    targetBox.style.display = "block";
-    if(targetBtn) targetBtn.classList.add("btn-active");
-
-    // BƯỚC 4: Gọi hàm load dữ liệu riêng cho từng module
-    if (type === "summary") { showSummary(); showGeneralSummaryReport(); }
-    if (type === "hours") renderWorkHoursInputs();
-    if (type === "ships") renderShipManagerList();
-    if (type === "progress") renderProgressInputs();
-    if (type === "checklist") renderChecklistInputs();
-    if (type === "extra") renderExtraSelect();
-    if (type === "jobs") renderJobList(); 
-    if (type === "comment") renderCommentList();
-    if (type === "dataEntry") applyFilter();
-    if (type === "revise") renderReviseList(); // Gọi hàm vẽ bảng Revise
+    // 4. Hiển thị
+    if (targetBox) {
+        targetBox.style.display = "block";
+        if (targetBtn) targetBtn.classList.add("btn-active");
+        
+        // 5. Gọi hàm load data tương ứng
+        if (type === "summary") { showSummary(); showGeneralSummaryReport(); }
+        if (type === "hours") renderWorkHoursInputs();
+        if (type === "ships") renderShipManagerList();
+        if (type === "progress") renderProgressInputs();
+        if (type === "checklist") renderChecklistInputs();
+        if (type === "extra") renderExtraSelect();
+        if (type === "jobs") renderJobList(); 
+        if (type === "comment") renderCommentList();
+        if (type === "dataEntry") applyFilter();
+        if (type === "revise") renderReviseList(); // Chạy hàm render data
+    }
 };
 
 function renderPagination() {

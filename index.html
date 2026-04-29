@@ -3268,6 +3268,12 @@ document.getElementById("dashboardInfo").innerHTML = infoHTML;
 let openedChecklistShip = null;
 
 window.toggleChecklistEvent = function(ship){
+    const now = new Date();
+const yyyy = now.getFullYear();
+const mm = String(now.getMonth() + 1).padStart(2,'0');
+const dd = String(now.getDate()).padStart(2,'0');
+
+const today = `${yyyy}-${mm}-${dd}`;
 
     const box = document.getElementById("eventChecklistPanel");
     if(!box) return;
@@ -3288,6 +3294,25 @@ window.toggleChecklistEvent = function(ship){
             x.job.toUpperCase().includes("EVENT")
         )
         .sort((a,b)=> b.date.localeCompare(a.date));
+    // ===== XÁC ĐỊNH NGÀY HIGHLIGHT =====
+
+let highlightDate = null;
+
+// 1. kiểm tra có ngày hôm nay không
+const todayEvents = events.filter(e => e.date === today);
+
+if (todayEvents.length > 0) {
+    highlightDate = today;
+} else {
+    // 2. tìm ngày nhỏ hơn và gần nhất
+    const pastDates = events
+        .map(e => e.date)
+        .filter(d => d < today);
+
+    if (pastDates.length > 0) {
+        highlightDate = pastDates.sort().pop(); // ngày gần nhất
+    }
+}
 
     let html = `<div style="margin-bottom:8px;">
         <b>📌 SỰ KIỆN CHÍNH: ${ship}</b>

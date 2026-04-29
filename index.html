@@ -4406,8 +4406,37 @@ window.exportCommentToExcel = function() {
     XLSX.utils.book_append_sheet(wb, ws, "Comments");
     XLSX.writeFile(wb, `Comment_Tau_${selectedShip}.xlsx`);
 };
+// Hàm cho bản vẽ REVISE
+function showSection(sectionId){
 
+    // 1. Ẩn tất cả section
+    document.querySelectorAll(".section").forEach(sec => {
+        sec.style.display = "none";
+    });
 
+    // 2. Hiện section được chọn
+    document.getElementById(sectionId).style.display = "block";
+
+    // 3. Xóa active tất cả nút
+    document.querySelectorAll(".menu button").forEach(btn => {
+        btn.classList.remove("active");
+    });
+
+    // 4. Thêm active cho nút đang click
+    const btnMap = {
+        dashboardSection: "btnDashboard",
+        workSection: "btnWork",
+        shipSection: "btnShip",
+        commentSection: "btnComment",
+        jobSection: "btnJobs",
+        reviseSection: "btnRevise"
+    };
+
+    const btnId = btnMap[sectionId];
+    if(btnId){
+        document.getElementById(btnId).classList.add("active");
+    }
+}
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

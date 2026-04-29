@@ -1541,7 +1541,55 @@ button {
         </table>
     </div>
 </div>
+<div id="reviseBox" class="card" style="display:none; margin-top:15px;">
+    <h4>📐 QUẢN LÝ BẢN VẼ REVISE</h4>
 
+    <div class="admin-only" style="background: #eef2f7; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #1a73e8;">
+        <p style="margin-top:0; font-weight:bold; color: #1a73e8;">➕ Cập nhật Bản vẽ Revise mới:</p>
+        <div class="flex">
+            <select id="revShip"><option value="">-- Chọn tàu --</option></select>
+            <input type="text" id="revNo" placeholder="Số bản vẽ (Ví dụ: S57706-642-001...)">
+            <input type="text" id="revName" placeholder="Tên bản vẽ / Khu vực">
+            <input type="text" id="revIndex" placeholder="Chỉ số Rev (Ví dụ: Rev.A, B...)">
+            <div class="date-field">
+                <label style="font-size: 13px; font-weight: bold;">📅 Ngày nhận bản vẽ:</label>
+                <input type="date" id="revReceiveDate">
+            </div>
+            <select id="revStatus">
+                <option value="pending">🔴 Chưa triển khai</option>
+                <option value="doing">🟡 Đang chỉnh sửa</option>
+                <option value="done">🟢 Đã hoàn thành</option>
+            </select>
+        </div>
+        <textarea id="revNote" placeholder="Nội dung thay đổi hoặc ghi chú..." style="width:100%; margin-top:10px; padding:10px; border-radius:8px; border:1px solid #ccc;"></textarea>
+        <button onclick="saveReviseData()" id="btnSaveRev" style="background: #1a73e8; margin-top: 15px;" class="btn-small-center">💾 Lưu Bản Vẽ</button>
+    </div>
+
+    <div style="margin-bottom: 10px; background: #f8f9fa; padding: 10px; border-radius: 8px;">
+        <label><b>🔍 Xem theo tàu:</b></label>
+        <select id="viewRevByShip" onchange="renderReviseList()">
+            <option value="">-- Chọn tàu --</option>
+        </select>
+    </div>
+
+    <div class="table-wrap">
+        <table id="reviseTable" style="width: 100%; min-width: 1200px;">
+            <thead>
+                <tr>
+                    <th style="width: 50px; text-align: center;">STT</th>
+                    <th style="width: 150px;">SỐ BẢN VẼ</th>
+                    <th style="width: 200px;">TÊN BẢN VẼ</th>
+                    <th style="width: 80px; text-align: center;">REV</th>
+                    <th style="width: 120px; text-align: center;">NGÀY NHẬN</th>
+                    <th style="width: 300px;">NỘI DUNG/GHI CHÚ</th>
+                    <th style="width: 140px;">TRẠNG THÁI</th>
+                    <th class="admin-inline" style="width: 80px; text-align: center;">Sửa</th>
+                </tr>
+            </thead>
+            <tbody id="reviseListContent"></tbody>
+        </table>
+    </div>
+</div>
 
 <script type="module">
 
@@ -1594,6 +1642,16 @@ document.getElementById("date").value = `${yyyy}-${mm}-${dd}`;
     let editJobId = null; // Dùng khi sửa
     let commentsData = {};
     let editCmtId = null;
+    let reviseData = {};
+let editRevId = null;
+
+// Lắng nghe dữ liệu Revise
+onValue(ref(db, "revises"), snapshot => {
+    reviseData = snapshot.val() || {};
+    if(document.getElementById("reviseBox").style.display === "block") {
+        renderReviseList();
+    }
+});
 
 // Lắng nghe dữ liệu Comment từ Firebase
 onValue(ref(db, "comments"), snapshot => {
@@ -2600,7 +2658,8 @@ document.querySelectorAll("input, select").forEach(el => {
         checklist: document.getElementById("checklistBox"),
         extra: document.getElementById("extraBox"),
         jobs: document.getElementById("jobManagerBox"), // Box mới thêm
-        comment: document.getElementById("commentBox")
+        comment: document.getElementById("commentBox"),
+        revise: document.getElementById("reviseBox")
     };
 
     // 2. Lấy tất cả các nút bấm tương ứng
@@ -2613,7 +2672,8 @@ document.querySelectorAll("input, select").forEach(el => {
         checklist: document.getElementById("btnChecklist"),
         extra: document.getElementById("btnExtra"),
         jobs: document.getElementById("btnJobs"), // Nút mới thêm
-        comment: document.getElementById("btnComment")
+        comment: document.getElementById("btnComment"),
+        revise: document.getElementById("btnRevise")
     };
 
     // Xử lý riêng cho nút Xuất Excel
@@ -2651,6 +2711,7 @@ document.querySelectorAll("input, select").forEach(el => {
     if (type === "jobs") renderJobList(); 
     if (type === "comment") renderCommentList();
     if(type === 'dataEntry') applyFilter();
+    if (type === "revise") renderReviseList();
 
 };
 
@@ -4431,7 +4492,111 @@ window.exportCommentToExcel = function() {
     XLSX.utils.book_append_sheet(wb, ws, "Comments");
     XLSX.writeFile(wb, `Comment_Tau_${selectedShip}.xlsx`);
 };
+// Hàm Render danh sách
+window.renderReviseList = function() {
+    const viewSelect = document.getElementById("viewRevByShip");
+    const inputSelect = document.getElementById("revShip");
+    const currentView = viewSelect.value;
 
+    // Cập nhật Select tàu
+    let options = '<option value="">-- Chọn tàu --</option>';
+    Object.keys(shipsData).sort().forEach(id => {
+        options += `<option value="${id}">${id}</option>`;
+    });
+    viewSelect.innerHTML = options;
+    inputSelect.innerHTML = options;
+    viewSelect.value = currentView;
+
+    let html = "";
+    let index = 1;
+    if (!currentView) {
+        html = "<tr><td colspan='8' style='text-align:center; padding:20px; color:#888;'>👉 Chọn tàu để xem danh sách bản vẽ revise.</td></tr>";
+    } else {
+        const filtered = Object.entries(reviseData).filter(([id, r]) => r.ship === currentView);
+        const disabledAttr = isAdmin ? "" : "disabled";
+
+        filtered.forEach(([id, r]) => {
+            let bgColor = r.status === "done" ? "#B2DFDB" : (r.status === "doing" ? "#FFF59D" : "#F8BBD0");
+            html += `
+            <tr style="background:${bgColor}">
+                <td style="text-align:center;">${index++}</td>
+                <td style="font-weight:bold;">${r.revNo}</td>
+                <td>${r.revName || "-"}</td>
+                <td style="text-align:center; color:red; font-weight:bold;">${r.revIndex || "-"}</td>
+                <td style="text-align:center;">${r.revReceiveDate || "-"}</td>
+                <td style="white-space:normal;">${r.revNote || ""}</td>
+                <td>
+                    <select onchange="updateRevStatus('${id}', this.value)" ${disabledAttr}>
+                        <option value="pending" ${r.status==="pending"?"selected":""}>🔴 Chưa làm</option>
+                        <option value="doing" ${r.status==="doing"?"selected":""}>🟡 Đang làm</option>
+                        <option value="done" ${r.status==="done"?"selected":""}>🟢 Đã xong</option>
+                    </select>
+                </td>
+                <td class="admin-inline" style="text-align:center;">
+                    <button onclick="editRev('${id}')">✏️</button>
+                    <button onclick="deleteRev('${id}')">🗑️</button>
+                </td>
+            </tr>`;
+        });
+    }
+    document.getElementById("reviseListContent").innerHTML = html;
+};
+
+// Hàm Lưu dữ liệu
+window.saveReviseData = function() {
+    const ship = document.getElementById("revShip").value;
+    const revNo = document.getElementById("revNo").value;
+    if(!ship || !revNo) return alert("Vui lòng chọn Tàu và nhập Số bản vẽ!");
+
+    const data = {
+        ship, revNo,
+        revName: document.getElementById("revName").value,
+        revIndex: document.getElementById("revIndex").value,
+        revReceiveDate: document.getElementById("revReceiveDate").value,
+        revStatus: document.getElementById("revStatus").value,
+        revNote: document.getElementById("revNote").value,
+        status: document.getElementById("revStatus").value
+    };
+
+    if(editRevId) {
+        update(ref(db, "revises/" + editRevId), data).then(() => {
+            editRevId = null;
+            document.getElementById("btnSaveRev").innerText = "💾 Lưu Bản Vẽ";
+            alert("Đã cập nhật!");
+            clearRevForm();
+        });
+    } else {
+        push(ref(db, "revises"), data).then(() => {
+            alert("Đã thêm bản vẽ!");
+            clearRevForm();
+        });
+    }
+};
+
+window.editRev = function(id) {
+    const r = reviseData[id];
+    document.getElementById("revShip").value = r.ship;
+    document.getElementById("revNo").value = r.revNo;
+    document.getElementById("revName").value = r.revName;
+    document.getElementById("revIndex").value = r.revIndex;
+    document.getElementById("revReceiveDate").value = r.revReceiveDate;
+    document.getElementById("revStatus").value = r.status;
+    document.getElementById("revNote").value = r.revNote;
+    editRevId = id;
+    document.getElementById("btnSaveRev").innerText = "💾 Cập nhật";
+};
+
+window.deleteRev = function(id) {
+    if(confirm("Xóa bản vẽ này khỏi danh sách?")) remove(ref(db, "revises/" + id));
+};
+
+window.updateRevStatus = function(id, status) {
+    update(ref(db, "revises/" + id), { status: status });
+};
+
+function clearRevForm() {
+    ["revNo", "revName", "revIndex", "revReceiveDate", "revNote"].forEach(id => document.getElementById(id).value = "");
+}
 
     
 </script>

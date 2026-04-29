@@ -1208,9 +1208,9 @@ button {
     <button id="btnProgress" class="admin-only" onclick="handleButton('progress')">Q.lý tiến độ tàu</button>
     <button id="btnChecklist" class="admin-only" onclick="handleButton('checklist')">Q.lý mục kiểm tra</button>
     <button id="btnExtra" onclick="handleButton('extra')">📦 Vật tư - Ghi chú</button>
-    <button id="btnJobs" onclick="handleButton('jobs')">📋 Remain Jobs</button>
+    <button id="btnJobs" onclick="handleButton('jobs')">📋 Công việc remain</button>
     <button id="btnComment" onclick="handleButton('comment')">💬 COMMENT</button>
-    <button id="btnRevise" onclick="handleButton('reviseSection')">📐 Bản vẽ REVISE</button>
+    <button id="btnRevise" onclick="handleButton('revise')">📐 Bản vẽ REVISE</button>
 </div>
         
      <div id="functionContentArea">
@@ -1539,30 +1539,6 @@ button {
     </div>
 </div>
 
-
-
-<div id="reviseSection" class="section" style="display:none;">
-    <h3>📐 Quản lý bản vẽ REVISE</h3>
-    <table border="1" width="100%">
-        <thead>
-            <tr>
-                <th>STT</th>
-                <th>TÀU</th>
-                <th>SỐ REVISE</th>
-                <th>VỊ TRÍ</th>
-                <th>NỘI DUNG REVISE</th>
-                <th>GHI CHÚ</th>
-                <th>TRẠNG THÁI</th>
-                <th>NGÀY XONG</th>
-            </tr>
-        </thead>
-        <tbody id="reviseTableContent"></tbody>
-    </table>
-</div>
-
-
-
-        
 
 <script type="module">
 
@@ -4406,22 +4382,8 @@ window.exportCommentToExcel = function() {
     XLSX.utils.book_append_sheet(wb, ws, "Comments");
     XLSX.writeFile(wb, `Comment_Tau_${selectedShip}.xlsx`);
 };
-// Hàm cho bản vẽ REVISE
-function showSection(sectionId) {
 
-    // 1. Ẩn tất cả section
-    document.querySelectorAll(".section").forEach(sec => {
-        sec.style.display = "none";
-    });
 
-    // 2. Hiện section được chọn
-    const target = document.getElementById(sectionId);
-    if (target) {
-        target.style.display = "block";
-    } else {
-        console.error("❌ Không tìm thấy section:", sectionId);
-    }
-}
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

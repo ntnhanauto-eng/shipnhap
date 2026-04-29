@@ -4407,7 +4407,7 @@ window.exportCommentToExcel = function() {
     XLSX.writeFile(wb, `Comment_Tau_${selectedShip}.xlsx`);
 };
 // Hàm cho bản vẽ REVISE
-function showSection(sectionId){
+function showSection(sectionId) {
 
     // 1. Ẩn tất cả section
     document.querySelectorAll(".section").forEach(sec => {
@@ -4415,26 +4415,11 @@ function showSection(sectionId){
     });
 
     // 2. Hiện section được chọn
-    document.getElementById(sectionId).style.display = "block";
-
-    // 3. Xóa active tất cả nút
-    document.querySelectorAll(".menu button").forEach(btn => {
-        btn.classList.remove("active");
-    });
-
-    // 4. Thêm active cho nút đang click
-    const btnMap = {
-        dashboardSection: "btnDashboard",
-        workSection: "btnWork",
-        shipSection: "btnShip",
-        commentSection: "btnComment",
-        jobSection: "btnJobs",
-        reviseSection: "btnRevise"
-    };
-
-    const btnId = btnMap[sectionId];
-    if(btnId){
-        document.getElementById(btnId).classList.add("active");
+    const target = document.getElementById(sectionId);
+    if (target) {
+        target.style.display = "block";
+    } else {
+        console.error("❌ Không tìm thấy section:", sectionId);
     }
 }
     

@@ -3321,18 +3321,31 @@ if (todayEvents.length > 0) {
     if(events.length === 0){
         html += `<div class="empty">Không có EVENT</div>`;
     } else {
-        events.slice(0,20).forEach(e => {
-            let jobText = (e.job || "")
-    .replace(/PLAN:/gi, "")
-    .replace(/\(EVENT\)/gi, "")   // 🔥 thêm dòng này
-    .trim();
+      events.slice(0,20).forEach(e => {
 
-            html += `
-                <div style="padding:4px 0; border-bottom:1px dashed #eee;">
-                    📅 ${e.date} — ${jobText}
-                </div>
-            `;
-        });
+    let jobText = (e.job || "")
+        .replace(/PLAN:/gi, "")
+        .replace(/\(EVENT\)/gi, "")
+        .trim();
+
+    // 🔥 highlight theo ngày
+    const isHighlight = e.date === highlightDate;
+
+    const bg = isHighlight ? "#fff3cd" : "transparent";
+    const border = isHighlight ? "3px solid #f9ab00" : "none";
+
+    html += `
+        <div style="
+            padding:6px;
+            margin-bottom:4px;
+            background:${bg};
+            border-left:${border};
+            border-radius:4px;
+        ">
+            📅 ${e.date} — ${jobText}
+        </div>
+    `;
+});
     }
 
     box.innerHTML = html;

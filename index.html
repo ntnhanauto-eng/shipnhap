@@ -1368,85 +1368,66 @@ button {
 <div id="jobManagerBox" class="card" style="display:none; margin-top:15px;">
     <h4>📋 CÔNG VIỆC CÒN LẠI TỪ GIAI ĐOẠN TRƯỚC</h4>
     
-   
-
     <div class="admin-only" style="background: #f9f9f9; padding: 10px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #ddd;">
         <p style="margin-top:0; font-weight:bold;">➕ Thêm/Sửa công việc:</p>
         <div class="flex">
-            <select id="jobShip"><option value="">-- Chọn tàu --</option></select>
-            <input type="text" id="jobBlock" placeholder="BLOCK">
-            <input type="text" id="jobPor" placeholder="POR">
-            <input type="text" id="jobPartNo" placeholder="PART NO">
-            <input type="text" id="jobName" placeholder="Tên vật tư">
-            <input type="number" id="jobQty" placeholder="QUANTITY">
-            <select id="jobType">
-    <option value="">-- Chọn loại --</option>
-    <option value="DESIGN MISTAKE">DESIGN MISTAKE</option>
-    <option value="MATERIAL MISTAKE">MATERIAL MISTAKE</option>
-    <option value="MATERIAL DELAY">MATERIAL DELAY</option>
-    <option value="MAKER MISTAKE">MAKER MISTAKE</option>
-    <option value="PRE MISTAKE">PRE MISTAKE</option>
-    <option value="PRODUCTION MISTAKE">PRODUCTION MISTAKE</option>
-    <option value="KHÁC">KHÁC</option>
-</select>
+             <select id="jobShip"><option value="">-- Chọn tàu --</option></select>
+             <input type="text" id="jobBlock" placeholder="BLOCK">
+             <input type="text" id="jobPor" placeholder="POR">
+             <input type="text" id="jobPartNo" placeholder="PART NO">
+             <input type="text" id="jobName" placeholder="Tên vật tư">
+             <input type="number" id="jobQty" placeholder="QUANTITY">
+             <select id="jobType">
+                <option value="">-- Chọn loại mistake --</option>
+                <option value="DESIGN MISTAKE">DESIGN MISTAKE</option>
+                <option value="MATERIAL MISTAKE">MATERIAL MISTAKE</option>
+                <option value="MATERIAL DELAY">MATERIAL DELAY</option>
+                <option value="MAKER MISTAKE">MAKER MISTAKE</option>
+                <option value="PRE MISTAKE">PRE MISTAKE</option>
+                <option value="PRODUCTION MISTAKE">PRODUCTION MISTAKE</option>
+                <option value="KHÁC">KHÁC</option>
+            </select>
         </div>
         <div class="date-row">
             <div class="date-field"><label>Ngày vật tư về</label><input type="date" id="jobMatDate"></div>
             <div class="date-field"><label>Ngày hoàn thành</label><input type="date" id="jobDoneDate"></div>
         </div>
         <input type="text" id="jobNote" placeholder="Ghi chú">
-
-        
-       <!-- <textarea id="jobNote"></textarea> -->
         <select id="jobStatus">
-    <option value="pending">🔴 Chưa làm</option>
-    <option value="doing">🟡 Đang làm</option>
-    <option value="done">🟢 Đã xong</option>
-</select>
-
-
-        
+            <option value="pending">🔴 Chưa làm</option>
+            <option value="doing">🟡 Đang làm</option>
+            <option value="done">🟢 Đã xong</option>
+        </select>
         <button onclick="saveJobData()" id="btnSaveJob" style="background: #28a745;">💾 Lưu dữ liệu</button>
     </div>
 
-     <div style="margin-bottom: 15px; background: #e8f0fe; padding: 10px; border-radius: 8px;">
-        <label style="font-weight: bold; color: #1a73e8;">1. Chọn tàu để xem công việc:</label>
-        <select id="viewJobByShip" onchange="renderJobList()">
-            <option value="">-- Chọn tàu --</option>
-        </select>
-   
+    <div style="margin-bottom: 15px; background: #e8f0fe; padding: 10px; border-radius: 8px;">
+        <label><b>1. Chọn tàu xem Job:</b></label>
+        <select id="viewJobByShip" onchange="renderJobList()"><option value="">-- Chọn tàu --</option></select>
+    </div>
 
-
-      <!-- 🔎 TẦNG 1: LOẠI MISTAKE -->
-       <label style="font-weight: bold; color: #1a73e8;">2. Chọn loại mistakec:</label>
-    <select id="filterMistake" onchange="filterJobList()">
-        <option value="">-- Tất cả loại mistake --</option>
-        <option value="DESIGN MISTAKE">Design mistake</option>
-        <option value="MATERIAL MISTAKE">Material mistake</option>
-        <option value="MAKER MISTAKE">Maker mistake</option>
-        <option value="PRODUCTION MISTAKE">Production mistake</option>
-        <option value="PRE MISTAKE">Pre mistake</option>
-        <option value="MATERIAL DELAY">Material delay</option>
-        <option value="KHÁC">Khác</option>
-    </select>
-
-     <!-- 🔎 TẦNG 2: TRẠNG THÁI -->
-        <label style="font-weight: bold; color: #1a73e8;">3. Chọn trạng thái:</label>
-    <select id="filterJobStatus" onchange="filterJobList()">
-        <option value="">-- Tất cả trạng thái --</option>
-        <option value="pending">🔴 Chưa làm</option>
-        <option value="doing">🟡 Đang làm</option>
-        <option value="done">🟢 Đã xong</option>
-    </select>
-     </div>
-      <div class="admin-only" style="text-align: left; margin-top: 15px;">
-      <button onclick="exportFilteredJobs()" style="background:#28a745; width: auto; padding: 10px 20px;">📤 Xuất Excel Remain Jobs</button>
-      </div>
-
-
- <tbody id="jobListContent"></tbody>
-    </table>
-    </div> </div> <div id="reviseBox" class="card" style="display:none; margin-top:15px;">
+    <div class="table-wrap">
+        <table id="jobTable">
+            <thead>
+                <tr>
+                    <th style="width: 50px;">STT</th>
+                    <th style="width: 65px;">BLOCK</th>
+                    <th style="width: 100px;">POR</th>
+                    <th style="width: 110px;">PART NO</th>
+                    <th style="width: 300px;">TÊN VẬT TƯ</th>
+                    <th style="width: 60px;">SL</th>
+                    <th style="width: 120px;">LOẠI</th>
+                    <th style="width: 100px;">VẬT TƯ VỀ</th>
+                    <th style="width: 100px;">NGÀY XONG</th>
+                    <th style="width: 200px;">GHI CHÚ</th>
+                    <th style="width: 150px;">TRẠNG THÁI</th>
+                    <th class="admin-inline" style="width: 80px;">Sửa</th>
+                </tr>
+            </thead>
+            <tbody id="jobListContent"></tbody>
+        </table>
+    </div>
+</div> <div id="reviseBox" class="card" style="display:none; margin-top:15px;">
     <h4>📐 QUẢN LÝ BẢN VẼ REVISE</h4>
 
     <div class="admin-only" style="background: #f0f7ff; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #1a73e8;">
@@ -1468,7 +1449,7 @@ button {
                 <input type="date" id="revDoneDate">
             </div>
         </div>
-        <button onclick="saveReviseData()" id="btnSaveRev" style="background: #1a73e8; margin-top: 15px; width: auto !important; min-width: 160px; display: block; margin: 15px auto;">💾 Lưu Bản Vẽ</button>
+        <button onclick="saveReviseData()" id="btnSaveRev" class="btn-small-center" style="background: #1a73e8;">💾 Lưu Bản Vẽ</button>
     </div>
 
     <div style="margin-bottom: 15px; background: #f8f9fa; padding: 10px; border-radius: 8px;">
@@ -1486,8 +1467,8 @@ button {
                     <th style="width: 100px;">TÀU</th>
                     <th style="width: 150px;">VỊ TRÍ</th>
                     <th style="width: 120px;">MÃ REVISE</th>
-                    <th style="width: 350px;">NỘI DUNG REVISE</th>
-                    <th style="width: 250px;">GHI CHÚ</th>
+                    <th style="width: 400px;">NỘI DUNG REVISE</th>
+                    <th style="width: 300px;">GHI CHÚ</th>
                     <th style="width: 120px;">POR</th>
                     <th style="width: 140px;">TRẠNG THÁI</th>
                     <th style="width: 140px; text-align: center;">NGÀY XONG</th>

@@ -3322,31 +3322,91 @@ if (todayEvents.length > 0) {
     if(events.length === 0){
         html += `<div class="empty">Không có EVENT</div>`;
     } else {
-        events.slice(0,20).forEach(e => {
+      // ===== GROUP THEO NGÀY =====
+let grouped = {};
 
-    let jobText = (e.job || "")
-        .replace(/PLAN:/gi, "")
-        .replace(/\(EVENT\)/gi, "")
-        .trim();
+events.forEach(e => {
+    if (!grouped[e.date]) grouped[e.date] = [];
+    grouped[e.date].push(e);
+});
 
-    // 🔥 CHECK HIGHLIGHT
-    const isHighlight = e.date === highlightDate;
+let dates = Object.keys(grouped).sort().reverse();
 
-    const bg = isHighlight ? "#fff3cd" : "transparent"; // vàng nhạt
-    const border = isHighlight ? "2px solid #f9ab00" : "none";
+// ===== XÁC ĐỊNH TODAY =====
+const now = new Date();
+const yyyy = now.getFullYear();
+const mm = String(now.getMonth() + 1).padStart(2,'0');
+const dd = String(now.getDate()).padStart(2,'0');
+
+const today = `${yyyy}-${mm}-${dd}`;
+
+// ===== XÁC ĐỊNH HIGHLIGHT =====
+let highlightDate = null;
+
+if (dates.includes(today)) {
+    highlightDate = today;
+} else {
+    const pastDates = dates.filter(d => d < today);
+    if (pastDates.length > 0) {
+        highlightDate = pastDates.sort().pop();
+    }
+}
+
+// ===== RENDER TIMELINE =====
+let html = `<div class="timeline">`;
+
+dates.forEach(date => {
+
+    let isToday = date === today;
+    let isHighlight = date === highlightDate && !isToday;
+
+    let color = "#999";
+    let label = "";
+
+    if (isToday) {
+        color = "#d93025";
+        label = "🔥 HÔM NAY";
+    } else if (isHighlight) {
+        color = "#f9ab00";
+        label = "⏳ GẦN NHẤT";
+    }
 
     html += `
-        <div style="
-            padding:6px;
-            margin-bottom:4px;
-            background:${bg};
-            border-left:${border};
-            border-radius:4px;
-        ">
-            📅 ${e.date} — ${jobText}
+    <div class="timeline-item">
+        <div class="timeline-left">
+            <div class="dot" style="background:${color}"></div>
+            <div class="line"></div>
         </div>
+
+        <div class="timeline-content">
+            <div class="timeline-date" style="color:${color}">
+                📅 ${date} ${label}
+            </div>
+    `;
+
+    grouped[date].forEach(e => {
+
+        let jobText = (e.job || "")
+            .replace(/PLAN:/gi, "")
+            .replace(/\(EVENT\)/gi, "")
+            .trim();
+
+        html += `
+            <div class="timeline-job">
+                • ${jobText}
+            </div>
+        `;
+    });
+
+    html += `
+        </div>
+    </div>
     `;
 });
+
+html += `</div>`;
+
+box.innerHTML = html;
             let jobText = (e.job || "")
     .replace(/PLAN:/gi, "")
     .replace(/\(EVENT\)/gi, "")   // 🔥 thêm dòng này

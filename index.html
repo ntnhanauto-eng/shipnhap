@@ -2654,8 +2654,8 @@ document.querySelectorAll("input, select").forEach(el => {
 
 });
 
-   window.handleButton = function(type) {
-    // 1. Lấy tất cả các vùng nội dung (Boxes)
+  window.handleButton = function(type) {
+    // 1. Danh sách tất cả các ID của các vùng nội dung (Boxes)
     const boxes = {
         dataEntry: document.getElementById("dataEntryBox"),
         summary: document.getElementById("summary"),
@@ -2664,12 +2664,12 @@ document.querySelectorAll("input, select").forEach(el => {
         progress: document.getElementById("progressBox"),
         checklist: document.getElementById("checklistBox"),
         extra: document.getElementById("extraBox"),
-        jobs: document.getElementById("jobManagerBox"), // Box mới thêm
+        jobs: document.getElementById("jobManagerBox"),
         comment: document.getElementById("commentBox"),
-        revise: document.getElementById("reviseBox")
+        revise: document.getElementById("reviseBox") // Đảm bảo ID này khớp với HTML
     };
 
-    // 2. Lấy tất cả các nút bấm tương ứng
+    // 2. Danh sách tất cả các ID của nút bấm tương ứng
     const btns = {
         dataEntry: document.getElementById("btnDataEntry"),
         summary: document.getElementById("btnSummary"),
@@ -2678,37 +2678,31 @@ document.querySelectorAll("input, select").forEach(el => {
         progress: document.getElementById("btnProgress"),
         checklist: document.getElementById("btnChecklist"),
         extra: document.getElementById("btnExtra"),
-        jobs: document.getElementById("btnJobs"), // Nút mới thêm
+        jobs: document.getElementById("btnJobs"),
         comment: document.getElementById("btnComment"),
-        revise: document.getElementById("btnRevise")
+        revise: document.getElementById("btnRevise") // Đảm bảo ID này khớp với HTML
     };
-
-    // Xử lý riêng cho nút Xuất Excel
-    if (type === 'export') {
-        exportExcel();
-        return;
-    }
 
     const targetBox = boxes[type];
     const targetBtn = btns[type];
 
     if (!targetBox) return;
 
-    // Kiểm tra trạng thái: Nếu đang mở thì bấm lần nữa sẽ đóng
+    // Kiểm tra trạng thái hiện tại
     const isAlreadyOpen = targetBox.style.display === "block";
 
-    // BƯỚC 1: ẨN TẤT CẢ các box và xóa màu xanh (active) của các nút
+    // BƯỚC 1: ẨN TẤT CẢ các box và xóa class active của các nút
     Object.values(boxes).forEach(box => { if(box) box.style.display = "none"; });
     Object.values(btns).forEach(btn => { if(btn) btn.classList.remove("btn-active"); });
 
-    // BƯỚC 2: Nếu cái vừa bấm đang mở -> Thoát (vì đã ẩn ở bước 1 rồi)
+    // BƯỚC 2: Nếu đang mở rồi thì ẩn đi (đã ẩn ở bước 1), nếu chưa mở thì mới xử lý tiếp
     if (isAlreadyOpen) return;
 
-    // BƯỚC 3: Nếu nó đang tắt -> Mở lên và load dữ liệu
+    // BƯỚC 3: Hiển thị box mục tiêu và đánh dấu nút đang chọn
     targetBox.style.display = "block";
-    targetBtn.classList.add("btn-active");
+    if(targetBtn) targetBtn.classList.add("btn-active");
 
-    // BƯỚC 4: Load dữ liệu đặc thù cho từng loại
+    // BƯỚC 4: Gọi hàm load dữ liệu riêng cho từng module
     if (type === "summary") { showSummary(); showGeneralSummaryReport(); }
     if (type === "hours") renderWorkHoursInputs();
     if (type === "ships") renderShipManagerList();
@@ -2717,9 +2711,8 @@ document.querySelectorAll("input, select").forEach(el => {
     if (type === "extra") renderExtraSelect();
     if (type === "jobs") renderJobList(); 
     if (type === "comment") renderCommentList();
-    if(type === 'dataEntry') applyFilter();
-    if (type === "revise") renderReviseList();
-
+    if (type === "dataEntry") applyFilter();
+    if (type === "revise") renderReviseList(); // Gọi hàm vẽ bảng Revise
 };
 
 function renderPagination() {

@@ -2956,7 +2956,7 @@ window.renderExtraDetail = function(){
         <textarea id="matBox" class="auto-textarea mat-box" ${readonly}>${materials}</textarea>
     </div>
 
-    ${isAdmin ? `<button onclick="saveMaterial()">💾 Lưu vật tư</button>` : ""}
+    ${isAdmin ? `<button onclick="saveMaterial()" style="width:auto; padding:6px 12px;">💾 Lưu vật tư</button>` : ""}
 </div>
 
 <div>
@@ -2967,7 +2967,7 @@ window.renderExtraDetail = function(){
         <textarea id="noteBox" class="auto-textarea note-box" ${readonly}>${notes}</textarea>
     </div>
 
-    ${isAdmin ? `<button onclick="saveNote()">💾 Lưu ghi chú</button>` : ""}
+    ${isAdmin ? `<button onclick="saveNote()" style="width:auto; padding:6px 12px;">💾 Lưu ghi chú</button>` : ""}
 </div>
 `;
 

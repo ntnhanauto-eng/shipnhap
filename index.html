@@ -1210,7 +1210,7 @@ button {
     <button id="btnExtra" onclick="handleButton('extra')">📦 Vật tư - Ghi chú</button>
     <button id="btnJobs" onclick="handleButton('jobs')">📋 Công việc remain</button>
     <button id="btnComment" onclick="handleButton('comment')">💬 COMMENT</button>
-   <button id="btnRevise" onclick="handleButton('revise')">📐 Bản vẽ REVISE</button>
+    <button id="btnRevise" onclick="handleButton('revise')">📐 Bản vẽ REVISE</button>
 </div>
         
      <div id="functionContentArea">
@@ -1368,119 +1368,114 @@ button {
 <div id="jobManagerBox" class="card" style="display:none; margin-top:15px;">
     <h4>📋 CÔNG VIỆC CÒN LẠI TỪ GIAI ĐOẠN TRƯỚC</h4>
     
+   
+
     <div class="admin-only" style="background: #f9f9f9; padding: 10px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #ddd;">
         <p style="margin-top:0; font-weight:bold;">➕ Thêm/Sửa công việc:</p>
         <div class="flex">
-             <select id="jobShip"><option value="">-- Chọn tàu --</option></select>
-             <input type="text" id="jobBlock" placeholder="BLOCK">
-             <input type="text" id="jobPor" placeholder="POR">
-             <input type="text" id="jobPartNo" placeholder="PART NO">
-             <input type="text" id="jobName" placeholder="Tên vật tư">
-             <input type="number" id="jobQty" placeholder="QUANTITY">
-             <select id="jobType">
-                <option value="">-- Chọn loại mistake --</option>
-                <option value="DESIGN MISTAKE">DESIGN MISTAKE</option>
-                <option value="MATERIAL MISTAKE">MATERIAL MISTAKE</option>
-                <option value="MATERIAL DELAY">MATERIAL DELAY</option>
-                <option value="MAKER MISTAKE">MAKER MISTAKE</option>
-                <option value="PRE MISTAKE">PRE MISTAKE</option>
-                <option value="PRODUCTION MISTAKE">PRODUCTION MISTAKE</option>
-                <option value="KHÁC">KHÁC</option>
-            </select>
+            <select id="jobShip"><option value="">-- Chọn tàu --</option></select>
+            <input type="text" id="jobBlock" placeholder="BLOCK">
+            <input type="text" id="jobPor" placeholder="POR">
+            <input type="text" id="jobPartNo" placeholder="PART NO">
+            <input type="text" id="jobName" placeholder="Tên vật tư">
+            <input type="number" id="jobQty" placeholder="QUANTITY">
+            <select id="jobType">
+    <option value="">-- Chọn loại --</option>
+    <option value="DESIGN MISTAKE">DESIGN MISTAKE</option>
+    <option value="MATERIAL MISTAKE">MATERIAL MISTAKE</option>
+    <option value="MATERIAL DELAY">MATERIAL DELAY</option>
+    <option value="MAKER MISTAKE">MAKER MISTAKE</option>
+    <option value="PRE MISTAKE">PRE MISTAKE</option>
+    <option value="PRODUCTION MISTAKE">PRODUCTION MISTAKE</option>
+    <option value="KHÁC">KHÁC</option>
+</select>
         </div>
         <div class="date-row">
             <div class="date-field"><label>Ngày vật tư về</label><input type="date" id="jobMatDate"></div>
             <div class="date-field"><label>Ngày hoàn thành</label><input type="date" id="jobDoneDate"></div>
         </div>
         <input type="text" id="jobNote" placeholder="Ghi chú">
+
+        
+       <!-- <textarea id="jobNote"></textarea> -->
         <select id="jobStatus">
-            <option value="pending">🔴 Chưa làm</option>
-            <option value="doing">🟡 Đang làm</option>
-            <option value="done">🟢 Đã xong</option>
-        </select>
+    <option value="pending">🔴 Chưa làm</option>
+    <option value="doing">🟡 Đang làm</option>
+    <option value="done">🟢 Đã xong</option>
+</select>
+
+
+        
         <button onclick="saveJobData()" id="btnSaveJob" style="background: #28a745;">💾 Lưu dữ liệu</button>
     </div>
 
-    <div style="margin-bottom: 15px; background: #e8f0fe; padding: 10px; border-radius: 8px;">
-        <label><b>1. Chọn tàu xem Job:</b></label>
-        <select id="viewJobByShip" onchange="renderJobList()"><option value="">-- Chọn tàu --</option></select>
-    </div>
-
-    <div class="table-wrap">
-        <table id="jobTable">
-            <thead>
-                <tr>
-                    <th style="width: 50px;">STT</th>
-                    <th style="width: 65px;">BLOCK</th>
-                    <th style="width: 100px;">POR</th>
-                    <th style="width: 110px;">PART NO</th>
-                    <th style="width: 300px;">TÊN VẬT TƯ</th>
-                    <th style="width: 60px;">SL</th>
-                    <th style="width: 120px;">LOẠI</th>
-                    <th style="width: 100px;">VẬT TƯ VỀ</th>
-                    <th style="width: 100px;">NGÀY XONG</th>
-                    <th style="width: 200px;">GHI CHÚ</th>
-                    <th style="width: 150px;">TRẠNG THÁI</th>
-                    <th class="admin-inline" style="width: 80px;">Sửa</th>
-                </tr>
-            </thead>
-            <tbody id="jobListContent"></tbody>
-        </table>
-    </div>
-</div> <div id="reviseBox" class="card" style="display:none; margin-top:15px;">
-    <h4>📐 QUẢN LÝ BẢN VẼ REVISE</h4>
-
-    <div class="admin-only" style="background: #f0f7ff; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #1a73e8;">
-        <p style="margin-top:0; font-weight:bold; color: #1a73e8;">➕ Thêm Bản vẽ Revise mới:</p>
-        <div class="flex">
-            <select id="revShip"><option value="">-- Chọn tàu --</option></select>
-            <input type="text" id="revPos" placeholder="Vị trí (E/R, Upper Deck...)">
-            <input type="text" id="revNo" placeholder="Mã REVISE (Ví dụ: Rev.01...)">
-            <input type="text" id="revContent" placeholder="Nội dung thay đổi">
-            <input type="text" id="revNote" placeholder="Ghi chú">
-            <input type="text" id="revPor" placeholder="Mã POR">
-            <select id="revStatus">
-                <option value="pending">🔴 Chưa làm</option>
-                <option value="doing">🟡 Đang làm</option>
-                <option value="done">🟢 Đã xong</option>
-            </select>
-            <div class="date-field">
-                <label style="font-size: 13px; font-weight: bold;">📅 Ngày xong:</label>
-                <input type="date" id="revDoneDate">
-            </div>
-        </div>
-        <button onclick="saveReviseData()" id="btnSaveRev" class="btn-small-center" style="background: #1a73e8;">💾 Lưu Bản Vẽ</button>
-    </div>
-
-    <div style="margin-bottom: 15px; background: #f8f9fa; padding: 10px; border-radius: 8px;">
-        <label><b>🔍 Xem bản vẽ theo tàu:</b></label>
-        <select id="viewRevByShip" onchange="renderReviseList()">
+     <div style="margin-bottom: 15px; background: #e8f0fe; padding: 10px; border-radius: 8px;">
+        <label style="font-weight: bold; color: #1a73e8;">1. Chọn tàu để xem công việc:</label>
+        <select id="viewJobByShip" onchange="renderJobList()">
             <option value="">-- Chọn tàu --</option>
         </select>
-    </div>
+   
 
+
+      <!-- 🔎 TẦNG 1: LOẠI MISTAKE -->
+       <label style="font-weight: bold; color: #1a73e8;">2. Chọn loại mistakec:</label>
+    <select id="filterMistake" onchange="filterJobList()">
+        <option value="">-- Tất cả loại mistake --</option>
+        <option value="DESIGN MISTAKE">Design mistake</option>
+        <option value="MATERIAL MISTAKE">Material mistake</option>
+        <option value="MAKER MISTAKE">Maker mistake</option>
+        <option value="PRODUCTION MISTAKE">Production mistake</option>
+        <option value="PRE MISTAKE">Pre mistake</option>
+        <option value="MATERIAL DELAY">Material delay</option>
+        <option value="KHÁC">Khác</option>
+    </select>
+
+     <!-- 🔎 TẦNG 2: TRẠNG THÁI -->
+        <label style="font-weight: bold; color: #1a73e8;">3. Chọn trạng thái:</label>
+    <select id="filterJobStatus" onchange="filterJobList()">
+        <option value="">-- Tất cả trạng thái --</option>
+        <option value="pending">🔴 Chưa làm</option>
+        <option value="doing">🟡 Đang làm</option>
+        <option value="done">🟢 Đã xong</option>
+    </select>
+     </div>
+      <div class="admin-only" style="text-align: left; margin-top: 15px;">
+      <button onclick="exportFilteredJobs()" style="background:#28a745; width: auto; padding: 10px 20px;">📤 Xuất Excel Remain Jobs</button>
+      </div>
+
+
+        
+    
     <div class="table-wrap">
-        <table id="reviseTable" style="width: 100%; min-width: 1500px; table-layout: auto;">
-            <thead>
-                <tr>
-                    <th style="width: 50px; text-align: center;">STT</th>
-                    <th style="width: 100px;">TÀU</th>
-                    <th style="width: 150px;">VỊ TRÍ</th>
-                    <th style="width: 120px;">MÃ REVISE</th>
-                    <th style="width: 400px;">NỘI DUNG REVISE</th>
-                    <th style="width: 300px;">GHI CHÚ</th>
-                    <th style="width: 120px;">POR</th>
-                    <th style="width: 140px;">TRẠNG THÁI</th>
-                    <th style="width: 140px; text-align: center;">NGÀY XONG</th>
-                    <th class="admin-inline" style="width: 80px; text-align: center;">Sửa</th>
-                </tr>
-            </thead>
-            <tbody id="reviseListContent"></tbody>
-        </table>
-    </div>
-  
-       
 
+ 
+
+
+
+        
+    <table id="jobTable">
+        <thead>
+            <tr>
+                <th style="width: 50px; text-align: center;">STT</th>
+                <th style="width: 65px;">BLOCK</th>
+                <th style="width: 100px;">POR</th>
+                <th style="width: 100px;">PART NO</th>
+                
+    
+                <th style="width: 300px;">TÊN VẬT TƯ</th>
+                <th style="width: 60px;">SỐ LƯỢNG</th>
+                <th style="width: 120px;">LOẠI</th>
+                <th style="width: 100px; text-align: center;">VẬT TƯ VỀ</th>
+                <th style="width: 120px; text-align: center;">NGÀY XONG</th>
+                <th style="width: 200px;">GHI CHÚ</th>
+                <th style="width: 150px;">TRẠNG THÁI</th>
+                <th class="admin-inline" style="width: 80px; text-align: center;">Sửa</th>
+            </tr>
+        </thead>
+        <tbody id="jobListContent"></tbody>
+    </table>
+        </div>
+</div>
 
 </div>
   <div id="commentBox" class="card" style="display:none; margin-top:15px;">
@@ -1599,16 +1594,6 @@ document.getElementById("date").value = `${yyyy}-${mm}-${dd}`;
     let editJobId = null; // Dùng khi sửa
     let commentsData = {};
     let editCmtId = null;
-    let reviseData = {};
-    let editRevId = null;
-
-// Lắng nghe dữ liệu Revise từ Firebase
-onValue(ref(db, "reviseDrawings"), snapshot => {
-    reviseData = snapshot.val() || {};
-    if(document.getElementById("reviseBox").style.display === "block") {
-        renderReviseList();
-    }
-});
 
 // Lắng nghe dữ liệu Comment từ Firebase
 onValue(ref(db, "comments"), snapshot => {
@@ -2604,58 +2589,69 @@ document.querySelectorAll("input, select").forEach(el => {
 
 });
 
- window.handleButton = function(type) {
-    // 1. Tự động lấy danh sách tất cả các ID cần xử lý
-    const boxIds = ["dataEntryBox", "summary", "workHoursBox", "shipManagerBox", "progressBox", "checklistBox", "extraBox", "jobManagerBox", "commentBox", "reviseBox"];
-    const btnIds = ["btnDataEntry", "btnSummary", "btnWorkHours", "btnManageShips", "btnProgress", "btnChecklist", "btnExtra", "btnJobs", "btnComment", "btnRevise"];
+   window.handleButton = function(type) {
+    // 1. Lấy tất cả các vùng nội dung (Boxes)
+    const boxes = {
+        dataEntry: document.getElementById("dataEntryBox"),
+        summary: document.getElementById("summary"),
+        hours: document.getElementById("workHoursBox"),
+        ships: document.getElementById("shipManagerBox"),
+        progress: document.getElementById("progressBox"),
+        checklist: document.getElementById("checklistBox"),
+        extra: document.getElementById("extraBox"),
+        jobs: document.getElementById("jobManagerBox"), // Box mới thêm
+        comment: document.getElementById("commentBox")
+    };
 
-    // 2. Ẩn tất cả các Box và xóa màu các nút
-    boxIds.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.style.display = "none";
-    });
-    btnIds.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.classList.remove("btn-active");
-    });
+    // 2. Lấy tất cả các nút bấm tương ứng
+    const btns = {
+        dataEntry: document.getElementById("btnDataEntry"),
+        summary: document.getElementById("btnSummary"),
+        hours: document.getElementById("btnWorkHours"),
+        ships: document.getElementById("btnManageShips"),
+        progress: document.getElementById("btnProgress"),
+        checklist: document.getElementById("btnChecklist"),
+        extra: document.getElementById("btnExtra"),
+        jobs: document.getElementById("btnJobs"), // Nút mới thêm
+        comment: document.getElementById("btnComment")
+    };
 
-    // 3. Xác định Box và Button mục tiêu dựa trên 'type'
-    let targetBoxId = "";
-    let targetBtnId = "";
-
-    switch(type) {
-        case 'dataEntry': targetBoxId = "dataEntryBox"; targetBtnId = "btnDataEntry"; break;
-        case 'summary': targetBoxId = "summary"; targetBtnId = "btnSummary"; break;
-        case 'hours': targetBoxId = "workHoursBox"; targetBtnId = "btnWorkHours"; break;
-        case 'ships': targetBoxId = "shipManagerBox"; targetBtnId = "btnManageShips"; break;
-        case 'progress': targetBoxId = "progressBox"; targetBtnId = "btnProgress"; break;
-        case 'checklist': targetBoxId = "checklistBox"; targetBtnId = "btnChecklist"; break;
-        case 'extra': targetBoxId = "extraBox"; targetBtnId = "btnExtra"; break;
-        case 'jobs': targetBoxId = "jobManagerBox"; targetBtnId = "btnJobs"; break;
-        case 'comment': targetBoxId = "commentBox"; targetBtnId = "btnComment"; break;
-        case 'revise': targetBoxId = "reviseBox"; targetBtnId = "btnRevise"; break;
+    // Xử lý riêng cho nút Xuất Excel
+    if (type === 'export') {
+        exportExcel();
+        return;
     }
 
-    const targetBox = document.getElementById(targetBoxId);
-    const targetBtn = document.getElementById(targetBtnId);
+    const targetBox = boxes[type];
+    const targetBtn = btns[type];
 
-    // 4. Hiển thị
-    if (targetBox) {
-        targetBox.style.display = "block";
-        if (targetBtn) targetBtn.classList.add("btn-active");
-        
-        // 5. Gọi hàm load data tương ứng
-        if (type === "summary") { showSummary(); showGeneralSummaryReport(); }
-        if (type === "hours") renderWorkHoursInputs();
-        if (type === "ships") renderShipManagerList();
-        if (type === "progress") renderProgressInputs();
-        if (type === "checklist") renderChecklistInputs();
-        if (type === "extra") renderExtraSelect();
-        if (type === "jobs") renderJobList(); 
-        if (type === "comment") renderCommentList();
-        if (type === "dataEntry") applyFilter();
-        if (type === "revise") renderReviseList(); // Chạy hàm render data
-    }
+    if (!targetBox) return;
+
+    // Kiểm tra trạng thái: Nếu đang mở thì bấm lần nữa sẽ đóng
+    const isAlreadyOpen = targetBox.style.display === "block";
+
+    // BƯỚC 1: ẨN TẤT CẢ các box và xóa màu xanh (active) của các nút
+    Object.values(boxes).forEach(box => { if(box) box.style.display = "none"; });
+    Object.values(btns).forEach(btn => { if(btn) btn.classList.remove("btn-active"); });
+
+    // BƯỚC 2: Nếu cái vừa bấm đang mở -> Thoát (vì đã ẩn ở bước 1 rồi)
+    if (isAlreadyOpen) return;
+
+    // BƯỚC 3: Nếu nó đang tắt -> Mở lên và load dữ liệu
+    targetBox.style.display = "block";
+    targetBtn.classList.add("btn-active");
+
+    // BƯỚC 4: Load dữ liệu đặc thù cho từng loại
+    if (type === "summary") { showSummary(); showGeneralSummaryReport(); }
+    if (type === "hours") renderWorkHoursInputs();
+    if (type === "ships") renderShipManagerList();
+    if (type === "progress") renderProgressInputs();
+    if (type === "checklist") renderChecklistInputs();
+    if (type === "extra") renderExtraSelect();
+    if (type === "jobs") renderJobList(); 
+    if (type === "comment") renderCommentList();
+    if(type === 'dataEntry') applyFilter();
+
 };
 
 function renderPagination() {
@@ -4436,122 +4432,7 @@ window.exportCommentToExcel = function() {
     XLSX.writeFile(wb, `Comment_Tau_${selectedShip}.xlsx`);
 };
 
-window.renderReviseList = function() {
-    const viewSelect = document.getElementById("viewRevByShip");
-    const inputSelect = document.getElementById("revShip");
-    const currentView = viewSelect.value;
 
-    // Cập nhật danh sách tàu cho Select
-    let options = '<option value="">-- Chọn tàu --</option>';
-    Object.keys(shipsData).sort().forEach(id => {
-        options += `<option value="${id}">${id}</option>`;
-    });
-    viewSelect.innerHTML = options;
-    inputSelect.innerHTML = options;
-    viewSelect.value = currentView;
-
-    let html = "";
-    let index = 1;
-    const selectedShip = viewSelect.value;
-
-    if (!selectedShip) {
-        html = "<tr><td colspan='10' style='text-align:center; padding:20px; color:#888;'>👉 Vui lòng chọn tàu để xem dữ liệu Revise.</td></tr>";
-    } else {
-        const filtered = Object.entries(reviseData).filter(([id, r]) => r.ship === selectedShip);
-        if (filtered.length === 0) {
-            html = `<tr><td colspan='10' style='text-align:center; padding:20px;'>Tàu <b>${selectedShip}</b> chưa có bản vẽ Revise nào.</td></tr>`;
-        } else {
-            const disabledAttr = isAdmin ? "" : "disabled";
-            filtered.forEach(([id, r]) => {
-                const status = r.status || "pending";
-                let bgColor = status === "done" ? "#B2DFDB" : (status === "doing" ? "#FFF59D" : "#F8BBD0");
-
-                html += `
-                <tr style="background: ${bgColor};">
-                    <td style="text-align:center;">${index++}</td>
-                    <td>${r.ship}</td>
-                    <td>${r.pos || "-"}</td>
-                    <td style="font-weight:bold;">${r.revNo || "-"}</td>
-                    <td>${r.content || "-"}</td>
-                    <td>${r.note || "-"}</td>
-                    <td>${r.por || "-"}</td>
-                    <td>
-                        <select onchange="updateRevStatus('${id}', this.value)" ${disabledAttr}>
-                            <option value="pending" ${status==="pending"?"selected":""}>🔴 Chưa làm</option>
-                            <option value="doing" ${status==="doing"?"selected":""}>🟡 Đang làm</option>
-                            <option value="done" ${status==="done"?"selected":""}>🟢 Đã xong</option>
-                        </select>
-                    </td>
-                    <td>
-                        <input type="date" value="${r.doneDate || ''}" onchange="updateRevDate('${id}', this.value)" ${disabledAttr}>
-                    </td>
-                    <td class="admin-inline" style="text-align:center;">
-                        <div class="action-buttons">
-                            <button class="btn-edit" onclick="editRev('${id}')">✏️</button>
-                            <button class="btn-delete" onclick="deleteRev('${id}')">🗑️</button>
-                        </div>
-                    </td>
-                </tr>`;
-            });
-        }
-    }
-    document.getElementById("reviseListContent").innerHTML = html;
-};
-
-window.saveReviseData = function() {
-    if(!isAdmin) return;
-    const ship = document.getElementById("revShip").value;
-    const revNo = document.getElementById("revNo").value;
-    if(!ship || !revNo) return alert("Vui lòng chọn Tàu và nhập Mã Revise!");
-
-    const data = {
-        ship,
-        pos: document.getElementById("revPos").value,
-        revNo,
-        content: document.getElementById("revContent").value,
-        note: document.getElementById("revNote").value,
-        por: document.getElementById("revPor").value,
-        status: document.getElementById("revStatus").value,
-        doneDate: document.getElementById("revDoneDate").value,
-        updatedAt: Date.now()
-    };
-
-    if(editRevId) {
-        update(ref(db, "reviseDrawings/" + editRevId), data).then(() => {
-            alert("✅ Cập nhật Revise thành công!");
-            editRevId = null;
-            document.getElementById("btnSaveRev").innerText = "💾 Lưu Bản Vẽ";
-            clearRevForm();
-        });
-    } else {
-        push(ref(db, "reviseDrawings"), data).then(() => {
-            alert("✅ Đã thêm Revise mới!");
-            clearRevForm();
-        });
-    }
-};
-
-window.updateRevStatus = (id, val) => update(ref(db, "reviseDrawings/" + id), { status: val });
-window.updateRevDate = (id, val) => update(ref(db, "reviseDrawings/" + id), { doneDate: val });
-window.deleteRev = (id) => confirm("Xóa bản vẽ này?") && remove(ref(db, "reviseDrawings/" + id));
-
-window.editRev = function(id) {
-    const r = reviseData[id];
-    document.getElementById("revShip").value = r.ship;
-    document.getElementById("revPos").value = r.pos;
-    document.getElementById("revNo").value = r.revNo;
-    document.getElementById("revContent").value = r.content;
-    document.getElementById("revNote").value = r.note;
-    document.getElementById("revPor").value = r.por;
-    document.getElementById("revStatus").value = r.status;
-    document.getElementById("revDoneDate").value = r.doneDate;
-    editRevId = id;
-    document.getElementById("btnSaveRev").innerText = "💾 Cập nhật";
-};
-
-function clearRevForm() {
-    ["revPos", "revNo", "revContent", "revNote", "revPor", "revDoneDate"].forEach(id => document.getElementById(id).value = "");
-}
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

@@ -2700,8 +2700,7 @@ document.querySelectorAll("input, select").forEach(el => {
 
 });
 
-   window.handleButton = function(type) {
-    // 1. Lấy tất cả các vùng nội dung (Boxes)
+  window.handleButton = function(type) {
     const boxes = {
         dataEntry: document.getElementById("dataEntryBox"),
         summary: document.getElementById("summary"),
@@ -2711,12 +2710,11 @@ document.querySelectorAll("input, select").forEach(el => {
         progress: document.getElementById("progressBox"),
         checklist: document.getElementById("checklistBox"),
         extra: document.getElementById("extraBox"),
-        jobs: document.getElementById("jobManagerBox"), // Box mới thêm
+        jobs: document.getElementById("jobManagerBox"),
         comment: document.getElementById("commentBox"),
         revise: document.getElementById("reviseBox")
     };
 
-    // 2. Lấy tất cả các nút bấm tương ứng
     const btns = {
         dataEntry: document.getElementById("btnDataEntry"),
         summary: document.getElementById("btnSummary"),
@@ -2726,51 +2724,34 @@ document.querySelectorAll("input, select").forEach(el => {
         progress: document.getElementById("btnProgress"),
         checklist: document.getElementById("btnChecklist"),
         extra: document.getElementById("btnExtra"),
-        jobs: document.getElementById("btnJobs"), // Nút mới thêm
+        jobs: document.getElementById("btnJobs"),
         comment: document.getElementById("btnComment"),
         revise: document.getElementById("btnRevise")
     };
 
-    // Xử lý riêng cho nút Xuất Excel
-    if (type === 'export') {
-        exportExcel();
-        return;
-    }
+    if (!boxes[type]) return;
 
-    const targetBox = boxes[type];
-    const targetBtn = btns[type];
-
-    if (!targetBox) return;
-
-    // Kiểm tra trạng thái: Nếu đang mở thì bấm lần nữa sẽ đóng
-    const isAlreadyOpen = targetBox.style.display === "block";
-
-    // BƯỚC 1: ẨN TẤT CẢ các box và xóa màu xanh (active) của các nút
+    const isAlreadyOpen = boxes[type].style.display === "block";
     Object.values(boxes).forEach(box => { if(box) box.style.display = "none"; });
     Object.values(btns).forEach(btn => { if(btn) btn.classList.remove("btn-active"); });
 
-    // BƯỚC 2: Nếu cái vừa bấm đang mở -> Thoát (vì đã ẩn ở bước 1 rồi)
     if (isAlreadyOpen) return;
 
-    // BƯỚC 3: Nếu nó đang tắt -> Mở lên và load dữ liệu
-    targetBox.style.display = "block";
-    targetBtn.classList.add("btn-active");
+    boxes[type].style.display = "block";
+    if(btns[type]) btns[type].classList.add("btn-active");
 
-    // BƯỚC 4: Load dữ liệu đặc thù cho từng loại
+    // Load dữ liệu tương ứng
     if (type === "summary") { showSummary(); showGeneralSummaryReport(); }
     if (type === "hours") renderWorkHoursInputs();
     if (type === "ships") renderShipManagerList();
-    if (type === "users") { renderUserManager(); 
-        renderShipSelectForUser(); // Để hiện danh sách tàu trong ô chọn đa luồng
-    }
+    if (type === "users") { renderUserManager(); renderShipSelectForUser(); }
     if (type === "progress") renderProgressInputs();
     if (type === "checklist") renderChecklistInputs();
     if (type === "extra") renderExtraSelect();
     if (type === "jobs") renderJobList(); 
     if (type === "comment") renderCommentList();
-    if(type === 'dataEntry') applyFilter();
     if (type === "revise") renderReviseList();
-
+    if (type === 'dataEntry') applyFilter();
 };
 
 function renderPagination() {
@@ -4763,22 +4744,23 @@ window.deleteUser = (key) => { if(confirm("Xóa quyền user này?")) remove(ref
 
 // Hàm kiểm tra User hiện tại có được phép sửa tàu này không
 function canUserEdit(shipId) {
-    if (isAdmin) return true; // Admin có toàn quyền
-
+    if (isAdmin) return true; 
     const user = auth.currentUser;
     if (!user) return false;
-
     const userKey = user.email.replace(/\./g, '_');
     const userData = usersData[userKey];
-
-    // Nếu user có trong danh sách và tàu nằm trong danh sách được giao
-    if (userData && userData.ships.includes(shipId)) {
-        return true;
-    }
-    return false;
+    return (userData && userData.ships && userData.ships.includes(shipId));
 }
 
-
+function renderShipSelectForUser() {
+    const select = document.getElementById("userShipAssign");
+    if (!select) return;
+    let options = "";
+    Object.keys(shipsData).sort().forEach(shipId => {
+        options += `<option value="${shipId}">${shipId}</option>`;
+    });
+    select.innerHTML = options;
+}
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

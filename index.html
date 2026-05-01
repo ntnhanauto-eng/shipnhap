@@ -4773,21 +4773,22 @@ function canUserEdit(shipId) {
     if (isAdmin) return true; 
 
     const user = auth.currentUser;
-    if (!user) return false;
+    if (!user || !user.email) return false;
 
-    const userKey = user.email.toLowerCase().replace(/\./g, '_');
+    // Chuẩn hóa email: viết thường, bỏ khoảng trắng
+    const userEmail = user.email.toLowerCase().trim();
+    const userKey = userEmail.replace(/\./g, '_');
     const userData = usersData[userKey];
 
-    // Kiểm tra log trong F12
-    console.log("Checking ship:", shipId, "for user:", user.email);
-    
-    if (userData && Array.isArray(userData.ships)) {
-        const hasPermission = userData.ships.includes(shipId);
-        console.log("Permission:", hasPermission);
-        return hasPermission;
+    // Debug an toàn ngay trong code
+    if (userData && userData.ships) {
+        // Chuẩn hóa danh sách tàu để so sánh chính xác
+        const shipList = userData.ships.map(s => String(s).trim());
+        const targetShip = String(shipId).trim();
+        
+        return shipList.includes(targetShip);
     }
     
-    console.log("No userData found for this email!");
     return false;
 }
 
@@ -4801,6 +4802,14 @@ function renderShipSelectForUser() {
     });
     select.innerHTML = options;
 }
+
+    // Thêm dòng này ở cuối script để debug
+window.checkMyAuth = () => {
+    console.log("Email hiện tại:", auth.currentUser ? auth.currentUser.email : "Chưa đăng nhập");
+    console.log("Danh sách phân quyền đang có:", usersData);
+};
+
+
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

@@ -1542,10 +1542,10 @@ button {
     </div>
 </div>
 <div id="reviseBox" class="card" style="display:none; margin-top:15px;">
-    <h4>📐 QUẢN LÝ BẢN VẼ REVISE</h4>
+    <h4>📐 QUẢN LÝ REVISE</h4>
 
     <div class="admin-only" style="background: #eef2f7; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #1a73e8;">
-        <p style="margin-top:0; font-weight:bold; color: #1a73e8;">➕ Cập nhật Bản vẽ Revise mới:</p>
+        <p style="margin-top:0; font-weight:bold; color: #1a73e8;">➕ Thêm Revise mới:</p>
         <div class="flex">
             <select id="revShip"><option value="">-- Chọn tàu --</option></select>
             <input type="text" id="revNo" placeholder="Số bản vẽ (Ví dụ: S57706-642-001...)">
@@ -1577,12 +1577,15 @@ button {
             <thead>
                 <tr>
                     <th style="width: 50px; text-align: center;">STT</th>
-                    <th style="width: 150px;">SỐ BẢN VẼ</th>
-                    <th style="width: 200px;">TÊN BẢN VẼ</th>
-                    <th style="width: 80px; text-align: center;">REV</th>
-                    <th style="width: 120px; text-align: center;">NGÀY NHẬN</th>
-                    <th style="width: 300px;">NỘI DUNG/GHI CHÚ</th>
+                    <th style="width: 100px;">TÀU</th>
+                    <th style="width: 150px;">VỊ TRÍ</th>
+                    <th style="width: 200px;">NỘI DUNG</th>
+                    <th style="width: 300px;">GHI CHÚ</th>
+                    <th style="width: 80px; text-align: center;">REV POR</th>
+                    
+                    
                     <th style="width: 140px;">TRẠNG THÁI</th>
+                    <th style="width: 120px; text-align: center;">NGÀY XONG</th>
                     <th class="admin-inline" style="width: 80px; text-align: center;">Sửa</th>
                 </tr>
             </thead>
@@ -4515,32 +4518,33 @@ window.renderReviseList = function() {
         const filtered = Object.entries(reviseData).filter(([id, r]) => r.ship === currentView);
         const disabledAttr = isAdmin ? "" : "disabled";
 
-        filtered.forEach(([id, r]) => {
-            let bgColor = r.status === "done" ? "#B2DFDB" : (r.status === "doing" ? "#FFF59D" : "#F8BBD0");
-            html += `
-            <tr style="background:${bgColor}">
-                <td style="text-align:center;">${index++}</td>
-                <td style="font-weight:bold;">${r.revNo}</td>
-                <td>${r.revName || "-"}</td>
-                <td style="text-align:center; color:red; font-weight:bold;">${r.revIndex || "-"}</td>
-                <td style="text-align:center;">${r.revReceiveDate || "-"}</td>
-                <td style="white-space:normal;">${r.revNote || ""}</td>
-                <td>
-                    <select onchange="updateRevStatus('${id}', this.value)" ${disabledAttr}>
-                        <option value="pending" ${r.status==="pending"?"selected":""}>🔴 Chưa làm</option>
-                        <option value="doing" ${r.status==="doing"?"selected":""}>🟡 Đang làm</option>
-                        <option value="done" ${r.status==="done"?"selected":""}>🟢 Đã xong</option>
-                    </select>
-                </td>
-                <td class="admin-inline" style="text-align:center;">
-                    <button onclick="editRev('${id}')">✏️</button>
-                    <button onclick="deleteRev('${id}')">🗑️</button>
-                </td>
-            </tr>`;
-        });
-    }
-    document.getElementById("reviseListContent").innerHTML = html;
-};
+       // Tìm trong hàm window.renderReviseList đoạn code tạo biến html:
+filtered.forEach(([id, r]) => {
+    let bgColor = r.status === "done" ? "#B2DFDB" : (r.status === "doing" ? "#FFF59D" : "#F8BBD0");
+    html += `
+    <tr style="background:${bgColor}">
+        <td style="text-align:center;">${index++}</td>
+        <td style="font-weight:bold; text-align:center;">${r.ship}</td> <!-- THÊM DÒNG NÀY -->
+        <td style="font-weight:bold;">${r.revNo}</td>
+        <td>${r.revName || "-"}</td>
+        <td style="text-align:center; color:red; font-weight:bold;">${r.revIndex || "-"}</td>
+       
+        <td style="white-space:normal;">${r.revNote || ""}</td>
+        
+        <td>
+            <select onchange="updateRevStatus('${id}', this.value)" ${disabledAttr}>
+                <option value="pending" ${r.status==="pending"?"selected":""}>🔴 Chưa làm</option>
+                <option value="doing" ${r.status==="doing"?"selected":""}>🟡 Đang làm</option>
+                <option value="done" ${r.status==="done"?"selected":""}>🟢 Đã xong</option>
+            </select>
+        </td>
+         <td style="text-align:center;">${r.revReceiveDate || "-"}</td>
+        <td class="admin-inline" style="text-align:center;">
+            <button onclick="editRev('${id}')">✏️</button>
+            <button onclick="deleteRev('${id}')">🗑️</button>
+        </td>
+    </tr>`;
+});
 
 // Hàm Lưu dữ liệu
 window.saveReviseData = function() {

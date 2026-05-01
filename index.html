@@ -4550,7 +4550,7 @@ window.renderReviseList = function() {
 
         filtered.forEach(([id, r]) => {
             const status = r.status || "pending";
-            let bgColor = status === "pending" ? "#F8BBD0" : (status === "doing" ? "#FFF59D" : "#B2DFDB");
+           
 
             const canEdit = canUserEdit(r.ship);
     const disabledAttr = canEdit ? "" : "disabled";
@@ -4746,9 +4746,10 @@ window.deleteUser = (key) => { if(confirm("Xóa quyền user này?")) remove(ref
 function canUserEdit(shipId) {
     if (isAdmin) return true; 
     const user = auth.currentUser;
-    if (!user) return false;
+    if (!user) return false; // Nếu chưa đăng nhập thì không có quyền sửa
     const userKey = user.email.replace(/\./g, '_');
     const userData = usersData[userKey];
+    // Kiểm tra xem userData có tồn tại và ships có chứa shipId không
     return (userData && userData.ships && userData.ships.includes(shipId));
 }
 

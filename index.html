@@ -1574,6 +1574,13 @@ button {
         </select>
     </div>
 
+<!-- Dán vào phía trên bảng reviseTable -->
+<div class="admin-only" style="text-align: left; margin-top: 10px; margin-bottom: 10px;">
+    <button onclick="exportReviseToExcel()" style="background:#28a745; width: auto; padding: 10px 20px;">
+        📤 Xuất Excel Revise
+    </button>
+</div>
+    
     <div class="table-wrap">
         <table id="reviseTable" style="width: 100%; min-width: 1200px;">
             <thead>
@@ -4606,6 +4613,71 @@ function resetRevForm() {
     editRevId = null;
     document.getElementById("btnSaveRev").innerText = "💾 Lưu Bản Vẽ";
 }
+
+window.exportReviseToExcel = function() {
+    const viewSelect = document.getElementById("viewRevByShip");
+    const selectedShip = viewSelect.value;
+
+    if (!selectedShip) {
+        alert("Vui lòng chọn một tàu để xuất dữ liệu!");
+        return;
+    }
+
+    // 1. Lọc dữ liệu Revise của tàu được chọn
+    const filtered = Object.entries(reviseData).filter(([id, r]) => r.ship === selectedShip);
+    
+    if (filtered.length === 0) {
+        alert("Không có dữ liệu bản vẽ Revise để xuất!");
+        return;
+    }
+
+    // 2. Chuẩn bị dữ liệu cho Excel
+    const rows = [
+        ["STT", "TÀU", "REVISE NO", "VỊ TRÍ", "NỘI DUNG", "GHI CHÚ", "TRẠNG THÁI", "NGÀY XONG"]
+    ];
+
+    filtered.forEach(([id, r], index) => {
+        let statusText = "";
+        if (r.status === "done") statusText = "Đã xong";
+        else if (r.status === "doing") statusText = "Đang làm";
+        else statusText = "Chưa làm";
+
+        rows.push([
+            index + 1,
+            r.ship,
+            r.revNo || "",
+            r.pos || "",
+            r.content || "",
+            r.note || "",
+            statusText,
+            r.doneDate || ""
+        ]);
+    });
+
+    // 3. Khởi tạo Workbook và Sheet
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+
+    // 4. Cài đặt độ rộng cột (wch là số ký tự)
+    const wscols = [
+        {wch: 5},  // STT
+        {wch: 10}, // Tàu
+        {wch: 15}, // REVISE NO
+        {wch: 20}, // Vị trí
+        {wch: 45}, // Nội dung
+        {wch: 30}, // Ghi chú
+        {wch: 15}, // Trạng thái
+        {wch: 15}  // Ngày xong
+    ];
+    ws['!cols'] = wscols;
+
+    // 5. Xuất file với tên file chứa ngày giờ
+    const now = new Date();
+    const dateStr = now.toISOString().slice(0, 10);
+    XLSX.utils.book_append_sheet(wb, ws, "Revise");
+    XLSX.writeFile(wb, `Revise_Tau_${selectedShip}_${dateStr}.xlsx`);
+};
+
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

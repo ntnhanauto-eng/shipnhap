@@ -1691,17 +1691,21 @@ document.getElementById("date").value = `${yyyy}-${mm}-${dd}`;
     let usersData = {};
 
 // Lắng nghe dữ liệu User
+// Tìm đoạn onValue(ref(db, "users"), ...) và thay thế:
 onValue(ref(db, "users"), snapshot => {
     usersData = snapshot.val() || {};
-    console.log("Đã cập nhật danh sách phân quyền từ Firebase");
-    
-    // 🔥 QUAN TRỌNG: Nếu đang mở tab nào thì vẽ lại tab đó ngay lập tức để cập nhật trạng thái 'disabled'
-    const currentBox = document.querySelector('.card[style*="display: block"]');
-    if (currentBox) {
-        if (currentBox.id === "jobManagerBox") renderJobList();
-        if (currentBox.id === "commentBox") renderCommentList();
-        if (currentBox.id === "reviseBox") renderReviseList();
-    }
+    console.log("Dữ liệu phân quyền đã cập nhật");
+
+    // 🔥 Sau khi có dữ liệu User, phải ép các hàm render chạy lại
+    // để cập nhật trạng thái 'disabled' hay 'enabled' cho các ô chọn
+    const selectedShipJob = document.getElementById("viewJobByShip")?.value;
+    if (selectedShipJob) renderJobList();
+
+    const selectedShipCmt = document.getElementById("viewCmtByShip")?.value;
+    if (selectedShipCmt) renderCommentList();
+
+    const selectedShipRev = document.getElementById("viewRevByShip")?.value;
+    if (selectedShipRev) renderReviseList();
 });
 
 // Lắng nghe dữ liệu Revise từ Firebase
@@ -4770,29 +4774,24 @@ window.deleteUser = (key) => { if(confirm("Xóa quyền user này?")) remove(ref
 
 // Hàm kiểm tra User hiện tại có được phép sửa tàu này không
 function canUserEdit(shipId) {
-    if (isAdmin) return true; // Nếu là Admin trong list ADMIN_EMAILS thì luôn xong
+    if (isAdmin) return true; // Admin thật sự thì luôn có quyền
 
     const user = auth.currentUser;
-    if (!user) {
-        console.log("Chưa đăng nhập");
-        return false;
-    }
+    if (!user) return false;
 
+    // Chuyển email về dạng key an toàn (giống lúc lưu)
     const userKey = user.email.toLowerCase().replace(/\./g, '_');
     const userData = usersData[userKey];
 
-    console.log("Đang kiểm tra quyền cho:", user.email);
-    console.log("Dữ liệu phân quyền hiện có:", userData);
-
-    // Kiểm tra: User có tồn tại, có danh sách tàu và tàu shipId có trong danh sách đó không
-    if (userData && userData.ships && userData.ships.includes(shipId)) {
-        console.log("=> Có quyền sửa tàu:", shipId);
-        return true;
+    // Kiểm tra kỹ dữ liệu userData
+    if (userData && Array.isArray(userData.ships)) {
+        return userData.ships.includes(shipId);
     }
-
-    console.log("=> KHÔNG có quyền sửa tàu:", shipId);
+    
     return false;
 }
+
+    
 function renderShipSelectForUser() {
     const select = document.getElementById("userShipAssign");
     if (!select) return;

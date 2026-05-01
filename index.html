@@ -1694,18 +1694,12 @@ document.getElementById("date").value = `${yyyy}-${mm}-${dd}`;
 // Tìm đoạn onValue(ref(db, "users"), ...) và thay thế:
 onValue(ref(db, "users"), snapshot => {
     usersData = snapshot.val() || {};
-    console.log("Dữ liệu phân quyền đã cập nhật");
+    console.log("Đã nhận danh sách phân quyền mới");
 
-    // 🔥 Sau khi có dữ liệu User, phải ép các hàm render chạy lại
-    // để cập nhật trạng thái 'disabled' hay 'enabled' cho các ô chọn
-    const selectedShipJob = document.getElementById("viewJobByShip")?.value;
-    if (selectedShipJob) renderJobList();
-
-    const selectedShipCmt = document.getElementById("viewCmtByShip")?.value;
-    if (selectedShipCmt) renderCommentList();
-
-    const selectedShipRev = document.getElementById("viewRevByShip")?.value;
-    if (selectedShipRev) renderReviseList();
+    // Ép các bảng vẽ lại để cập nhật trạng thái disabled/enabled
+    if (document.getElementById("jobManagerBox").style.display === "block") renderJobList();
+    if (document.getElementById("commentBox").style.display === "block") renderCommentList();
+    if (document.getElementById("reviseBox").style.display === "block") renderReviseList();
 });
 
 // Lắng nghe dữ liệu Revise từ Firebase
@@ -1991,27 +1985,29 @@ onAuthStateChanged(auth, (user) => {
     const btn = document.getElementById("authBtn");
     
     if (user) {
-        // CHỈ set isAdmin là true nếu email nằm trong danh sách Admin
         isAdmin = ADMIN_EMAILS.includes(user.email.toLowerCase());
         
         if (isAdmin) {
             body.classList.add("is-admin");
             btn.innerText = "🔐 Thoát Admin";
         } else {
-            // Nếu là User/PIC thì KHÔNG thêm class is-admin
             body.classList.remove("is-admin");
-            btn.innerText = "👤 Thoát User";
+            btn.innerText = "👤 Thoát User: " + user.email.split('@')[0]; // Hiện tên user cho chắc chắn
         }
         
         btn.classList.add("logout-mode");
-        startAutoLogout();
+        startAutoLogout(); // Chỉ chạy khi có user
     } else {
         isAdmin = false;
         body.classList.remove("is-admin");
         btn.innerText = "🔐 Admin";
         btn.classList.remove("logout-mode");
     }
-    applyFilter(); // Vẽ lại bảng
+    
+    // 🔥 Sau khi trạng thái đăng nhập thay đổi, vẽ lại bảng ngay
+    if (document.getElementById("jobManagerBox").style.display === "block") renderJobList();
+    if (document.getElementById("commentBox").style.display === "block") renderCommentList();
+    if (document.getElementById("reviseBox").style.display === "block") renderReviseList();
 });
 
     // --- CÁC HÀM CỦA BẠN (GIỮ NGUYÊN LOGIC) ---
@@ -4774,20 +4770,24 @@ window.deleteUser = (key) => { if(confirm("Xóa quyền user này?")) remove(ref
 
 // Hàm kiểm tra User hiện tại có được phép sửa tàu này không
 function canUserEdit(shipId) {
-    if (isAdmin) return true; // Admin thật sự thì luôn có quyền
+    if (isAdmin) return true; 
 
     const user = auth.currentUser;
     if (!user) return false;
 
-    // Chuyển email về dạng key an toàn (giống lúc lưu)
     const userKey = user.email.toLowerCase().replace(/\./g, '_');
     const userData = usersData[userKey];
 
-    // Kiểm tra kỹ dữ liệu userData
+    // Kiểm tra log trong F12
+    console.log("Checking ship:", shipId, "for user:", user.email);
+    
     if (userData && Array.isArray(userData.ships)) {
-        return userData.ships.includes(shipId);
+        const hasPermission = userData.ships.includes(shipId);
+        console.log("Permission:", hasPermission);
+        return hasPermission;
     }
     
+    console.log("No userData found for this email!");
     return false;
 }
 

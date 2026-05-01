@@ -1693,8 +1693,14 @@ document.getElementById("date").value = `${yyyy}-${mm}-${dd}`;
 // Lắng nghe dữ liệu User
 onValue(ref(db, "users"), snapshot => {
     usersData = snapshot.val() || {};
-    if(document.getElementById("userManagerBox").style.display === "block") {
-        renderUserManager();
+    console.log("Đã cập nhật danh sách phân quyền từ Firebase");
+    
+    // 🔥 QUAN TRỌNG: Nếu đang mở tab nào thì vẽ lại tab đó ngay lập tức để cập nhật trạng thái 'disabled'
+    const currentBox = document.querySelector('.card[style*="display: block"]');
+    if (currentBox) {
+        if (currentBox.id === "jobManagerBox") renderJobList();
+        if (currentBox.id === "commentBox") renderCommentList();
+        if (currentBox.id === "reviseBox") renderReviseList();
     }
 });
 
@@ -4764,15 +4770,29 @@ window.deleteUser = (key) => { if(confirm("Xóa quyền user này?")) remove(ref
 
 // Hàm kiểm tra User hiện tại có được phép sửa tàu này không
 function canUserEdit(shipId) {
-    if (isAdmin) return true; 
-    const user = auth.currentUser;
-    if (!user) return false; // Nếu chưa đăng nhập thì không có quyền sửa
-    const userKey = user.email.replace(/\./g, '_');
-    const userData = usersData[userKey];
-    // Kiểm tra xem userData có tồn tại và ships có chứa shipId không
-    return (userData && userData.ships && userData.ships.includes(shipId));
-}
+    if (isAdmin) return true; // Nếu là Admin trong list ADMIN_EMAILS thì luôn xong
 
+    const user = auth.currentUser;
+    if (!user) {
+        console.log("Chưa đăng nhập");
+        return false;
+    }
+
+    const userKey = user.email.toLowerCase().replace(/\./g, '_');
+    const userData = usersData[userKey];
+
+    console.log("Đang kiểm tra quyền cho:", user.email);
+    console.log("Dữ liệu phân quyền hiện có:", userData);
+
+    // Kiểm tra: User có tồn tại, có danh sách tàu và tàu shipId có trong danh sách đó không
+    if (userData && userData.ships && userData.ships.includes(shipId)) {
+        console.log("=> Có quyền sửa tàu:", shipId);
+        return true;
+    }
+
+    console.log("=> KHÔNG có quyền sửa tàu:", shipId);
+    return false;
+}
 function renderShipSelectForUser() {
     const select = document.getElementById("userShipAssign");
     if (!select) return;

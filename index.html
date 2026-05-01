@@ -1204,6 +1204,7 @@ button {
    
     <button id="btnSummary" onclick="handleButton('summary')">📊 BÁO CÁO</button>
     <button id="btnManageShips" class="admin-only" onclick="handleButton('ships')">Q.lý D.sách Tàu</button>
+    <button id="btnUsers" class="admin-only" onclick="handleButton('users')">👥 Quản lý USER</button>
     <button id="btnWorkHours" class="admin-only" onclick="handleButton('hours')">Q.lý giờ công</button>
     <button id="btnProgress" class="admin-only" onclick="handleButton('progress')">Q.lý tiến độ tàu</button>
     <button id="btnChecklist" class="admin-only" onclick="handleButton('checklist')">Q.lý mục kiểm tra</button>
@@ -1345,6 +1346,39 @@ button {
         </div>
         <div id="shipListContent" style="margin-top:10px;"></div>
     </div>
+
+
+<!-- ... (Đoạn mã Quản lý danh sách tàu ở trên) ... -->
+<div id="shipManagerBox" class="card admin-only" style="display:none; margin-top:15px;">
+    <!-- Nội dung quản lý tàu -->
+</div>
+
+<!-- DÁN ĐOẠN MÃ MỚI VÀO ĐÂY -->
+<div id="userManagerBox" class="card admin-only" style="display:none; margin-top:15px;">
+    <h4 style="color: #1a73e8;">👥 PHÂN QUYỀN NGƯỜI PHỤ TRÁCH</h4>
+    <div style="background: #f1f3f4; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+        <label><b>1. Email người phụ trách:</b></label>
+        <input type="email" id="userEmail" placeholder="Nhập Gmail (ví dụ: nhan@gmail.com)">
+        
+        <label><b>2. Chọn các tàu phụ trách (Giữ Ctrl để chọn nhiều):</b></label>
+        <select id="userShipAssign" multiple style="height: 120px; margin-top: 5px;">
+            <!-- Danh sách tàu sẽ được tự động đổ vào đây bằng JS -->
+        </select>
+        
+        <button onclick="saveUserPermission()" style="background: #1a73e8; margin-top: 15px;">✅ Xác nhận cấp quyền</button>
+    </div>
+    <div id="userListContent" class="table-wrap">
+        <!-- Bảng danh sách các User đã phân quyền sẽ hiện ở đây -->
+    </div>
+</div>
+<!-- KẾT THÚC ĐOẠN MÃ MỚI -->
+
+<div id="progressBox" class="card admin-only" style="display:none; margin-top:15px;">
+    <!-- Nội dung quản lý tiến độ tàu -->
+</div>
+<!-- ... -->
+
+         
 
     <div id="progressBox" class="card admin-only" style="display:none; margin-top:15px;">
         <h4>📌 Nhập tiến độ thực tế (%)</h4>
@@ -1653,7 +1687,16 @@ document.getElementById("date").value = `${yyyy}-${mm}-${dd}`;
     let commentsData = {};
     let editCmtId = null;
     let reviseData = {};
-let editRevId = null;
+    let editRevId = null;
+    let usersData = {};
+
+// Lắng nghe dữ liệu User
+onValue(ref(db, "users"), snapshot => {
+    usersData = snapshot.val() || {};
+    if(document.getElementById("userManagerBox").style.display === "block") {
+        renderUserManager();
+    }
+});
 
 // Lắng nghe dữ liệu Revise từ Firebase
 onValue(ref(db, "revises"), snapshot => {
@@ -2664,6 +2707,7 @@ document.querySelectorAll("input, select").forEach(el => {
         summary: document.getElementById("summary"),
         hours: document.getElementById("workHoursBox"),
         ships: document.getElementById("shipManagerBox"),
+        users: document.getElementById("userManagerBox"),
         progress: document.getElementById("progressBox"),
         checklist: document.getElementById("checklistBox"),
         extra: document.getElementById("extraBox"),
@@ -2678,6 +2722,7 @@ document.querySelectorAll("input, select").forEach(el => {
         summary: document.getElementById("btnSummary"),
         hours: document.getElementById("btnWorkHours"),
         ships: document.getElementById("btnManageShips"),
+        users: document.getElementById("btnUsers"),
         progress: document.getElementById("btnProgress"),
         checklist: document.getElementById("btnChecklist"),
         extra: document.getElementById("btnExtra"),
@@ -2715,6 +2760,9 @@ document.querySelectorAll("input, select").forEach(el => {
     if (type === "summary") { showSummary(); showGeneralSummaryReport(); }
     if (type === "hours") renderWorkHoursInputs();
     if (type === "ships") renderShipManagerList();
+    if (type === "users") { renderUserManager(); 
+        renderShipSelectForUser(); // Để hiện danh sách tàu trong ô chọn đa luồng
+    }
     if (type === "progress") renderProgressInputs();
     if (type === "checklist") renderChecklistInputs();
     if (type === "extra") renderExtraSelect();
@@ -4042,7 +4090,8 @@ filteredJobs.forEach(([id, j]) => {
     let status = j.status || "pending";
     
     // 🔥 THÊM DÒNG NÀY ĐỂ KIỂM TRA QUYỀN ADMIN
-    const disabledAttr = isAdmin ? "" : "disabled"; 
+   const canEdit = canUserEdit(j.ship); 
+    const disabledAttr = canEdit ? "" : "disabled";
 
     let bgColor = "";
     if (status === "pending") bgColor = "#F8BBD0";   
@@ -4063,6 +4112,7 @@ filteredJobs.forEach(([id, j]) => {
         <td>${j.note || ""}</td>
 
         <td>
+            <!-- Áp dụng disabledAttr vào đây -->
             <select onchange="updateJobStatus('${id}', this.value)" ${disabledAttr}>
                 <option value="pending" ${status==="pending"?"selected":""}>🔴 Chưa làm</option>
                 <option value="doing" ${status==="doing"?"selected":""}>🟡 Đang làm</option>
@@ -4276,54 +4326,44 @@ window.renderCommentList = function() {
             // Khóa mọi thứ nếu không phải Admin
             const disabledAttr = isAdmin ? "" : "disabled";
 
-            filtered.forEach(([id, c]) => {
-                const status = c.status || "pending";
-                let bgColor = "";
-                if (status === "pending") bgColor = "#F8BBD0";
-                else if (status === "doing") bgColor = "#FFF59D";
-                else if (status === "done") bgColor = "#B2DFDB";
-
-               html += `
-<tr style="background: ${bgColor};">
-    <td style="text-align:center;">${index++}</td>
-    <td>${c.ship}</td>
+           // --- TRONG HÀM renderCommentList ---
+filtered.forEach(([id, c]) => {
+    const status = c.status || "pending";
     
-    <td style="font-weight: bold; text-align: center; color: #d32f2f;">${c.cmtNo || "-"}</td> 
-    
-    <td>${c.pos || "-"}</td>
+    // 🔴 THAY ĐỔI TẠI ĐÂY: Kiểm tra quyền cho tàu c.ship
+    const canEdit = canUserEdit(c.ship);
+    const disabledAttr = canEdit ? "" : "disabled";
 
-    <td style="white-space: normal; word-break: break-word;">
-        ${c.content}
-    </td>
+    let bgColor = status === "pending" ? "#F8BBD0" : (status === "doing" ? "#FFF59D" : "#B2DFDB");
 
-    <!-- 🔥 CỘT GHI CHÚ -->
-    <td style="white-space: normal; word-break: break-word;">
-        ${c.note || ""}
-    </td>
-
-    <td>
-        <select onchange="updateCmtStatus('${id}', this.value)" ${disabledAttr}>
-            <option value="pending" ${status === "pending" ? "selected" : ""}>🔴 Chưa làm</option>
-            <option value="doing" ${status === "doing" ? "selected" : ""}>🟡 Đang làm</option>
-            <option value="done" ${status === "done" ? "selected" : ""}>🟢 Đã xong</option>
-        </select>
-    </td>
-
-    <td style="text-align:center;">
-        <input type="date" 
-               value="${c.doneDate || ''}" 
-               onchange="updateCmtDate('${id}', this.value)" 
-               ${disabledAttr}>
-    </td>
-
-    <td class="admin-inline" style="text-align:center;">
-        <div class="action-buttons">
-            <button onclick="editCmt('${id}')">✏️</button>
-            <button onclick="deleteCmt('${id}')">🗑️</button>
-        </div>
-    </td>
-</tr>`;
-            });
+    html += `
+    <tr style="background: ${bgColor};">
+        <td style="text-align:center;">${index++}</td>
+        <td>${c.ship}</td>
+        <td style="font-weight: bold; text-align: center; color: #d32f2f;">${c.cmtNo || "-"}</td> 
+        <td>${c.pos || "-"}</td>
+        <td style="white-space: normal;">${c.content}</td>
+        <td style="white-space: normal;">${c.note || ""}</td>
+        <td>
+            <!-- Áp dụng disabledAttr vào Select trạng thái -->
+            <select onchange="updateCmtStatus('${id}', this.value)" ${disabledAttr}>
+                <option value="pending" ${status === "pending" ? "selected" : ""}>🔴 Chưa làm</option>
+                <option value="doing" ${status === "doing" ? "selected" : ""}>🟡 Đang làm</option>
+                <option value="done" ${status === "done" ? "selected" : ""}>🟢 Đã xong</option>
+            </select>
+        </td>
+        <td style="text-align:center;">
+            <!-- Áp dụng disabledAttr vào Input ngày xong -->
+            <input type="date" value="${c.doneDate || ''}" onchange="updateCmtDate('${id}', this.value)" ${disabledAttr}>
+        </td>
+        <td class="admin-inline">
+            <div class="action-buttons">
+                <button onclick="editCmt('${id}')">✏️</button>
+                <button onclick="deleteCmt('${id}')">🗑️</button>
+            </div>
+        </td>
+    </tr>`;
+});
         }
     }
     document.getElementById("commentListContent").innerHTML = html;
@@ -4531,32 +4571,39 @@ window.renderReviseList = function() {
             const status = r.status || "pending";
             let bgColor = status === "pending" ? "#F8BBD0" : (status === "doing" ? "#FFF59D" : "#B2DFDB");
 
-            html += `
-            <tr style="background: ${bgColor};">
-                <td style="text-align:center;">${index++}</td>
-                <td>${r.ship}</td>
-                <td style="font-weight:bold; color:#1565c0;">${r.revNo || "-"}</td>
-                <td>${r.pos || "-"}</td>
-                <td style="white-space:normal;">${r.content || "-"}</td>
-                <td style="white-space:normal;">${r.note || "-"}</td>
-                <td>
-                    <select onchange="updateRevStatus('${id}', this.value)" ${disabledAttr}>
-                        <option value="pending" ${status === "pending" ? "selected" : ""}>🔴 Chưa làm</option>
-                        <option value="doing" ${status === "doing" ? "selected" : ""}>🟡 Đang làm</option>
-                        <option value="done" ${status === "done" ? "selected" : ""}>🟢 Đã xong</option>
-                    </select>
-                </td>
-                <td style="text-align:center;">
-                    <input type="date" value="${r.doneDate || ''}" onchange="updateRevDate('${id}', this.value)" ${disabledAttr}>
-                </td>
-                <td class="admin-inline" style="text-align:center;">
-                    <div class="action-buttons">
-                        <button onclick="editRev('${id}')" class="btn-edit">✏️</button>
-                        <button onclick="deleteRev('${id}')" class="btn-delete">🗑️</button>
-                    </div>
-                </td>
-            </tr>`;
-        });
+            const canEdit = canUserEdit(r.ship);
+    const disabledAttr = canEdit ? "" : "disabled";
+
+    let bgColor = status === "pending" ? "#F8BBD0" : (status === "doing" ? "#FFF59D" : "#B2DFDB");
+
+    html += `
+    <tr style="background: ${bgColor};">
+        <td style="text-align:center;">${index++}</td>
+        <td>${r.ship}</td>
+        <td style="font-weight:bold; color:#1565c0;">${r.revNo || "-"}</td>
+        <td>${r.pos || "-"}</td>
+        <td>${r.content || "-"}</td>
+        <td>${r.note || "-"}</td>
+        <td>
+            <!-- Áp dụng disabledAttr -->
+            <select onchange="updateRevStatus('${id}', this.value)" ${disabledAttr}>
+                <option value="pending" ${status === "pending" ? "selected" : ""}>🔴 Chưa làm</option>
+                <option value="doing" ${status === "doing" ? "selected" : ""}>🟡 Đang làm</option>
+                <option value="done" ${status === "done" ? "selected" : ""}>🟢 Đã xong</option>
+            </select>
+        </td>
+        <td style="text-align:center;">
+            <!-- Áp dụng disabledAttr -->
+            <input type="date" value="${r.doneDate || ''}" onchange="updateRevDate('${id}', this.value)" ${disabledAttr}>
+        </td>
+        <td class="admin-inline">
+            <div class="action-buttons">
+                <button onclick="editRev('${id}')">✏️</button>
+                <button onclick="deleteRev('${id}')">🗑️</button>
+            </div>
+        </td>
+    </tr>`;
+});
     }
     document.getElementById("reviseListContent").innerHTML = html;
 };
@@ -4677,6 +4724,60 @@ window.exportReviseToExcel = function() {
     XLSX.utils.book_append_sheet(wb, ws, "Revise");
     XLSX.writeFile(wb, `Revise_Tau_${selectedShip}_${dateStr}.xlsx`);
 };
+// Hàm lưu phân quyền
+window.saveUserPermission = function() {
+    const email = document.getElementById("userEmail").value.trim().toLowerCase();
+    const selectedShips = Array.from(document.getElementById("userShipAssign").selectedOptions).map(opt => opt.value);
+
+    if(!email || selectedShips.length === 0) return alert("Vui lòng nhập Email và chọn ít nhất 1 tàu!");
+
+    // Thay đổi dấu chấm trong email vì Firebase Key không cho phép dấu chấm
+    const userKey = email.replace(/\./g, '_');
+
+    set(ref(db, "users/" + userKey), {
+        email: email,
+        ships: selectedShips
+    }).then(() => {
+        alert("Đã phân quyền cho " + email);
+        document.getElementById("userEmail").value = "";
+    });
+};
+
+// Hiển thị danh sách đã phân quyền
+function renderUserManager() {
+    let html = `<table><tr><th>Email</th><th>Tàu phụ trách</th><th>Xóa</th></tr>`;
+    Object.keys(usersData).forEach(key => {
+        const u = usersData[key];
+        html += `<tr>
+            <td>${u.email}</td>
+            <td>${u.ships.join(", ")}</td>
+            <td><button class="btn-delete" onclick="deleteUser('${key}')">🗑️</button></td>
+        </tr>`;
+    });
+    html += "</table>";
+    document.getElementById("userListContent").innerHTML = html;
+}
+
+window.deleteUser = (key) => { if(confirm("Xóa quyền user này?")) remove(ref(db, "users/" + key)); };
+
+
+// Hàm kiểm tra User hiện tại có được phép sửa tàu này không
+function canUserEdit(shipId) {
+    if (isAdmin) return true; // Admin có toàn quyền
+
+    const user = auth.currentUser;
+    if (!user) return false;
+
+    const userKey = user.email.replace(/\./g, '_');
+    const userData = usersData[userKey];
+
+    // Nếu user có trong danh sách và tàu nằm trong danh sách được giao
+    if (userData && userData.ships.includes(shipId)) {
+        return true;
+    }
+    return false;
+}
+
 
     
 </script>

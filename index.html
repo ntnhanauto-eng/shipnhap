@@ -1973,24 +1973,36 @@ function renderShipManagerList() {
 }
 
     // Theo dõi trạng thái đăng nhập
-    onAuthStateChanged(auth, (user) => {
-        const body = document.getElementById("mainBody");
-        const btn = document.getElementById("authBtn");
-        if (user) {
-            isAdmin = true;
+   // Khai báo danh sách Email có quyền Admin cao nhất
+const ADMIN_EMAILS = ["admin@gmail.com", "nhan@gmail.com"]; // Thay bằng Email thật của bạn
+
+onAuthStateChanged(auth, (user) => {
+    const body = document.getElementById("mainBody");
+    const btn = document.getElementById("authBtn");
+    
+    if (user) {
+        // CHỈ set isAdmin là true nếu email nằm trong danh sách Admin
+        isAdmin = ADMIN_EMAILS.includes(user.email.toLowerCase());
+        
+        if (isAdmin) {
             body.classList.add("is-admin");
             btn.innerText = "🔐 Thoát Admin";
-            btn.classList.add("logout-mode");
-            startAutoLogout();
         } else {
-            isAdmin = false;
+            // Nếu là User/PIC thì KHÔNG thêm class is-admin
             body.classList.remove("is-admin");
-            btn.innerText = "🔐 Admin";
-            btn.classList.remove("logout-mode");
-            document.getElementById("workHoursBox").style.display = "none";
+            btn.innerText = "👤 Thoát User";
         }
-        applyFilter(); // Vẽ lại bảng để hiện/ẩn cột Sửa/Xóa
-    });
+        
+        btn.classList.add("logout-mode");
+        startAutoLogout();
+    } else {
+        isAdmin = false;
+        body.classList.remove("is-admin");
+        btn.innerText = "🔐 Admin";
+        btn.classList.remove("logout-mode");
+    }
+    applyFilter(); // Vẽ lại bảng
+});
 
     // --- CÁC HÀM CỦA BẠN (GIỮ NGUYÊN LOGIC) ---
    window.saveLog = function(){
@@ -2701,6 +2713,14 @@ document.querySelectorAll("input, select").forEach(el => {
 });
 
   window.handleButton = function(type) {
+     // Danh sách các chức năng CHỈ Admin cấp cao mới được vào
+    const adminFunctions = ['ships', 'users', 'hours', 'progress', 'checklist'];
+    
+    if (adminFunctions.includes(type) && !isAdmin) {
+        alert("⚠️ Bạn không có quyền truy cập chức năng quản trị này!");
+        return;
+    }
+      
     const boxes = {
         dataEntry: document.getElementById("dataEntryBox"),
         summary: document.getElementById("summary"),

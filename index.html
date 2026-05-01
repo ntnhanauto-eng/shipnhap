@@ -1204,7 +1204,6 @@ button {
    
     <button id="btnSummary" onclick="handleButton('summary')">📊 BÁO CÁO</button>
     <button id="btnManageShips" class="admin-only" onclick="handleButton('ships')">Q.lý D.sách Tàu</button>
-    <button id="btnUsers" class="admin-only" onclick="handleButton('users')">👥 Quản lý USER</button>
     <button id="btnWorkHours" class="admin-only" onclick="handleButton('hours')">Q.lý giờ công</button>
     <button id="btnProgress" class="admin-only" onclick="handleButton('progress')">Q.lý tiến độ tàu</button>
     <button id="btnChecklist" class="admin-only" onclick="handleButton('checklist')">Q.lý mục kiểm tra</button>
@@ -1346,39 +1345,6 @@ button {
         </div>
         <div id="shipListContent" style="margin-top:10px;"></div>
     </div>
-
-
-<!-- ... (Đoạn mã Quản lý danh sách tàu ở trên) ... -->
-<div id="shipManagerBox" class="card admin-only" style="display:none; margin-top:15px;">
-    <!-- Nội dung quản lý tàu -->
-</div>
-
-<!-- DÁN ĐOẠN MÃ MỚI VÀO ĐÂY -->
-<div id="userManagerBox" class="card admin-only" style="display:none; margin-top:15px;">
-    <h4 style="color: #1a73e8;">👥 PHÂN QUYỀN NGƯỜI PHỤ TRÁCH</h4>
-    <div style="background: #f1f3f4; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
-        <label><b>1. Email người phụ trách:</b></label>
-        <input type="email" id="userEmail" placeholder="Nhập Gmail (ví dụ: nhan@gmail.com)">
-        
-        <label><b>2. Chọn các tàu phụ trách (Giữ Ctrl để chọn nhiều):</b></label>
-        <select id="userShipAssign" multiple style="height: 120px; margin-top: 5px;">
-            <!-- Danh sách tàu sẽ được tự động đổ vào đây bằng JS -->
-        </select>
-        
-        <button onclick="saveUserPermission()" style="background: #1a73e8; margin-top: 15px;">✅ Xác nhận cấp quyền</button>
-    </div>
-    <div id="userListContent" class="table-wrap">
-        <!-- Bảng danh sách các User đã phân quyền sẽ hiện ở đây -->
-    </div>
-</div>
-<!-- KẾT THÚC ĐOẠN MÃ MỚI -->
-
-<div id="progressBox" class="card admin-only" style="display:none; margin-top:15px;">
-    <!-- Nội dung quản lý tiến độ tàu -->
-</div>
-<!-- ... -->
-
-         
 
     <div id="progressBox" class="card admin-only" style="display:none; margin-top:15px;">
         <h4>📌 Nhập tiến độ thực tế (%)</h4>
@@ -1687,20 +1653,7 @@ document.getElementById("date").value = `${yyyy}-${mm}-${dd}`;
     let commentsData = {};
     let editCmtId = null;
     let reviseData = {};
-    let editRevId = null;
-    let usersData = {};
-
-// Lắng nghe dữ liệu User
-// Tìm đoạn onValue(ref(db, "users"), ...) và thay thế:
-onValue(ref(db, "users"), snapshot => {
-    usersData = snapshot.val() || {};
-    console.log("Đã nhận danh sách phân quyền mới");
-
-    // Ép các bảng vẽ lại để cập nhật trạng thái disabled/enabled
-    if (document.getElementById("jobManagerBox").style.display === "block") renderJobList();
-    if (document.getElementById("commentBox").style.display === "block") renderCommentList();
-    if (document.getElementById("reviseBox").style.display === "block") renderReviseList();
-});
+let editRevId = null;
 
 // Lắng nghe dữ liệu Revise từ Firebase
 onValue(ref(db, "revises"), snapshot => {
@@ -1977,38 +1930,24 @@ function renderShipManagerList() {
 }
 
     // Theo dõi trạng thái đăng nhập
-   // Khai báo danh sách Email có quyền Admin cao nhất
-const ADMIN_EMAILS = ["admin@gmail.com", "nhan@gmail.com"]; // Thay bằng Email thật của bạn
-
-onAuthStateChanged(auth, (user) => {
-    const body = document.getElementById("mainBody");
-    const btn = document.getElementById("authBtn");
-    
-    if (user) {
-        isAdmin = ADMIN_EMAILS.includes(user.email.toLowerCase());
-        
-        if (isAdmin) {
+    onAuthStateChanged(auth, (user) => {
+        const body = document.getElementById("mainBody");
+        const btn = document.getElementById("authBtn");
+        if (user) {
+            isAdmin = true;
             body.classList.add("is-admin");
             btn.innerText = "🔐 Thoát Admin";
+            btn.classList.add("logout-mode");
+            startAutoLogout();
         } else {
+            isAdmin = false;
             body.classList.remove("is-admin");
-            btn.innerText = "👤 Thoát User: " + user.email.split('@')[0]; // Hiện tên user cho chắc chắn
+            btn.innerText = "🔐 Admin";
+            btn.classList.remove("logout-mode");
+            document.getElementById("workHoursBox").style.display = "none";
         }
-        
-        btn.classList.add("logout-mode");
-        startAutoLogout(); // Chỉ chạy khi có user
-    } else {
-        isAdmin = false;
-        body.classList.remove("is-admin");
-        btn.innerText = "🔐 Admin";
-        btn.classList.remove("logout-mode");
-    }
-    
-    // 🔥 Sau khi trạng thái đăng nhập thay đổi, vẽ lại bảng ngay
-    if (document.getElementById("jobManagerBox").style.display === "block") renderJobList();
-    if (document.getElementById("commentBox").style.display === "block") renderCommentList();
-    if (document.getElementById("reviseBox").style.display === "block") renderReviseList();
-});
+        applyFilter(); // Vẽ lại bảng để hiện/ẩn cột Sửa/Xóa
+    });
 
     // --- CÁC HÀM CỦA BẠN (GIỮ NGUYÊN LOGIC) ---
    window.saveLog = function(){
@@ -2718,66 +2657,72 @@ document.querySelectorAll("input, select").forEach(el => {
 
 });
 
-  window.handleButton = function(type) {
-     // Danh sách các chức năng CHỈ Admin cấp cao mới được vào
-    const adminFunctions = ['ships', 'users', 'hours', 'progress', 'checklist'];
-    
-    if (adminFunctions.includes(type) && !isAdmin) {
-        alert("⚠️ Bạn không có quyền truy cập chức năng quản trị này!");
-        return;
-    }
-      
+   window.handleButton = function(type) {
+    // 1. Lấy tất cả các vùng nội dung (Boxes)
     const boxes = {
         dataEntry: document.getElementById("dataEntryBox"),
         summary: document.getElementById("summary"),
         hours: document.getElementById("workHoursBox"),
         ships: document.getElementById("shipManagerBox"),
-        users: document.getElementById("userManagerBox"),
         progress: document.getElementById("progressBox"),
         checklist: document.getElementById("checklistBox"),
         extra: document.getElementById("extraBox"),
-        jobs: document.getElementById("jobManagerBox"),
+        jobs: document.getElementById("jobManagerBox"), // Box mới thêm
         comment: document.getElementById("commentBox"),
         revise: document.getElementById("reviseBox")
     };
 
+    // 2. Lấy tất cả các nút bấm tương ứng
     const btns = {
         dataEntry: document.getElementById("btnDataEntry"),
         summary: document.getElementById("btnSummary"),
         hours: document.getElementById("btnWorkHours"),
         ships: document.getElementById("btnManageShips"),
-        users: document.getElementById("btnUsers"),
         progress: document.getElementById("btnProgress"),
         checklist: document.getElementById("btnChecklist"),
         extra: document.getElementById("btnExtra"),
-        jobs: document.getElementById("btnJobs"),
+        jobs: document.getElementById("btnJobs"), // Nút mới thêm
         comment: document.getElementById("btnComment"),
         revise: document.getElementById("btnRevise")
     };
 
-    if (!boxes[type]) return;
+    // Xử lý riêng cho nút Xuất Excel
+    if (type === 'export') {
+        exportExcel();
+        return;
+    }
 
-    const isAlreadyOpen = boxes[type].style.display === "block";
+    const targetBox = boxes[type];
+    const targetBtn = btns[type];
+
+    if (!targetBox) return;
+
+    // Kiểm tra trạng thái: Nếu đang mở thì bấm lần nữa sẽ đóng
+    const isAlreadyOpen = targetBox.style.display === "block";
+
+    // BƯỚC 1: ẨN TẤT CẢ các box và xóa màu xanh (active) của các nút
     Object.values(boxes).forEach(box => { if(box) box.style.display = "none"; });
     Object.values(btns).forEach(btn => { if(btn) btn.classList.remove("btn-active"); });
 
+    // BƯỚC 2: Nếu cái vừa bấm đang mở -> Thoát (vì đã ẩn ở bước 1 rồi)
     if (isAlreadyOpen) return;
 
-    boxes[type].style.display = "block";
-    if(btns[type]) btns[type].classList.add("btn-active");
+    // BƯỚC 3: Nếu nó đang tắt -> Mở lên và load dữ liệu
+    targetBox.style.display = "block";
+    targetBtn.classList.add("btn-active");
 
-    // Load dữ liệu tương ứng
+    // BƯỚC 4: Load dữ liệu đặc thù cho từng loại
     if (type === "summary") { showSummary(); showGeneralSummaryReport(); }
     if (type === "hours") renderWorkHoursInputs();
     if (type === "ships") renderShipManagerList();
-    if (type === "users") { renderUserManager(); renderShipSelectForUser(); }
     if (type === "progress") renderProgressInputs();
     if (type === "checklist") renderChecklistInputs();
     if (type === "extra") renderExtraSelect();
     if (type === "jobs") renderJobList(); 
     if (type === "comment") renderCommentList();
+    if(type === 'dataEntry') applyFilter();
     if (type === "revise") renderReviseList();
-    if (type === 'dataEntry') applyFilter();
+
 };
 
 function renderPagination() {
@@ -4097,8 +4042,7 @@ filteredJobs.forEach(([id, j]) => {
     let status = j.status || "pending";
     
     // 🔥 THÊM DÒNG NÀY ĐỂ KIỂM TRA QUYỀN ADMIN
-   const canEdit = canUserEdit(j.ship); 
-    const disabledAttr = canEdit ? "" : "disabled";
+    const disabledAttr = isAdmin ? "" : "disabled"; 
 
     let bgColor = "";
     if (status === "pending") bgColor = "#F8BBD0";   
@@ -4119,7 +4063,6 @@ filteredJobs.forEach(([id, j]) => {
         <td>${j.note || ""}</td>
 
         <td>
-            <!-- Áp dụng disabledAttr vào đây -->
             <select onchange="updateJobStatus('${id}', this.value)" ${disabledAttr}>
                 <option value="pending" ${status==="pending"?"selected":""}>🔴 Chưa làm</option>
                 <option value="doing" ${status==="doing"?"selected":""}>🟡 Đang làm</option>
@@ -4333,44 +4276,54 @@ window.renderCommentList = function() {
             // Khóa mọi thứ nếu không phải Admin
             const disabledAttr = isAdmin ? "" : "disabled";
 
-           // --- TRONG HÀM renderCommentList ---
-filtered.forEach(([id, c]) => {
-    const status = c.status || "pending";
+            filtered.forEach(([id, c]) => {
+                const status = c.status || "pending";
+                let bgColor = "";
+                if (status === "pending") bgColor = "#F8BBD0";
+                else if (status === "doing") bgColor = "#FFF59D";
+                else if (status === "done") bgColor = "#B2DFDB";
+
+               html += `
+<tr style="background: ${bgColor};">
+    <td style="text-align:center;">${index++}</td>
+    <td>${c.ship}</td>
     
-    // 🔴 THAY ĐỔI TẠI ĐÂY: Kiểm tra quyền cho tàu c.ship
-    const canEdit = canUserEdit(c.ship);
-    const disabledAttr = canEdit ? "" : "disabled";
+    <td style="font-weight: bold; text-align: center; color: #d32f2f;">${c.cmtNo || "-"}</td> 
+    
+    <td>${c.pos || "-"}</td>
 
-    let bgColor = status === "pending" ? "#F8BBD0" : (status === "doing" ? "#FFF59D" : "#B2DFDB");
+    <td style="white-space: normal; word-break: break-word;">
+        ${c.content}
+    </td>
 
-    html += `
-    <tr style="background: ${bgColor};">
-        <td style="text-align:center;">${index++}</td>
-        <td>${c.ship}</td>
-        <td style="font-weight: bold; text-align: center; color: #d32f2f;">${c.cmtNo || "-"}</td> 
-        <td>${c.pos || "-"}</td>
-        <td style="white-space: normal;">${c.content}</td>
-        <td style="white-space: normal;">${c.note || ""}</td>
-        <td>
-            <!-- Áp dụng disabledAttr vào Select trạng thái -->
-            <select onchange="updateCmtStatus('${id}', this.value)" ${disabledAttr}>
-                <option value="pending" ${status === "pending" ? "selected" : ""}>🔴 Chưa làm</option>
-                <option value="doing" ${status === "doing" ? "selected" : ""}>🟡 Đang làm</option>
-                <option value="done" ${status === "done" ? "selected" : ""}>🟢 Đã xong</option>
-            </select>
-        </td>
-        <td style="text-align:center;">
-            <!-- Áp dụng disabledAttr vào Input ngày xong -->
-            <input type="date" value="${c.doneDate || ''}" onchange="updateCmtDate('${id}', this.value)" ${disabledAttr}>
-        </td>
-        <td class="admin-inline">
-            <div class="action-buttons">
-                <button onclick="editCmt('${id}')">✏️</button>
-                <button onclick="deleteCmt('${id}')">🗑️</button>
-            </div>
-        </td>
-    </tr>`;
-});
+    <!-- 🔥 CỘT GHI CHÚ -->
+    <td style="white-space: normal; word-break: break-word;">
+        ${c.note || ""}
+    </td>
+
+    <td>
+        <select onchange="updateCmtStatus('${id}', this.value)" ${disabledAttr}>
+            <option value="pending" ${status === "pending" ? "selected" : ""}>🔴 Chưa làm</option>
+            <option value="doing" ${status === "doing" ? "selected" : ""}>🟡 Đang làm</option>
+            <option value="done" ${status === "done" ? "selected" : ""}>🟢 Đã xong</option>
+        </select>
+    </td>
+
+    <td style="text-align:center;">
+        <input type="date" 
+               value="${c.doneDate || ''}" 
+               onchange="updateCmtDate('${id}', this.value)" 
+               ${disabledAttr}>
+    </td>
+
+    <td class="admin-inline" style="text-align:center;">
+        <div class="action-buttons">
+            <button onclick="editCmt('${id}')">✏️</button>
+            <button onclick="deleteCmt('${id}')">🗑️</button>
+        </div>
+    </td>
+</tr>`;
+            });
         }
     }
     document.getElementById("commentListContent").innerHTML = html;
@@ -4576,41 +4529,34 @@ window.renderReviseList = function() {
 
         filtered.forEach(([id, r]) => {
             const status = r.status || "pending";
-           
+            let bgColor = status === "pending" ? "#F8BBD0" : (status === "doing" ? "#FFF59D" : "#B2DFDB");
 
-            const canEdit = canUserEdit(r.ship);
-    const disabledAttr = canEdit ? "" : "disabled";
-
-    let bgColor = status === "pending" ? "#F8BBD0" : (status === "doing" ? "#FFF59D" : "#B2DFDB");
-
-    html += `
-    <tr style="background: ${bgColor};">
-        <td style="text-align:center;">${index++}</td>
-        <td>${r.ship}</td>
-        <td style="font-weight:bold; color:#1565c0;">${r.revNo || "-"}</td>
-        <td>${r.pos || "-"}</td>
-        <td>${r.content || "-"}</td>
-        <td>${r.note || "-"}</td>
-        <td>
-            <!-- Áp dụng disabledAttr -->
-            <select onchange="updateRevStatus('${id}', this.value)" ${disabledAttr}>
-                <option value="pending" ${status === "pending" ? "selected" : ""}>🔴 Chưa làm</option>
-                <option value="doing" ${status === "doing" ? "selected" : ""}>🟡 Đang làm</option>
-                <option value="done" ${status === "done" ? "selected" : ""}>🟢 Đã xong</option>
-            </select>
-        </td>
-        <td style="text-align:center;">
-            <!-- Áp dụng disabledAttr -->
-            <input type="date" value="${r.doneDate || ''}" onchange="updateRevDate('${id}', this.value)" ${disabledAttr}>
-        </td>
-        <td class="admin-inline">
-            <div class="action-buttons">
-                <button onclick="editRev('${id}')">✏️</button>
-                <button onclick="deleteRev('${id}')">🗑️</button>
-            </div>
-        </td>
-    </tr>`;
-});
+            html += `
+            <tr style="background: ${bgColor};">
+                <td style="text-align:center;">${index++}</td>
+                <td>${r.ship}</td>
+                <td style="font-weight:bold; color:#1565c0;">${r.revNo || "-"}</td>
+                <td>${r.pos || "-"}</td>
+                <td style="white-space:normal;">${r.content || "-"}</td>
+                <td style="white-space:normal;">${r.note || "-"}</td>
+                <td>
+                    <select onchange="updateRevStatus('${id}', this.value)" ${disabledAttr}>
+                        <option value="pending" ${status === "pending" ? "selected" : ""}>🔴 Chưa làm</option>
+                        <option value="doing" ${status === "doing" ? "selected" : ""}>🟡 Đang làm</option>
+                        <option value="done" ${status === "done" ? "selected" : ""}>🟢 Đã xong</option>
+                    </select>
+                </td>
+                <td style="text-align:center;">
+                    <input type="date" value="${r.doneDate || ''}" onchange="updateRevDate('${id}', this.value)" ${disabledAttr}>
+                </td>
+                <td class="admin-inline" style="text-align:center;">
+                    <div class="action-buttons">
+                        <button onclick="editRev('${id}')" class="btn-edit">✏️</button>
+                        <button onclick="deleteRev('${id}')" class="btn-delete">🗑️</button>
+                    </div>
+                </td>
+            </tr>`;
+        });
     }
     document.getElementById("reviseListContent").innerHTML = html;
 };
@@ -4731,84 +4677,6 @@ window.exportReviseToExcel = function() {
     XLSX.utils.book_append_sheet(wb, ws, "Revise");
     XLSX.writeFile(wb, `Revise_Tau_${selectedShip}_${dateStr}.xlsx`);
 };
-// Hàm lưu phân quyền
-window.saveUserPermission = function() {
-    const email = document.getElementById("userEmail").value.trim().toLowerCase();
-    const selectedShips = Array.from(document.getElementById("userShipAssign").selectedOptions).map(opt => opt.value);
-
-    if(!email || selectedShips.length === 0) return alert("Vui lòng nhập Email và chọn ít nhất 1 tàu!");
-
-    // Thay đổi dấu chấm trong email vì Firebase Key không cho phép dấu chấm
-    const userKey = email.replace(/\./g, '_');
-
-    set(ref(db, "users/" + userKey), {
-        email: email,
-        ships: selectedShips
-    }).then(() => {
-        alert("Đã phân quyền cho " + email);
-        document.getElementById("userEmail").value = "";
-    });
-};
-
-// Hiển thị danh sách đã phân quyền
-function renderUserManager() {
-    let html = `<table><tr><th>Email</th><th>Tàu phụ trách</th><th>Xóa</th></tr>`;
-    Object.keys(usersData).forEach(key => {
-        const u = usersData[key];
-        html += `<tr>
-            <td>${u.email}</td>
-            <td>${u.ships.join(", ")}</td>
-            <td><button class="btn-delete" onclick="deleteUser('${key}')">🗑️</button></td>
-        </tr>`;
-    });
-    html += "</table>";
-    document.getElementById("userListContent").innerHTML = html;
-}
-
-window.deleteUser = (key) => { if(confirm("Xóa quyền user này?")) remove(ref(db, "users/" + key)); };
-
-
-// Hàm kiểm tra User hiện tại có được phép sửa tàu này không
-function canUserEdit(shipId) {
-    if (isAdmin) return true; 
-
-    const user = auth.currentUser;
-    if (!user || !user.email) return false;
-
-    // Chuẩn hóa email: viết thường, bỏ khoảng trắng
-    const userEmail = user.email.toLowerCase().trim();
-    const userKey = userEmail.replace(/\./g, '_');
-    const userData = usersData[userKey];
-
-    // Debug an toàn ngay trong code
-    if (userData && userData.ships) {
-        // Chuẩn hóa danh sách tàu để so sánh chính xác
-        const shipList = userData.ships.map(s => String(s).trim());
-        const targetShip = String(shipId).trim();
-        
-        return shipList.includes(targetShip);
-    }
-    
-    return false;
-}
-
-    
-function renderShipSelectForUser() {
-    const select = document.getElementById("userShipAssign");
-    if (!select) return;
-    let options = "";
-    Object.keys(shipsData).sort().forEach(shipId => {
-        options += `<option value="${shipId}">${shipId}</option>`;
-    });
-    select.innerHTML = options;
-}
-
-    // Thêm dòng này ở cuối script để debug
-window.checkMyAuth = () => {
-    console.log("Email hiện tại:", auth.currentUser ? auth.currentUser.email : "Chưa đăng nhập");
-    console.log("Danh sách phân quyền đang có:", usersData);
-};
-
 
     
 </script>

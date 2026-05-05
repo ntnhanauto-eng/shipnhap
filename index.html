@@ -4678,16 +4678,7 @@ window.exportReviseToExcel = function() {
     XLSX.utils.book_append_sheet(wb, ws, "Revise");
     XLSX.writeFile(wb, `Revise_Tau_${selectedShip}_${dateStr}.xlsx`);
 };
-function handleButton(action) {
-    if (action === '3Dblock') {
-        // Mở trang web trong một tab mới
-        window.open('https://ntnhanauto-eng.github.io/block3dviewer/', '_blank');
-    } else {
-        // Xử lý các nút khác của bạn ở đây
-        console.log("Đang mở chức năng: " + action);
-        // Ví dụ: switch(action) { ... }
-    }
-}
+
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

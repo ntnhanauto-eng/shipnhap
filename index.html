@@ -4678,7 +4678,23 @@ window.exportReviseToExcel = function() {
     XLSX.utils.book_append_sheet(wb, ws, "Revise");
     XLSX.writeFile(wb, `Revise_Tau_${selectedShip}_${dateStr}.xlsx`);
 };
+function handleButton(action) {
+    console.log("Action nhận được:", action); // Thêm dòng này để kiểm tra xem hàm có chạy không
 
+    if (action === '3Dblock') {
+        const url = 'https://ntnhanauto-eng.github.io/block3dviewer/';
+        const newWindow = window.open(url, '_blank');
+        
+        // Kiểm tra nếu trình duyệt chặn pop-up
+        if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') { 
+            alert('Vui lòng cho phép trình duyệt mở Pop-up để xem 3D Block!');
+            // Chữa cháy bằng cách mở ngay tại tab hiện tại nếu bị chặn tab mới
+            window.location.href = url;
+        }
+    } else {
+        // ... các code khác
+    }
+}
     
 </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

@@ -1,0 +1,158 @@
+<?php
+session_start();
+
+// 1. Khởi tạo CSRF Token bảo mật như bạn đã biết
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
+$video_id = '';
+$subtitles_json = '[]';
+$error_message = '';
+
+// Điền API Key của bạn vào đây
+define('YOUTUBE_API_KEY', 'AIzaSyAGrm8cv1s6h12y_dHFqS9tjOJ4hw63sFQ'); 
+
+// 2. Xử lý khi người dùng submit link YouTube
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Kiểm tra CSRF Token xem có hợp lệ không
+    if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
+        $error_message = "Yêu cầu không hợp lệ (CSRF Failed).";
+    } else {
+        $url = $_POST['youtube_url'] ?? '';
+        
+        // Trích xuất Video ID từ link YouTube
+        preg_match('%(?:youtube(?:-nocookie)?\.com/(?:[^/]+/.+/|(?:v|e(?:mbed)?)/|.*[?&]v=)|youtu\.be/)([^"&?/ ]{11})%i', $url, $match);
+        
+        if (isset($match[1])) {
+            $video_id = $match[1];
+            
+            // LƯU Ý BẢO MẬT: Trong thực tế, bạn sẽ gọi API YouTube tại đây để lấy danh sách phụ đề (Captions)
+            // Tuy nhiên, để lấy nội dung file phụ đề chi tiết (track), YouTube API yêu cầu xác thực OAuth2 khá phức tạp.
+            // Đoạn code dưới đây giả lập cấu trúc dữ liệu phụ đề (Thời gian bắt đầu, thời gian chạy, Text gốc, Text dịch)
+            // để JavaScript bên dưới có thể đồng bộ trực tiếp với video.
+            
+            $subtitles_mock = [
+                ["start" => 1, "duration" => 3, "en" => "Welcome to this English tutorial video!", "vi" => "Chào mừng bạn đến với video hướng dẫn tiếng Anh này!"],
+                ["start" => 5, "duration" => 4, "en" => "Today, we are learning how to build a PHP website.", "vi" => "Hôm nay, chúng ta sẽ học cách xây dựng một trang web PHP."],
+                ["start" => 10, "duration" => 3, "en" => "It is very easy and fun to learn.", "vi" => "Nó rất dễ dàng và thú vị để học."]
+            ];
+            $subtitles_json = json_encode($subtitles_mock);
+        } else {
+            $error_message = "Link YouTube không hợp lệ. Vui lòng thử lại.";
+        }
+    }
+}
+?>
+
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Song Ngữ Player</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f7f6; margin: 0; padding: 20 border-box; display: flex; flex-direction: column; align-items: center; }
+        .container { max-width: 800px; width: 100%; background: white; padding: 25px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-top: 30px; }
+        h1 { color: #333; text-align: center; }
+        .form-group { display: flex; gap: 10px; margin-bottom: 20px; }
+        input[type="text"] { flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 16px; }
+        button { padding: 12px 24px; background: #ff0000; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; font-weight: bold; }
+        button:hover { background: #cc0000; }
+        .error { color: red; margin-bottom: 15px; }
+        .video-box { position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; max-width: 100%; background: #000; border-radius: 4px; }
+        .video-box iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        #subtitles-container { margin-top: 20px; background: #222; color: #fff; padding: 15px; border-radius: 4px; text-align: center; min-height: 60px; }
+        .sub-en { font-size: 18px; color: #fff; margin-bottom: 5px; font-weight: 500; }
+        .sub-vi { font-size: 16px; color: #ffeb3b; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🎬 YouTube Song Ngữ Player</h1>
+    
+    <?php if ($error_message): ?>
+        <p class="error"><?php echo htmlspecialchars($error_message); ?></p>
+    <?php endif; ?>
+
+    <!-- Form dán link -->
+    <form method="POST" class="form-group">
+        <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+        <input type="text" name="youtube_url" placeholder="Dán link YouTube tiếng Anh vào đây..." required>
+        <button type="submit">Mở Video</button>
+    </form>
+
+    <?php if ($video_id): ?>
+        <!-- Khu vực hiển thị Video -->
+        <div class="video-box">
+            <div id="player"></div>
+        </div>
+
+        <!-- Khu vực hiển thị phụ đề song ngữ tự chế -->
+        <div id="subtitles-container">
+            <div id="en-text" class="sub-en">Phụ đề tiếng Anh sẽ hiển thị tại đây...</div>
+            <div id="vi-text" class="sub-vi">Phụ đề tiếng Việt tương ứng...</div>
+        </div>
+    <?php endif; ?>
+</div>
+
+<!-- Nhúng YouTube Iframe Player API để đồng bộ thời gian chạy -->
+<script src="https://www.youtube.com/iframe_api"></script>
+<script>
+    // Nhận dữ liệu phụ đề từ PHP chuyển sang JSON trong JavaScript
+    const subtitles = <?php echo $subtitles_json; ?>;
+    let player;
+
+    // Hàm này tự động chạy khi thư viện YouTube API tải xong
+    function onYouTubeIframeAPIReady() {
+        if ("<?php echo $video_id; ?>" !== "") {
+            player = new YT.Player('player', {
+                height: '100%',
+                width: '100%',
+                videoId: '<?php echo $video_id; ?>',
+                playerVars: {
+                    'playsinline': 1,
+                    'controls': 1,
+                    'cc_load_policy': 0 // Tắt phụ đề gốc của YouTube để không bị đè chữ
+                },
+                events: {
+                    'onStateChange': onPlayerStateChange
+                }
+            });
+        }
+    }
+
+    let subtitleInterval;
+
+    function onPlayerStateChange(event) {
+        // Nếu video đang phát (State = 1), kiểm tra thời gian mỗi 200ms để cập nhật phụ đề
+        if (event.data == YT.PlayerState.PLAYING) {
+            subtitleInterval = setInterval(updateSubtitles, 200);
+        } else {
+            clearInterval(subtitleInterval);
+        }
+    }
+
+    function updateSubtitles() {
+        if (!player) return;
+        
+        // Lấy thời gian hiện tại của video (tính bằng giây)
+        const currentTime = player.getCurrentTime();
+        
+        // Tìm xem giây hiện tại có trùng với đoạn phụ đề nào không
+        const currentSub = subtitles.find(sub => currentTime >= sub.start && currentTime <= (sub.start + sub.duration));
+        
+        if (currentSub) {
+            document.getElementById('en-text').innerText = currentSub.en;
+            document.getElementById('vi-text').innerText = currentSub.vi;
+        } else {
+            // Nếu không có thoại, xóa trắng hộp phụ đề
+            document.getElementById('en-text').innerText = "";
+            document.getElementById('vi-text').innerText = "";
+        }
+    }
+</script>
+
+</body>
+</html>

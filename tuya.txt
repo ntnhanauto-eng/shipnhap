@@ -1,0 +1,3 @@
+Access ID/Client ID: qap98nweqkmufpdp5d3r
+Access Secret/Client Secret: cb7684adc56045bdb5f77c1d7a541d48
+https://openapi.tuyaus.com

@@ -3,31 +3,81 @@ Access Secret/Client Secret: cb7684adc56045bdb5f77c1d7a541d48
 https://openapi.tuyaus.com
 
 
+
+
+
+
+
+
 <?php
-// Điền thông số của bạn vào đây
+// 1. ĐIỀN THÔNG SỐ CỦA BẠN VÀO ĐÂY
 $accessId = 'qap98nweqkmufpdp5d3r';
 $secret = 'cb7684adc56045bdb5f77c1d7a541d48';
 $deviceId = 'eb9530c1bda34fc126kdqn';
-$baseUrl = 'https://openapi.tuyaus.com'; // Vì bạn chọn Western America
+$baseUrl = 'https://openapi.tuyaus.com'; // Server Mỹ (Western America)
 
+// ==========================================
+// BƯỚC 1: LẤY ACCESS TOKEN
+// ==========================================
 $timestamp = round(microtime(true) * 1000);
-$sign = strtoupper(hash_hmac('sha256', $accessId . $timestamp, $secret));
+$easySignStr = "GET\n" . hash('sha256', "") . "\n" . "" . "\n" . "/v1.0/token?grant_type=1";
+$sign = strtoupper(hash_hmac('sha256', $accessId . $timestamp . $easySignStr, $secret));
 
-// Bước 1: Lấy Token
 $ch = curl_init("$baseUrl/v1.0/token?grant_type=1");
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-curl_setopt($ch, CURLOPT_HTTPHEADER, ["client_id: $accessId", "sign: $sign", "t: $timestamp", "sign_method: HMAC-SHA256"]);
+curl_setopt($ch, CURLOPT_HTTPHEADER, [
+    "client_id: $accessId",
+    "sign: $sign",
+    "t: $timestamp",
+    "sign_method: HMAC-SHA256"
+]);
 $res = json_decode(curl_exec($ch), true);
+
+if (!isset($res['result']['access_token'])) {
+    die("Lỗi lấy Token ở Bước 1: " . json_encode($res));
+}
+
 $token = $res['result']['access_token'];
 
-// Bước 2: Lấy trạng thái cửa
+// ==========================================
+// BƯỚC 2: LẤY TRẠNG THÁI CẢM BIẾN CỬA
+// ==========================================
 $timestamp = round(microtime(true) * 1000);
-$strToSign = "GET\n" . hash('sha256', "") . "\n\n" . "/v1.0/devices/$deviceId/status";
-$sign = strtoupper(hash_hmac('sha256', $accessId . $token . $timestamp . $strToSign, $secret));
+$endpoint = "/v1.0/devices/$deviceId/status";
 
-$ch = curl_init("$baseUrl/v1.0/devices/$deviceId/status");
+// Chuỗi StringToSign tiêu chuẩn bắt buộc của Tuya khi có Token
+$strToSign = "GET\n" . hash('sha256', "") . "\n" . "" . "\n" . $endpoint;
+$source = $accessId . $token . $timestamp . $strToSign;
+$sign2 = strtoupper(hash_hmac('sha256', $source, $secret));
+
+$ch = curl_init($baseUrl . $endpoint);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-curl_setopt($ch, CURLOPT_HTTPHEADER, ["client_id: $accessId", "access_token: $token", "sign: $sign", "t: $timestamp", "sign_method: HMAC-SHA256"]);
-$status = curl_exec($ch);
+curl_setopt($ch, CURLOPT_HTTPHEADER, [
+    "client_id: $accessId",
+    "access_token: $token",
+    "sign: $sign2",
+    "t: $timestamp",
+    "sign_method: HMAC-SHA256",
+    "Content-Type: application/json"
+]);
+$statusResponse = curl_exec($ch);
+curl_close($ch);
 
-echo "Trạng thái cảm biến cửa: " . $status;
+// ==========================================
+// BƯỚC 3: HIỂN THỊ KẾT QUẢ ĐẸP MẮT
+// ==========================================
+echo "<h3>Kết quả trả về từ Tuya Cloud:</h3>";
+echo "<pre>" . $statusResponse . "</pre>";
+
+$data = json_decode($statusResponse, true);
+if (isset($data['success']) && $data['success'] == true) {
+    echo "<h4>Phân tích trạng thái cửa:</h4>";
+    foreach ($data['result'] as $status) {
+        // Cảm biến cửa thường trả về mã 'doorcontact_state' hoặc 'switch'
+        if ($status['code'] == 'doorcontact_state' || $status['code'] == 'switch') {
+            $is_open = ($status['value'] === true || $status['value'] === 'open');
+            echo "Trạng thái cửa hiện tại: <strong>" . ($is_open ? "<span style='color:red;'>ĐANG MỞ</span>" : "<span style='color:green;'>ĐANG ĐÓNG</span>") . "</strong>";
+        }
+    }
+}
+?>

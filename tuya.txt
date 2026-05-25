@@ -1,3 +1,33 @@
 Access ID/Client ID: qap98nweqkmufpdp5d3r
 Access Secret/Client Secret: cb7684adc56045bdb5f77c1d7a541d48
 https://openapi.tuyaus.com
+
+
+<?php
+// Điền thông số của bạn vào đây
+$accessId = 'qap98nweqkmufpdp5d3r';
+$secret = 'cb7684adc56045bdb5f77c1d7a541d48';
+$deviceId = 'eb9530c1bda34fc126kdqn';
+$baseUrl = 'https://openapi.tuyaus.com'; // Vì bạn chọn Western America
+
+$timestamp = round(microtime(true) * 1000);
+$sign = strtoupper(hash_hmac('sha256', $accessId . $timestamp, $secret));
+
+// Bước 1: Lấy Token
+$ch = curl_init("$baseUrl/v1.0/token?grant_type=1");
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_HTTPHEADER, ["client_id: $accessId", "sign: $sign", "t: $timestamp", "sign_method: HMAC-SHA256"]);
+$res = json_decode(curl_exec($ch), true);
+$token = $res['result']['access_token'];
+
+// Bước 2: Lấy trạng thái cửa
+$timestamp = round(microtime(true) * 1000);
+$strToSign = "GET\n" . hash('sha256', "") . "\n\n" . "/v1.0/devices/$deviceId/status";
+$sign = strtoupper(hash_hmac('sha256', $accessId . $token . $timestamp . $strToSign, $secret));
+
+$ch = curl_init("$baseUrl/v1.0/devices/$deviceId/status");
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_HTTPHEADER, ["client_id: $accessId", "access_token: $token", "sign: $sign", "t: $timestamp", "sign_method: HMAC-SHA256"]);
+$status = curl_exec($ch);
+
+echo "Trạng thái cảm biến cửa: " . $status;

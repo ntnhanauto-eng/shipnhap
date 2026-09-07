@@ -238,40 +238,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     // Kiểm tra hàng ngày (Nấu đúng & Tỷ lệ đổi - Mỗi món 1 lần/ngày)
     if ($act === 'save_daily_check') {
         $menu_id    = intval($_POST['menu_id']);
-        $c_date     = $_POST['check_date'] ?? $today;
         $is_correct = isset($_POST['is_correct']) ? 1 : 0;
         $adj_pct    = intval($_POST['adjustment_percent'] ?? 0);
 
-        // Chặn nếu chọn ngày tương lai
-        if ($c_date > $today) {
-            $error = "Không thể đánh giá kiểm tra thực tế cho các ngày trong tương lai!";
-        } else {
-            try {
-                $chk = $pdo->prepare("SELECT id FROM meal_checks WHERE menu_id = :mid AND check_date = :cdate");
-                $chk->execute([':mid' => $menu_id, ':cdate' => $c_date]);
-                $exists = $chk->fetch();
+        // Lấy ngày chính xác của món ăn dựa trên tuần và thứ
+        $stmtMenuInfo = $pdo->prepare("SELECT week_code, day_of_week FROM meal_menus WHERE id = :mid");
+        $stmtMenuInfo->execute([':mid' => $menu_id]);
+        $menuInfo = $stmtMenuInfo->fetch();
 
-                if ($exists) {
-                    $stmt = $pdo->prepare("
-                        UPDATE meal_checks 
-                        SET is_correct = :corr, adjustment_percent = :apct
-                        WHERE id = :id
-                    ");
-                    $stmt->execute([
-                        ':corr' => $is_correct, ':apct' => $is_correct ? 0 : $adj_pct, ':id' => $exists['id']
-                    ]);
-                } else {
-                    $stmt = $pdo->prepare("
-                        INSERT INTO meal_checks (menu_id, check_date, is_correct, adjustment_percent)
-                        VALUES (:mid, :cdate, :corr, :apct)
-                    ");
-                    $stmt->execute([
-                        ':mid' => $menu_id, ':cdate' => $c_date, ':corr' => $is_correct, ':apct' => $is_correct ? 0 : $adj_pct
-                    ]);
+        if ($menuInfo) {
+            sscanf($menuInfo['week_code'], "%d-W%d", $mYear, $mWeek);
+            if (!$mYear) $mYear = date('Y');
+            if (!$mWeek) $mWeek = date('W');
+            $dMap = [
+                'Thứ 2' => 1, 'Thứ 3' => 2, 'Thứ 4' => 3, 'Thứ 5' => 4, 
+                'Thứ 6' => 5, 'Thứ 7' => 6, 'Chủ Nhật' => 7
+            ];
+            $dNum = $dMap[trim($menuInfo['day_of_week'])] ?? 1;
+            $dtObj = new DateTime();
+            $dtObj->setISODate($mYear, $mWeek, $dNum);
+            $c_date = $dtObj->format('Y-m-d');
+
+            if ($c_date > $today) {
+                $error = "Không thể đánh giá kiểm tra thực tế cho các món ăn trong tương lai!";
+            } else {
+                try {
+                    $chk = $pdo->prepare("SELECT id FROM meal_checks WHERE menu_id = :mid AND check_date = :cdate");
+                    $chk->execute([':mid' => $menu_id, ':cdate' => $c_date]);
+                    $exists = $chk->fetch();
+
+                    if ($exists) {
+                        $stmt = $pdo->prepare("
+                            UPDATE meal_checks 
+                            SET is_correct = :corr, adjustment_percent = :apct
+                            WHERE id = :id
+                        ");
+                        $stmt->execute([
+                            ':corr' => $is_correct, ':apct' => $is_correct ? 0 : $adj_pct, ':id' => $exists['id']
+                        ]);
+                    } else {
+                        $stmt = $pdo->prepare("
+                            INSERT INTO meal_checks (menu_id, check_date, is_correct, adjustment_percent)
+                            VALUES (:mid, :cdate, :corr, :apct)
+                        ");
+                        $stmt->execute([
+                            ':mid' => $menu_id, ':cdate' => $c_date, ':corr' => $is_correct, ':apct' => $is_correct ? 0 : $adj_pct
+                        ]);
+                    }
+                    $message = "Đã lưu kết quả kiểm tra thực tế ngày " . date('d/m/Y', strtotime($c_date)) . " thành công!";
+                } catch (PDOException $e) {
+                    $error = "Lỗi lưu kiểm tra: " . $e->getMessage();
                 }
-                $message = "Đã lưu kết quả kiểm tra thực tế ngày " . date('d/m/Y', strtotime($c_date)) . " thành công!";
-            } catch (PDOException $e) {
-                $error = "Lỗi lưu kiểm tra: " . $e->getMessage();
             }
         }
     }
@@ -279,13 +296,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     // Mở khóa kiểm tra thực tế (cho phép đánh giá lại)
     if ($act === 'unlock_daily_check') {
         $menu_id = intval($_POST['menu_id']);
-        $c_date  = $_POST['check_date'] ?? $today;
-        try {
-            $stmt = $pdo->prepare("DELETE FROM meal_checks WHERE menu_id = :mid AND check_date = :cdate");
-            $stmt->execute([':mid' => $menu_id, ':cdate' => $c_date]);
-            $message = "Đã mở khóa kiểm tra thực tế để bạn có thể đánh giá lại!";
-        } catch (PDOException $e) {
-            $error = "Lỗi mở khóa: " . $e->getMessage();
+        $stmtMenuInfo = $pdo->prepare("SELECT week_code, day_of_week FROM meal_menus WHERE id = :mid");
+        $stmtMenuInfo->execute([':mid' => $menu_id]);
+        $menuInfo = $stmtMenuInfo->fetch();
+        if ($menuInfo) {
+            sscanf($menuInfo['week_code'], "%d-W%d", $mYear, $mWeek);
+            if (!$mYear) $mYear = date('Y');
+            if (!$mWeek) $mWeek = date('W');
+            $dMap = [
+                'Thứ 2' => 1, 'Thứ 3' => 2, 'Thứ 4' => 3, 'Thứ 5' => 4, 
+                'Thứ 6' => 5, 'Thứ 7' => 6, 'Chủ Nhật' => 7
+            ];
+            $dNum = $dMap[trim($menuInfo['day_of_week'])] ?? 1;
+            $dtObj = new DateTime();
+            $dtObj->setISODate($mYear, $mWeek, $dNum);
+            $c_date = $dtObj->format('Y-m-d');
+
+            try {
+                $stmt = $pdo->prepare("DELETE FROM meal_checks WHERE menu_id = :mid AND check_date = :cdate");
+                $stmt->execute([':mid' => $menu_id, ':cdate' => $c_date]);
+                $message = "Đã mở khóa kiểm tra thực tế để bạn có thể đánh giá lại!";
+            } catch (PDOException $e) {
+                $error = "Lỗi mở khóa: " . $e->getMessage();
+            }
         }
     }
 
@@ -403,12 +436,21 @@ $mapDays = [
 ];
 $currentSelectedDayName = $mapDays[$dayOfWeekNum] ?? 'Thứ 2';
 
+// Parse năm và tuần từ $selected_week (VD: 2026-W37)
+sscanf($selected_week, "%d-W%d", $selYear, $selWeek);
+if (!$selYear) $selYear = date('Y');
+if (!$selWeek) $selWeek = date('W');
+
+$dowMap = [
+    'Thứ 2' => 1, 'Thứ 3' => 2, 'Thứ 4' => 3, 'Thứ 5' => 4, 
+    'Thứ 6' => 5, 'Thứ 7' => 6, 'Chủ Nhật' => 7
+];
+
 $todayMenus = [];
 try {
     $sqlQuery = "
-        SELECT m.*, c.is_correct, c.adjustment_percent, c.id as check_record_id 
+        SELECT m.* 
         FROM meal_menus m 
-        LEFT JOIN meal_checks c ON m.id = c.menu_id AND c.check_date = :cdate
         WHERE m.week_code = :wcode
     ";
     
@@ -419,12 +461,39 @@ try {
     $sqlQuery .= " ORDER BY FIELD(m.day_of_week, 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ Nhật'), m.id DESC";
 
     $stmtM = $pdo->prepare($sqlQuery);
-    $params = [':cdate' => $check_date, ':wcode' => $selected_week];
+    $params = [':wcode' => $selected_week];
     if ($view_mode === 'today') {
         $params[':dow'] = $currentSelectedDayName;
     }
     $stmtM->execute($params);
-    $todayMenus = $stmtM->fetchAll();
+    $rawMenus = $stmtM->fetchAll();
+
+    // Xử lý tính toán ngày tháng và trạng thái kiểm tra cho từng món
+    foreach ($rawMenus as $m) {
+        $dNum = $dowMap[trim($m['day_of_week'])] ?? 1;
+        $dto = new DateTime();
+        $dto->setISODate($selYear, $selWeek, $dNum);
+        $m['item_date'] = $dto->format('Y-m-d');
+        $m['is_future'] = ($m['item_date'] > $today);
+
+        // Lấy kết quả kiểm tra của món đúng vào ngày của món đó
+        $chkStmt = $pdo->prepare("SELECT id, is_correct, adjustment_percent FROM meal_checks WHERE menu_id = :mid AND check_date = :cdate");
+        $chkStmt->execute([':mid' => $m['id'], ':cdate' => $m['item_date']]);
+        $chkData = $chkStmt->fetch();
+
+        if ($chkData) {
+            $m['check_record_id'] = $chkData['id'];
+            $m['is_correct'] = $chkData['is_correct'];
+            $m['adjustment_percent'] = $chkData['adjustment_percent'];
+        } else {
+            $m['check_record_id'] = null;
+            $m['is_correct'] = 1;
+            $m['adjustment_percent'] = 0;
+        }
+
+        $todayMenus[] = $m;
+    }
+
 } catch (PDOException $e) {}
 
 // Lấy danh sách đánh giá chất lượng cho các món trong ngày chọn
@@ -638,7 +707,7 @@ include 'header.php';
     <div class="card-box">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:12px;">
             <h3 style="font-size:1.1rem; color:#334155; margin:0;">
-                📋 Kiểm Tra Thực Tế (Nấu Đúng / Tỷ Lệ Đổi) - Ngày: <span style="color:#0284c7;"><?= date('d/m/Y', strtotime($check_date)) ?></span>
+                📋 Kiểm Tra Thực Tế (Nấu Đúng / Tỷ Lệ Đổi) - Tuần: <span style="color:#0284c7;"><?= htmlspecialchars($selected_week) ?></span>
             </h3>
             <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
                 <span style="font-size:0.85rem; font-weight:600; color:#64748b; margin-right:4px;">Chế độ xem:</span>
@@ -667,18 +736,11 @@ include 'header.php';
             ?>
         <?php endif; ?>
 
-        <!-- Cảnh báo nếu đang chọn ngày trong tương lai -->
-        <?php if ($check_date > $today): ?>
-            <div style="background: #fef3c7; border: 1px solid #fde68a; color: #b45309; padding: 10px 14px; border-radius: 6px; font-size: 0.88rem; margin-bottom: 15px; font-weight: 600;">
-                ⚠️ Bạn đang xem ngày trong tương lai (<?= date('d/m/Y', strtotime($check_date)) ?>). Nút lưu trạng thái kiểm tra thực tế sẽ bị khóa và làm mờ cho đến khi đến ngày.
-            </div>
-        <?php endif; ?>
-
         <div style="overflow-x:auto;">
             <table class="table-data">
                 <thead>
                     <tr>
-                        <th>Thứ / Buổi</th>
+                        <th>Thứ / Ngày / Buổi</th>
                         <th>Tên Món Ăn (Thực Đơn)</th>
                         <th style="width:110px; text-align:center;">Nấu Đúng?</th>
                         <th style="width:140px;">Tỷ Lệ Đổi (%)</th>
@@ -699,10 +761,14 @@ include 'header.php';
                         <?php foreach ($displayMenus as $m): ?>
                             <?php 
                                 $isChecked = !is_null($m['check_record_id']); 
-                                $isFutureDate = ($check_date > $today);
+                                $isFutureDate = $m['is_future'];
                             ?>
                             <tr>
-                                <td><b><?= htmlspecialchars($m['day_of_week']) ?></b><br><span style="font-size:0.75rem; color:#64748b;"><?= htmlspecialchars($m['meal_type']) ?></span></td>
+                                <td>
+                                    <b><?= htmlspecialchars($m['day_of_week']) ?></b>
+                                    <br><span style="font-size:0.72rem; color:#0284c7;"><?= date('d/m/Y', strtotime($m['item_date'])) ?></span>
+                                    <br><span style="font-size:0.75rem; color:#64748b;"><?= htmlspecialchars($m['meal_type']) ?></span>
+                                </td>
                                 <td>
                                     <strong><?= htmlspecialchars($m['dish_name']) ?></strong>
                                     <?php if (!empty($m['description'])): ?>
@@ -711,9 +777,9 @@ include 'header.php';
                                 </td>
                                 
                                 <?php if ($isFutureDate): ?>
-                                    <!-- Nếu là ngày tương lai: làm mờ và vô hiệu hóa -->
+                                    <!-- Nếu là ngày trong tương lai so với hôm nay: làm mờ và vô hiệu hóa -->
                                     <td style="text-align:center;">
-                                        <input type="checkbox" disabled <?= (!isset($m['is_correct']) || $m['is_correct'] == 1) ? 'checked' : '' ?> style="width:18px; height:18px; opacity:0.5; cursor:not-allowed;">
+                                        <input type="checkbox" disabled <?= (!isset($m['is_correct']) || $m['is_correct'] == 1) ? 'checked' : '' ?> style="width:18px; height:18px; opacity:0.4; cursor:not-allowed;">
                                     </td>
                                     <td>
                                         <input type="number" disabled value="<?= intval($m['adjustment_percent'] ?? 0) ?>" style="width:85px; padding:6px; border:1px solid #cbd5e1; border-radius:4px; background:#f1f5f9; color:#94a3b8; cursor:not-allowed;">
@@ -725,7 +791,6 @@ include 'header.php';
                                     <form method="POST" action="cai-thien-suat-an.php?f_week=<?= urlencode($selected_week) ?>&stat_period=<?= urlencode($stat_period) ?>&check_date=<?= urlencode($check_date) ?>&view_mode=<?= urlencode($view_mode) ?><?= $view_mode === 'days_list' ? '&filter_dow='.urlencode($_GET['filter_dow'] ?? $currentSelectedDayName) : '' ?>" id="form_check_<?= $m['id'] ?>">
                                         <input type="hidden" name="action" value="save_daily_check">
                                         <input type="hidden" name="menu_id" value="<?= $m['id'] ?>">
-                                        <input type="hidden" name="check_date" value="<?= htmlspecialchars($check_date) ?>">
                                         
                                         <td style="text-align:center;">
                                             <input type="checkbox" name="is_correct" value="1" <?= (!isset($m['is_correct']) || $m['is_correct'] == 1) ? 'checked' : '' ?> style="width:18px; height:18px; cursor:pointer;">
@@ -748,7 +813,6 @@ include 'header.php';
                                         <form method="POST" action="cai-thien-suat-an.php?f_week=<?= urlencode($selected_week) ?>&stat_period=<?= urlencode($stat_period) ?>&check_date=<?= urlencode($check_date) ?>&view_mode=<?= urlencode($view_mode) ?><?= $view_mode === 'days_list' ? '&filter_dow='.urlencode($_GET['filter_dow'] ?? $currentSelectedDayName) : '' ?>" style="margin:0; display:inline-block;">
                                             <input type="hidden" name="action" value="unlock_daily_check">
                                             <input type="hidden" name="menu_id" value="<?= $m['id'] ?>">
-                                            <input type="hidden" name="check_date" value="<?= htmlspecialchars($check_date) ?>">
                                             <button type="submit" class="btn-action" style="background:#f59e0b; padding:6px 10px; font-size:0.8rem;" title="Hủy đánh giá để đánh giá lại">🔓 Mở Khóa</button>
                                         </form>
                                     </td>

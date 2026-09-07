@@ -745,7 +745,6 @@ include 'header.php';
                 </thead>
                 <tbody>
                     <?php if (!empty($dominantRatings)): ?>
-                        <?>
                         <?php 
                         $totalRat = array_sum(array_column($dominantRatings, 'count_rat')) ?: 1;
                         foreach ($dominantRatings as $dr): 

@@ -385,7 +385,7 @@ include 'header.php';
                 </a>
                 <div class="card-subtasks">
                     <ul class="task-list">
-                        <li><span class="task-bullet"></span> <a href="quan-ly-bep.php">Xuất ăn hôm nay</a></li>
+                        <li><span class="task-bullet"></span> <a href="quan-ly-bep.php">Suất ăn hôm nay</a></li>
                         <li><span class="task-bullet"></span> <a href="#">Cải thiện khẩu phần ăn</a></li>
                     </ul>
                 </div>

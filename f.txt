@@ -1,0 +1,1773 @@
+<?php
+// cap-phat-nuoc-uong.php
+require_once 'db_connect.php';
+
+if (!isset($_SESSION['user_id'])) {
+    header('Location: login.php');
+    exit;
+}
+
+$message = '';
+$error = '';
+$today = date('Y-m-d');
+$limit = 15; // Số dòng trên mỗi trang
+
+// Khai báo an toàn các biến phân trang
+$p_water = max(1, intval($_GET['p_water'] ?? 1));
+$p_prop  = max(1, intval($_GET['p_prop'] ?? 1));
+$p_hist  = max(1, intval($_GET['p_hist'] ?? 1));
+
+// ==================== CÁC HÀM HỖ TRỢ (ĐẶT Ở ĐẦU FILE) ====================
+// Hàm hiển thị thanh phân trang tổng quát
+function renderPaginationBar($currentPage, $totalPages, $paramName) {
+    if ($totalPages <= 1) return;
+    $queryParams = $_GET;
+
+    echo '<div class="pagination-wrapper">';
+    if ($currentPage > 1) {
+        $queryParams[$paramName] = $currentPage - 1;
+        echo '<a href="?' . http_build_query($queryParams) . '" class="page-link">&laquo;</a>';
+    } else {
+        echo '<span class="page-link disabled">&laquo;</span>';
+    }
+
+    $start = max(1, $currentPage - 1);
+    $end = min($totalPages, $currentPage + 1);
+    if ($currentPage == 1) $end = min($totalPages, $start + 2);
+    elseif ($currentPage == $totalPages) $start = max(1, $end - 2);
+
+    for ($i = $start; $i <= $end; $i++) {
+        $queryParams[$paramName] = $i;
+        $activeClass = ($i == $currentPage) ? 'active' : '';
+        echo '<a href="?' . http_build_query($queryParams) . '" class="page-link ' . $activeClass . '">' . $i . '</a>';
+    }
+
+    if ($currentPage < $totalPages) {
+        $queryParams[$paramName] = $currentPage + 1;
+        echo '<a href="?' . http_build_query($queryParams) . '" class="page-link">&raquo;</a>';
+    } else {
+        echo '<span class="page-link disabled">&raquo;</span>';
+    }
+    echo '</div>';
+}
+
+// Hàm sinh mã yêu cầu dạng dmyHis; chỉ thêm hậu tố A, B, C... nếu bị trùng
+function generateUniqueWaterCode($pdo, $table, $timeStr, $excludeId = 0) {
+    $ts = strtotime($timeStr) ?: time();
+    $baseCode = date('dmYHis', $ts);
+
+    $sql = "SELECT request_code FROM `{$table}` WHERE request_code LIKE :b AND id != :exId";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([':b' => $baseCode . '%', ':exId' => $excludeId]);
+    $existing = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+    if (empty($existing) || !in_array($baseCode, $existing)) {
+        return $baseCode;
+    }
+
+    $suffixes = range('A', 'Z');
+    foreach ($suffixes as $char) {
+        $candidate = $baseCode . $char;
+        if (!in_array($candidate, $existing)) {
+            return $candidate;
+        }
+    }
+    return $baseCode . '_' . rand(10, 99);
+}
+
+// Hàm lấy mã hiển thị cho các dòng dữ liệu
+function getDisplayCode($row) {
+    if (!empty($row['request_code'])) {
+        return $row['request_code'];
+    }
+    return date('dmYHis', strtotime($row['created_at']));
+}
+
+// Hàm kiểm tra bình 19L/20L
+function is19LBottle($name, $spec = '') {
+    $str = mb_strtolower($name . ' ' . $spec, 'UTF-8');
+    return (strpos($str, '19l') !== false || strpos($str, '19 l') !== false || strpos($str, '19 lít') !== false || strpos($str, '20l') !== false);
+}
+
+// Danh sách phòng ban mặc định
+if (!isset($DEFAULT_DEPARTMENTS) || !is_array($DEFAULT_DEPARTMENTS)) {
+    $DEFAULT_DEPARTMENTS = [
+        'Ban Giám Đốc', 'Phòng Hành Chính - Nhân Sự', 'Phòng Kế Toán - Tài Chính',
+        'Phòng Kỹ Thuật - IT', 'Phòng Kinh Doanh - Marketing', 'Phòng Quản Lý Chất Lượng (QA/QC)',
+        'Bộ Phận Sản Xuất / Kho Vận', 'Bộ Phận Bếp & Dịch Vụ'
+    ];
+}
+
+// Tự động kiểm tra cấu trúc bảng tương thích mọi phiên bản MySQL
+try {
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS `water_items` (
+            `id` INT AUTO_INCREMENT PRIMARY KEY,
+            `item_code` VARCHAR(50) DEFAULT '',
+            `item_name` VARCHAR(150) NOT NULL,
+            `specification` VARCHAR(100) DEFAULT '',
+            `unit` VARCHAR(50) DEFAULT 'Bình',
+            `initial_stock` INT DEFAULT 0,
+            `total_imported` INT DEFAULT 0,
+            `stock_qty` INT DEFAULT 0,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    ");
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS `water_requests` (
+            `id` INT AUTO_INCREMENT PRIMARY KEY,
+            `request_code` VARCHAR(60) DEFAULT '',
+            `request_date` DATE NOT NULL,
+            `department` VARCHAR(100) NOT NULL,
+            `receiver_name` VARCHAR(150) DEFAULT '',
+            `item_id` INT NOT NULL,
+            `quantity` INT NOT NULL DEFAULT 1,
+            `has_bottle_return` INT NOT NULL DEFAULT 0,
+            `delivery_location` VARCHAR(255) DEFAULT '',
+            `notes` VARCHAR(255) DEFAULT '',
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX (`item_id`),
+            INDEX (`request_date`),
+            INDEX (`request_code`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    ");
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS `water_proposals` (
+            `id` INT AUTO_INCREMENT PRIMARY KEY,
+            `request_code` VARCHAR(60) DEFAULT '',
+            `employee_id` INT DEFAULT NULL,
+            `receiver_name` VARCHAR(150) NOT NULL,
+            `department` VARCHAR(100) NOT NULL,
+            `item_id` INT NOT NULL,
+            `quantity` INT NOT NULL DEFAULT 1,
+            `return_bottle_count` INT NOT NULL DEFAULT 0,
+            `delivery_location` TEXT DEFAULT NULL,
+            `status` VARCHAR(50) DEFAULT 'Chờ cấp phát',
+            `reject_reason` VARCHAR(255) DEFAULT '',
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX (`item_id`),
+            INDEX (`status`),
+            INDEX (`request_code`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    ");
+
+    $colListReq = $pdo->query("SHOW COLUMNS FROM `water_requests`")->fetchAll(PDO::FETCH_COLUMN);
+    if (!in_array('request_code', $colListReq)) {
+        $pdo->exec("ALTER TABLE `water_requests` ADD COLUMN `request_code` VARCHAR(60) DEFAULT '' AFTER `id`");
+    }
+    if (!in_array('receiver_name', $colListReq)) {
+        $pdo->exec("ALTER TABLE `water_requests` ADD COLUMN `receiver_name` VARCHAR(150) DEFAULT '' AFTER `department`");
+    }
+    if (!in_array('delivery_location', $colListReq)) {
+        $pdo->exec("ALTER TABLE `water_requests` ADD COLUMN `delivery_location` VARCHAR(255) DEFAULT '' AFTER `has_bottle_return`");
+    }
+
+    $colListProp = $pdo->query("SHOW COLUMNS FROM `water_proposals`")->fetchAll(PDO::FETCH_COLUMN);
+    if (!in_array('request_code', $colListProp)) {
+        $pdo->exec("ALTER TABLE `water_proposals` ADD COLUMN `request_code` VARCHAR(60) DEFAULT '' AFTER `id`");
+    }
+    if (!in_array('reject_reason', $colListProp)) {
+        $pdo->exec("ALTER TABLE `water_proposals` ADD COLUMN `reject_reason` VARCHAR(255) DEFAULT '' AFTER `status`");
+    }
+} catch (PDOException $e) {}
+
+$selected_month = $_GET['month'] ?? date('Y-m');
+$f_dept = trim($_GET['f_dept'] ?? '');
+$search_water = trim($_GET['search_water'] ?? '');
+
+// ==================== 1. XỬ LÝ CẤP PHÁT TỪ ĐỀ XUẤT ====================
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'approve_proposal') {
+    $prop_id       = intval($_POST['proposal_id']);
+    $receiver_name = trim($_POST['receiver_name'] ?? '');
+    $department    = trim($_POST['department'] ?? '');
+    $item_id       = intval($_POST['item_id'] ?? 0);
+    $quantity      = intval($_POST['quantity'] ?? 1);
+    $delivery_loc  = trim($_POST['delivery_location'] ?? '');
+    $custom_notes  = trim($_POST['notes'] ?? '');
+
+    try {
+        $pdo->beginTransaction();
+        $stmtProp = $pdo->prepare("SELECT * FROM water_proposals WHERE id = :id AND status = 'Chờ cấp phát' FOR UPDATE");
+        $stmtProp->execute([':id' => $prop_id]);
+        $prop = $stmtProp->fetch();
+
+        if (!$prop) {
+            throw new Exception("Yêu cầu đề xuất không tồn tại hoặc đã được xử lý từ trước!");
+        }
+
+        $stmtCheck = $pdo->prepare("SELECT item_name, specification, stock_qty, unit FROM water_items WHERE id = :id FOR UPDATE");
+        $stmtCheck->execute([':id' => $item_id]);
+        $it = $stmtCheck->fetch();
+
+        if (!$it) {
+            throw new Exception("Sản phẩm nước không tồn tại trong kho!");
+        }
+        if ($it['stock_qty'] < $quantity) {
+            throw new Exception("Tồn kho hiện tại không đủ để cấp! [{$it['item_name']}] chỉ còn {$it['stock_qty']} {$it['unit']}.");
+        }
+
+        $is19L = is19LBottle($it['item_name'], $it['specification']);
+        $ret_bottles = $is19L ? max(0, intval($_POST['return_bottle_count'] ?? 0)) : 0;
+
+        $code = !empty($prop['request_code']) ? $prop['request_code'] : generateUniqueWaterCode($pdo, 'water_requests', $prop['created_at']);
+
+        // 1. Trừ tồn kho
+        $stmtSub = $pdo->prepare("UPDATE water_items SET stock_qty = stock_qty - :qty WHERE id = :id");
+        $stmtSub->execute([':qty' => $quantity, ':id' => $item_id]);
+
+        // 2. Ghi vào lịch sử cấp phát
+        $stmtReq = $pdo->prepare("
+            INSERT INTO water_requests (request_code, request_date, department, receiver_name, item_id, quantity, has_bottle_return, delivery_location, notes)
+            VALUES (:code, :r_date, :dept, :rec, :item_id, :qty, :has_ret, :loc, :notes)
+        ");
+        $stmtReq->execute([
+            ':code'    => $code,
+            ':r_date'  => date('Y-m-d'),
+            ':dept'    => $department,
+            ':rec'     => $receiver_name,
+            ':item_id' => $item_id,
+            ':qty'     => $quantity,
+            ':has_ret' => $ret_bottles,
+            ':loc'     => $delivery_loc,
+            ':notes'   => $custom_notes
+        ]);
+
+        // 3. Đánh dấu đề xuất là đã cấp phát
+        $stmtUp = $pdo->prepare("UPDATE water_proposals SET status = 'Đã cấp phát', request_code = :code WHERE id = :id");
+        $stmtUp->execute([':code' => $code, ':id' => $prop_id]);
+
+        $pdo->commit();
+        $message = "Đã xác nhận cấp phát nước uống thành công cho " . htmlspecialchars($receiver_name) . " (Mã: $code)!";
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        $error = "Lỗi cấp phát: " . $e->getMessage();
+    }
+}
+
+// Từ chối đề xuất
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'reject_proposal') {
+    $prop_id = intval($_POST['proposal_id']);
+    $reason  = trim($_POST['reject_reason'] ?? 'Tạm thời hết hàng');
+    try {
+        $stmt = $pdo->prepare("UPDATE water_proposals SET status = 'Từ chối', reject_reason = :reason WHERE id = :id");
+        $stmt->execute([':reason' => $reason, ':id' => $prop_id]);
+        $message = "Đã từ chối yêu cầu đề xuất cấp nước!";
+    } catch (PDOException $e) { $error = "Lỗi: " . $e->getMessage(); }
+}
+
+// ==================== 2. SỬA / XÓA LỊCH SỬ CẤP PHÁT ====================
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'update_request') {
+    $req_id   = intval($_POST['request_id']);
+    $new_date = $_POST['request_date'];
+    $new_dept = trim($_POST['department']);
+    $new_rec  = trim($_POST['receiver_name'] ?? '');
+    $new_item = intval($_POST['item_id']);
+    $new_qty  = intval($_POST['quantity']);
+    $new_loc  = trim($_POST['delivery_location'] ?? '');
+    $new_notes= trim($_POST['notes'] ?? '');
+
+    try {
+        $pdo->beginTransaction();
+        $stmtOld = $pdo->prepare("SELECT * FROM water_requests WHERE id = :id FOR UPDATE");
+        $stmtOld->execute([':id' => $req_id]);
+        $oldReq = $stmtOld->fetch();
+
+        if (!$oldReq) throw new Exception("Bản ghi cấp phát không tồn tại!");
+
+        $stmtIt = $pdo->prepare("SELECT item_name, specification, stock_qty, unit FROM water_items WHERE id = :id FOR UPDATE");
+        $stmtIt->execute([':id' => $new_item]);
+        $it = $stmtIt->fetch();
+        if (!$it) throw new Exception("Sản phẩm nước không tồn tại!");
+
+        if (intval($oldReq['item_id']) === $new_item) {
+            $diff = $new_qty - intval($oldReq['quantity']);
+            if ($diff > 0 && $diff > $it['stock_qty']) {
+                throw new Exception("Không đủ nước trong kho để tăng số lượng cấp! Còn thiếu {$diff} {$it['unit']}.");
+            }
+            $stmtUpStock = $pdo->prepare("UPDATE water_items SET stock_qty = GREATEST(0, stock_qty - :diff) WHERE id = :id");
+            $stmtUpStock->execute([':diff' => $diff, ':id' => $new_item]);
+        } else {
+            $stmtBack = $pdo->prepare("UPDATE water_items SET stock_qty = stock_qty + :q WHERE id = :id");
+            $stmtBack->execute([':q' => $oldReq['quantity'], ':id' => $oldReq['item_id']]);
+
+            if ($new_qty > $it['stock_qty']) {
+                throw new Exception("Không đủ tồn kho mặt hàng mới để cấp! Tồn: {$it['stock_qty']} {$it['unit']}.");
+            }
+            $stmtTake = $pdo->prepare("UPDATE water_items SET stock_qty = stock_qty - :q WHERE id = :id");
+            $stmtTake->execute([':q' => $new_qty, ':id' => $new_item]);
+        }
+
+        $is19L = is19LBottle($it['item_name'], $it['specification']);
+        $ret_bottles = $is19L ? max(0, intval($_POST['return_bottle_count'] ?? 0)) : 0;
+
+        $stmtUpReq = $pdo->prepare("
+            UPDATE water_requests 
+            SET request_date = :r_date, department = :dept, receiver_name = :rec, item_id = :item_id, 
+                quantity = :qty, has_bottle_return = :has_ret, delivery_location = :loc, notes = :notes 
+            WHERE id = :id
+        ");
+        $stmtUpReq->execute([
+            ':r_date'  => $new_date, ':dept'    => $new_dept, ':rec'     => $new_rec,
+            ':item_id' => $new_item, ':qty'     => $new_qty,  ':has_ret' => $ret_bottles,
+            ':loc'     => $new_loc,  ':notes'   => $new_notes, ':id'     => $req_id
+        ]);
+
+        $pdo->commit();
+        $message = "Đã cập nhật bản ghi lịch sử cấp phát nước và điều chỉnh kho thành công!";
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        $error = "Lỗi cập nhật: " . $e->getMessage();
+    }
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_request') {
+    $req_id = intval($_POST['request_id']);
+    try {
+        $pdo->beginTransaction();
+        $stmtGet = $pdo->prepare("SELECT * FROM water_requests WHERE id = :id FOR UPDATE");
+        $stmtGet->execute([':id' => $req_id]);
+        $req = $stmtGet->fetch();
+
+        if ($req) {
+            $stmtRet = $pdo->prepare("UPDATE water_items SET stock_qty = stock_qty + :qty WHERE id = :item_id");
+            $stmtRet->execute([':qty' => $req['quantity'], ':item_id' => $req['item_id']]);
+
+            $stmtDel = $pdo->prepare("DELETE FROM water_requests WHERE id = :id");
+            $stmtDel->execute([':id' => $req_id]);
+        }
+        $pdo->commit();
+        $message = "Đã xóa bản ghi cấp phát và hoàn trả {$req['quantity']} bình/chai vào kho!";
+    } catch (PDOException $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        $error = "Lỗi xóa: " . $e->getMessage();
+    }
+}
+
+// ==================== 3. CÁC THAO TÁC CRUD SẢN PHẨM & KHO ====================
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    $act = $_POST['action'];
+
+    if ($act === 'add_item') {
+        $code = trim($_POST['item_code'] ?? '');
+        $name = trim($_POST['item_name'] ?? '');
+        $spec = trim($_POST['specification'] ?? '');
+        $unit = trim($_POST['unit'] ?? 'Bình');
+        $init = intval($_POST['initial_stock'] ?? 0);
+        if ($name) {
+            $stmt = $pdo->prepare("INSERT INTO water_items (item_code, item_name, specification, unit, initial_stock, total_imported, stock_qty) VALUES (:c, :n, :s, :u, :i, 0, :st)");
+            $stmt->execute([':c'=>$code, ':n'=>$name, ':s'=>$spec, ':u'=>$unit, ':i'=>$init, ':st'=>$init]);
+            $message = "Đã thêm loại nước mới vào danh mục!";
+        }
+    }
+
+    if ($act === 'update_item') {
+        $item_id = intval($_POST['item_id']);
+        $code    = trim($_POST['item_code'] ?? '');
+        $name    = trim($_POST['item_name'] ?? '');
+        $spec    = trim($_POST['specification'] ?? '');
+        $unit    = trim($_POST['unit'] ?? 'Bình');
+        $init    = intval($_POST['initial_stock'] ?? 0);
+
+        if (!empty($name) && $item_id > 0) {
+            try {
+                $pdo->beginTransaction();
+                $stmtOld = $pdo->prepare("SELECT initial_stock, stock_qty FROM water_items WHERE id = :id FOR UPDATE");
+                $stmtOld->execute([':id' => $item_id]);
+                $oldItem = $stmtOld->fetch();
+
+                $diffInit = $init - intval($oldItem['initial_stock']);
+                $newStock = max(0, intval($oldItem['stock_qty']) + $diffInit);
+
+                $stmt = $pdo->prepare("
+                    UPDATE water_items 
+                    SET item_code = :code, item_name = :name, specification = :spec, unit = :unit, initial_stock = :init, stock_qty = :stock 
+                    WHERE id = :id
+                ");
+                $stmt->execute([
+                    ':code'  => $code, ':name'  => $name, ':spec'  => $spec, ':unit'  => $unit,
+                    ':init'  => $init, ':stock' => $newStock, ':id'    => $item_id
+                ]);
+                $pdo->commit();
+                $message = "Đã cập nhật thông tin sản phẩm nước uống thành công!";
+            } catch (PDOException $e) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                $error = "Lỗi cập nhật: " . $e->getMessage();
+            }
+        }
+    }
+
+    if ($act === 'delete_item') {
+        $item_id = intval($_POST['item_id']);
+        try {
+            $stmt = $pdo->prepare("DELETE FROM water_items WHERE id = :id");
+            $stmt->execute([':id' => $item_id]);
+            $message = "Đã xóa loại nước khỏi danh mục kho!";
+        } catch (PDOException $e) {
+            $error = "Không thể xóa do loại nước này đang có dữ liệu trong lịch sử cấp phát: " . $e->getMessage();
+        }
+    }
+
+    if ($act === 'import_stock') {
+        $item_id = intval($_POST['item_id']);
+        $add_qty = intval($_POST['add_qty']);
+        if ($item_id > 0 && $add_qty > 0) {
+            $stmt = $pdo->prepare("UPDATE water_items SET stock_qty = stock_qty + :q1, total_imported = total_imported + :q2 WHERE id = :id");
+            $stmt->execute([':q1'=>$add_qty, ':q2'=>$add_qty, ':id'=>$item_id]);
+            $message = "Đã nhập thêm {$add_qty} vào kho thành công!";
+        }
+    }
+
+    if ($act === 'add_manual_request') {
+        $r_date = $_POST['request_date'];
+        $dept   = trim($_POST['department']);
+        $rec    = trim($_POST['receiver_name'] ?? '');
+        $item_id= intval($_POST['item_id']);
+        $qty    = intval($_POST['quantity']);
+        $loc    = trim($_POST['delivery_location'] ?? '');
+        $notes  = trim($_POST['notes'] ?? '');
+
+        $stmtChk = $pdo->prepare("SELECT item_name, specification FROM water_items WHERE id = :id");
+        $stmtChk->execute([':id' => $item_id]);
+        $curItem = $stmtChk->fetch();
+
+        $is19L = $curItem ? is19LBottle($curItem['item_name'], $curItem['specification']) : false;
+        $ret_bottles = $is19L ? max(0, intval($_POST['return_bottle_count'] ?? 0)) : 0;
+        $manual_code = generateUniqueWaterCode($pdo, 'water_requests', date('Y-m-d H:i:s'));
+
+        try {
+            $pdo->beginTransaction();
+            $stmtSub = $pdo->prepare("UPDATE water_items SET stock_qty = GREATEST(0, stock_qty - :q) WHERE id = :id");
+            $stmtSub->execute([':q' => $qty, ':id' => $item_id]);
+
+            $stmtReq = $pdo->prepare("
+                INSERT INTO water_requests (request_code, request_date, department, receiver_name, item_id, quantity, has_bottle_return, delivery_location, notes)
+                VALUES (:code, :rd, :dept, :rec, :it, :q, :hr, :loc, :n)
+            ");
+            $stmtReq->execute([':code'=>$manual_code, ':rd'=>$r_date, ':dept'=>$dept, ':rec'=>$rec, ':it'=>$item_id, ':q'=>$qty, ':hr'=>$ret_bottles, ':loc'=>$loc, ':n'=>$notes]);
+            $pdo->commit();
+            $message = "Đã cấp phát nước thành công (Mã: $manual_code)!";
+        } catch (Exception $e) { $pdo->rollBack(); $error = "Lỗi: " . $e->getMessage(); }
+    }
+
+    if ($act === 'manual_set_stock') {
+        $stmt = $pdo->prepare("UPDATE water_items SET stock_qty = :q WHERE id = :id");
+        $stmt->execute([':q' => intval($_POST['new_qty']), ':id' => intval($_POST['item_id'])]);
+        $message = "Đã cập nhật tồn kho thực tế thành công!";
+    }
+
+    if ($act === 'reset_all_data') {
+        $pdo->exec("UPDATE water_items SET initial_stock = 0, total_imported = 0, stock_qty = 0");
+        $pdo->exec("TRUNCATE TABLE water_requests");
+        $pdo->exec("TRUNCATE TABLE water_proposals");
+        $message = "Đã reset toàn bộ dữ liệu nước uống về 0!";
+    }
+}
+
+// ==================== 4. XỬ LÝ XUẤT EXCEL ====================
+// 4A. Xuất Excel Báo Cáo Tồn Kho Đầy Đủ
+if (isset($_GET['export_stock_full'])) {
+    $date_str = date('d-m-Y');
+    header("Content-Type: application/vnd.ms-excel; charset=UTF-8");
+    header("Content-Disposition: attachment; filename=Bao_Cao_Ton_Kho_Nuoc_Uong_{$date_str}.xls");
+    header("Pragma: no-cache"); header("Expires: 0"); echo "\xEF\xBB\xBF";
+
+    $itemsExport = $pdo->query("
+        SELECT i.*, COALESCE((SELECT SUM(r.quantity) FROM water_requests r WHERE r.item_id = i.id), 0) AS total_exported 
+        FROM water_items i ORDER BY i.item_code ASC, i.item_name ASC
+    ")->fetchAll();
+
+    echo '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <style>.rpt-title { font-family:"Times New Roman", Arial; font-size:16pt; font-weight:bold; text-align:center; height:35px; } .th-c { background-color:#10b981; color:#fff; font-weight:bold; text-align:center; border:0.5pt solid #000; height:28px; } .td-c { text-align:center; border:0.5pt solid #000; height:25px; } .td-l { text-align:left; border:0.5pt solid #000; padding-left:8px; } .td-r { text-align:right; border:0.5pt solid #000; font-weight:bold; padding-right:8px; }</style></head><body><table border="1">';
+    echo '<tr><td colspan="9" class="rpt-title">BÁO CÁO TỔNG HỢP XUẤT - NHẬP - TỒN KHO NƯỚC UỐNG</td></tr>';
+    echo '<tr><td colspan="9" style="text-align:center; font-style:italic;">Thời gian xuất báo cáo: ' . date('d/m/Y H:i:s') . '</td></tr><tr><td colspan="9" style="border:none; height:12px;"></td></tr>';
+    echo '<tr><th class="th-c" width="50">STT</th><th class="th-c" width="110">Mã SP</th><th class="th-c" width="220">Tên Loại Nước</th><th class="th-c" width="140">Quy Cách</th><th class="th-c" width="80">ĐVT</th><th class="th-c" width="120">Tồn Đầu Kỳ</th><th class="th-c" width="120">Tổng Nhập</th><th class="th-c" width="120">Tổng Đã Cấp</th><th class="th-c" width="130">Tồn Kho Thực Tế</th></tr>';
+
+    $stt1 = 1; $sInit=0; $sImp=0; $sExp=0; $sStk=0;
+    foreach ($itemsExport as $it) {
+        $init = intval($it['initial_stock']); $imp = intval($it['total_imported']); $exp = intval($it['total_exported']); $stk = intval($it['stock_qty']);
+        $sInit += $init; $sImp += $imp; $sExp += $exp; $sStk += $stk;
+        echo "<tr><td class='td-c'>{$stt1}</td><td class='td-c'>" . htmlspecialchars($it['item_code'] ?? '—') . "</td><td class='td-l'><b>" . htmlspecialchars($it['item_name']) . "</b></td><td class='td-c'>" . htmlspecialchars($it['specification'] ?? '—') . "</td><td class='td-c'>" . htmlspecialchars($it['unit']) . "</td><td class='td-c'>{$init}</td><td class='td-c'>{$imp}</td><td class='td-c' style='color:#ea580c; font-weight:bold;'>{$exp}</td><td class='td-c' style='color:#0284c7; font-weight:bold;'>{$stk}</td></tr>";
+        $stt1++;
+    }
+    echo "<tr><td colspan='5' class='td-r' style='background:#f8fafc;'>TỔNG CỘNG TOÀN KHO:</td><td class='td-c' style='background:#f8fafc; font-weight:bold;'>{$sInit}</td><td class='td-c' style='background:#f8fafc; font-weight:bold;'>{$sImp}</td><td class='td-c' style='background:#f8fafc; color:#ea580c; font-weight:bold;'>{$sExp}</td><td class='td-c' style='background:#f8fafc; color:#0284c7; font-weight:bold;'>{$sStk}</td></tr>";
+    echo '</table></body></html>'; exit;
+}
+
+// 4B. Xuất Excel Báo Cáo Đề Xuất
+if (isset($_GET['export_proposals_full'])) {
+    $date_str = date('d-m-Y');
+    header("Content-Type: application/vnd.ms-excel; charset=UTF-8");
+    header("Content-Disposition: attachment; filename=Bao_Cao_De_Xuat_Nuoc_Uong_{$date_str}.xls");
+    header("Pragma: no-cache"); header("Expires: 0"); echo "\xEF\xBB\xBF";
+
+    $propExp = $pdo->query("
+        SELECT p.*, i.item_code, i.item_name, i.specification, i.unit 
+        FROM water_proposals p 
+        JOIN water_items i ON p.item_id = i.id 
+        ORDER BY (p.status = 'Chờ cấp phát') DESC, p.id DESC
+    ")->fetchAll();
+
+    echo '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <style>.rpt-title { font-family:"Times New Roman", Arial; font-size:16pt; font-weight:bold; text-align:center; height:35px; } .th-c { background-color:#0284c7; color:#ffffff; font-weight:bold; text-align:center; border:0.5pt solid #000; height:28px; } .td-c { text-align:center; border:0.5pt solid #000; height:25px; } .td-l { text-align:left; border:0.5pt solid #000; padding-left:6px; } .td-r { text-align:right; border:0.5pt solid #000; font-weight:bold; padding-right:6px; }</style></head><body>';
+    echo '<table border="1"><tr><td colspan="10" class="rpt-title">BÁO CÁO DANH SÁCH ĐỀ XUẤT CẤP NƯỚC UỐNG</td></tr>';
+    echo '<tr><td colspan="10" style="text-align:center; font-style:italic;">Thời gian xuất: ' . date('d/m/Y H:i:s') . '</td></tr><tr><td colspan="10" style="border:none; height:10px;"></td></tr>';
+    echo '<tr><th class="th-c" width="45">STT</th><th class="th-c" width="150">Mã Yêu Cầu</th><th class="th-c" width="140">Thời Gian Gửi</th><th class="th-c" width="160">Người Nhận</th><th class="th-c" width="160">Phòng Ban</th><th class="th-c" width="200">Loại Nước</th><th class="th-c" width="80">Số Lượng</th><th class="th-c" width="90">Trả Vỏ</th><th class="th-c" width="110">Trạng Thái</th><th class="th-c" width="180">Vị Trí / Ghi Chú</th></tr>';
+
+    $stt = 1; $sQty = 0; $sBottles = 0;
+    foreach ($propExp as $p) {
+        $sQty += intval($p['quantity']);
+        $sBottles += intval($p['return_bottle_count']);
+        $pCode = getDisplayCode($p);
+        $statusText = $p['status'];
+        if ($p['status'] === 'Từ chối' && !empty($p['reject_reason'])) {
+            $statusText .= " (" . $p['reject_reason'] . ")";
+        }
+        echo "<tr>
+                <td class='td-c'>{$stt}</td>
+                <td class='td-c'>{$pCode}</td>
+                <td class='td-c'>" . date('d/m/Y H:i:s', strtotime($p['created_at'])) . "</td>
+                <td class='td-l'><b>" . htmlspecialchars($p['receiver_name']) . "</b></td>
+                <td class='td-l'>" . htmlspecialchars($p['department']) . "</td>
+                <td class='td-l'>" . htmlspecialchars($p['item_name']) . " (" . htmlspecialchars($p['specification'] ?: '—') . ")</td>
+                <td class='td-c' style='color:#0284c7; font-weight:bold;'>" . intval($p['quantity']) . " " . htmlspecialchars($p['unit']) . "</td>
+                <td class='td-c'>" . intval($p['return_bottle_count']) . " vỏ</td>
+                <td class='td-c'>{$statusText}</td>
+                <td class='td-l'>" . htmlspecialchars($p['delivery_location'] ?: '—') . "</td>
+              </tr>";
+        $stt++;
+    }
+    echo "<tr><td colspan='6' class='td-r' style='background:#f8fafc;'>TỔNG CỘNG:</td><td class='td-c' style='background:#f8fafc; color:#0284c7;'>{$sQty}</td><td class='td-c' style='background:#f8fafc; color:#c2410c;'>{$sBottles} vỏ</td><td colspan='2' style='background:#f8fafc;'></td></tr>";
+    echo '</table></body></html>'; exit;
+}
+
+// 4C. Xuất Excel Báo Cáo Chi Tiết Cấp Phát
+if (isset($_GET['export_report'])) {
+    $date_str = date('d-m-Y');
+    header("Content-Type: application/vnd.ms-excel; charset=UTF-8");
+    header("Content-Disposition: attachment; filename=Bao_Cao_Cap_Phat_Nuoc_Chi_Tiet_{$date_str}.xls");
+    header("Pragma: no-cache"); header("Expires: 0"); echo "\xEF\xBB\xBF";
+
+    $whereExp = ["1=1"];
+    $paramsExp = [];
+
+    $f_hist_search = trim($_GET['f_hist_search'] ?? '');
+    $f_hist_dept   = trim($_GET['f_hist_dept'] ?? '');
+    $f_hist_mode   = trim($_GET['f_hist_mode'] ?? 'month');
+    $f_hist_date   = trim($_GET['f_hist_date'] ?? $today);
+    $f_hist_week   = trim($_GET['f_hist_week'] ?? date('Y-\WW'));
+    $f_hist_month  = trim($_GET['f_hist_month'] ?? date('Y-m'));
+    $f_hist_year   = trim($_GET['f_hist_year'] ?? date('Y'));
+
+    if (!empty($f_hist_search)) {
+        $whereExp[] = "(r.request_code LIKE :hs1 
+                     OR DATE_FORMAT(r.created_at, '%d%m%Y%H%i%s') LIKE :hs2 
+                     OR r.receiver_name LIKE :hs3 
+                     OR i.item_name LIKE :hs4)";
+        $paramsExp[':hs1'] = "%$f_hist_search%";
+        $paramsExp[':hs2'] = "%$f_hist_search%";
+        $paramsExp[':hs3'] = "%$f_hist_search%";
+        $paramsExp[':hs4'] = "%$f_hist_search%";
+    }
+    if (!empty($f_hist_dept)) {
+        $whereExp[] = "r.department = :hdept";
+        $paramsExp[':hdept'] = $f_hist_dept;
+    }
+
+    if ($f_hist_mode === 'day') {
+        $whereExp[] = "r.request_date = :hd";
+        $paramsExp[':hd'] = $f_hist_date;
+    } elseif ($f_hist_mode === 'week') {
+        $yw = substr($f_hist_week, 0, 4);
+        $ww = substr($f_hist_week, 6);
+        $dto = new DateTime();
+        $dto->setISODate(intval($yw), intval($ww));
+        $ws = $dto->format('Y-m-d');
+        $dto->modify('+6 days');
+        $we = $dto->format('Y-m-d');
+        $whereExp[] = "r.request_date BETWEEN :hws AND :hwe";
+        $paramsExp[':hws'] = $ws;
+        $paramsExp[':hwe'] = $we;
+    } elseif ($f_hist_mode === 'year') {
+        $whereExp[] = "DATE_FORMAT(r.request_date, '%Y') = :hy";
+        $paramsExp[':hy'] = $f_hist_year;
+    } else {
+        $whereExp[] = "DATE_FORMAT(r.request_date, '%Y-%m') = :hm";
+        $paramsExp[':hm'] = $f_hist_month;
+    }
+
+    $sqlExp = "
+        SELECT r.*, i.item_name, i.specification, i.unit 
+        FROM water_requests r 
+        JOIN water_items i ON r.item_id = i.id 
+        WHERE " . implode(' AND ', $whereExp) . " 
+        ORDER BY r.id DESC
+    ";
+    $stmtExp = $pdo->prepare($sqlExp);
+    $stmtExp->execute($paramsExp);
+    $reportRows = $stmtExp->fetchAll();
+
+    echo '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <style>.rpt-title { font-family:"Times New Roman", Arial; font-size:16pt; font-weight:bold; text-align:center; height:35px; } .th-c { background-color:#0284c7; color:#ffffff; font-weight:bold; text-align:center; border:0.5pt solid #000; height:28px; } .td-c { text-align:center; border:0.5pt solid #000; height:25px; } .td-l { text-align:left; border:0.5pt solid #000; padding-left:6px; } .td-r { text-align:right; border:0.5pt solid #000; font-weight:bold; padding-right:6px; }</style></head><body>';
+    echo '<table border="1">';
+    echo '<tr><td colspan="11" class="rpt-title">BÁO CÁO CHI TIẾT CẤP PHÁT NƯỚC UỐNG</td></tr>';
+    echo '<tr><td colspan="11" style="text-align:center; font-style:italic;">Thời gian xuất: ' . date('d/m/Y H:i:s') . '</td></tr><tr><td colspan="11" style="border:none; height:10px;"></td></tr>';
+
+    echo '<tr>
+            <th class="th-c" width="45">STT</th>
+            <th class="th-c" width="140">Mã Cấp Phát</th>
+            <th class="th-c" width="95">Ngày</th>
+            <th class="th-c" width="85">Thời Gian</th>
+            <th class="th-c" width="160">Người Nhận</th>
+            <th class="th-c" width="160">Phòng Ban</th>
+            <th class="th-c" width="220">Loại Nước</th>
+            <th class="th-c" width="90">Số Lượng</th>
+            <th class="th-c" width="100">Đổi/Trả Vỏ</th>
+            <th class="th-c" width="180">Vị Trí Giao</th>
+            <th class="th-c" width="180">Ghi Chú</th>
+          </tr>';
+
+    $stt = 1; $sumQty = 0; $sumBottles = 0;
+    if (!empty($reportRows)) {
+        foreach ($reportRows as $row) {
+            $sumQty += intval($row['quantity']);
+            $timeOnly = date('H:i:s', strtotime($row['created_at']));
+            $is19L = is19LBottle($row['item_name'], $row['specification']);
+            $retCount = intval($row['has_bottle_return']);
+            $rCode = getDisplayCode($row);
+            
+            $bottleText = '—';
+            if ($is19L) {
+                if ($retCount > 0) {
+                    $bottleText = $retCount . ' vỏ';
+                    $sumBottles += $retCount;
+                } else {
+                    $bottleText = '0 vỏ';
+                }
+            }
+
+            echo "<tr>
+                    <td class='td-c'>{$stt}</td>
+                    <td class='td-c'>{$rCode}</td>
+                    <td class='td-c'>" . date('d/m/Y', strtotime($row['request_date'])) . "</td>
+                    <td class='td-c'>{$timeOnly}</td>
+                    <td class='td-l'><b>" . htmlspecialchars($row['receiver_name'] ?: '—') . "</b></td>
+                    <td class='td-l'>" . htmlspecialchars($row['department']) . "</td>
+                    <td class='td-l'>" . htmlspecialchars($row['item_name']) . " (" . htmlspecialchars($row['specification'] ?: '—') . ")</td>
+                    <td class='td-c' style='color:#0284c7; font-weight:bold;'>" . intval($row['quantity']) . " " . htmlspecialchars($row['unit']) . "</td>
+                    <td class='td-c'>" . $bottleText . "</td>
+                    <td class='td-l'>" . htmlspecialchars($row['delivery_location'] ?: '—') . "</td>
+                    <td class='td-l'>" . htmlspecialchars($row['notes'] ?: '') . "</td>
+                  </tr>";
+            $stt++;
+        }
+    } else {
+        echo '<tr><td colspan="11" class="td-c" style="height:35px; font-style:italic;">Không có dữ liệu cấp phát phù hợp</td></tr>';
+    }
+
+    echo "<tr>
+            <td colspan='7' class='td-r' style='background:#f8fafc;'>TỔNG CỘNG:</td>
+            <td class='td-c' style='background:#f8fafc; color:#0284c7; font-weight:bold;'>{$sumQty}</td>
+            <td class='td-c' style='background:#f8fafc; color:#c2410c; font-weight:bold;'>{$sumBottles} vỏ</td>
+            <td colspan='2' style='background:#f8fafc;'></td>
+          </tr>";
+
+    echo '</table></body></html>';
+    exit;
+}
+
+// ==================== 5. TRUY VẤN DỮ LIỆU ĐỀ XUẤT ====================
+$f_prop_search = trim($_GET['f_prop_search'] ?? '');
+$f_prop_dept   = trim($_GET['f_prop_dept'] ?? '');
+$f_prop_mode   = trim($_GET['f_prop_mode'] ?? 'month');
+$f_prop_date   = trim($_GET['f_prop_date'] ?? $today);
+$f_prop_week   = trim($_GET['f_prop_week'] ?? date('Y-\WW'));
+$f_prop_month  = trim($_GET['f_prop_month'] ?? date('Y-m'));
+$f_prop_year   = trim($_GET['f_prop_year'] ?? date('Y'));
+
+$whereP = ["1=1"];
+$paramsP = [];
+
+if (!empty($f_prop_search)) {
+    $whereP[] = "(p.request_code LIKE :ps1 
+                 OR DATE_FORMAT(p.created_at, '%d%m%Y%H%i%s') LIKE :ps2 
+                 OR p.receiver_name LIKE :ps3 
+                 OR i.item_name LIKE :ps4)";
+    $paramsP[':ps1'] = "%$f_prop_search%";
+    $paramsP[':ps2'] = "%$f_prop_search%";
+    $paramsP[':ps3'] = "%$f_prop_search%";
+    $paramsP[':ps4'] = "%$f_prop_search%";
+}
+
+if (!empty($f_prop_dept)) {
+    $whereP[] = "p.department = :pdept";
+    $paramsP[':pdept'] = $f_prop_dept;
+}
+
+if ($f_prop_mode === 'day') {
+    $whereP[] = "DATE(p.created_at) = :pd";
+    $paramsP[':pd'] = $f_prop_date;
+} elseif ($f_prop_mode === 'week') {
+    $yw = substr($f_prop_week, 0, 4);
+    $ww = substr($f_prop_week, 6);
+    $dto = new DateTime();
+    $dto->setISODate(intval($yw), intval($ww));
+    $ws = $dto->format('Y-m-d 00:00:00');
+    $dto->modify('+6 days');
+    $we = $dto->format('Y-m-d 23:59:59');
+    $whereP[] = "p.created_at BETWEEN :pws AND :pwe";
+    $paramsP[':pws'] = $ws;
+    $paramsP[':pwe'] = $we;
+} elseif ($f_prop_mode === 'month') {
+    $whereP[] = "DATE_FORMAT(p.created_at, '%Y-%m') = :pm";
+    $paramsP[':pm'] = $f_prop_month;
+} elseif ($f_prop_mode === 'year') {
+    $whereP[] = "DATE_FORMAT(p.created_at, '%Y') = :py";
+    $paramsP[':py'] = $f_prop_year;
+}
+
+$countPropStmt = $pdo->prepare("
+    SELECT COUNT(*), SUM(p.quantity) AS sum_q, SUM(p.return_bottle_count) AS sum_b 
+    FROM water_proposals p 
+    JOIN water_items i ON p.item_id = i.id 
+    WHERE " . implode(' AND ', $whereP)
+);
+$countPropStmt->execute($paramsP);
+$propSumData = $countPropStmt->fetch();
+$total_proposals = intval($propSumData['COUNT(*)'] ?? 0);
+$total_prop_qty  = intval($propSumData['sum_q'] ?? 0);
+$total_prop_bot  = intval($propSumData['sum_b'] ?? 0);
+
+$pages_prop = ceil($total_proposals / $limit) ?: 1;
+if ($p_prop > $pages_prop) $p_prop = $pages_prop;
+$offset_prop = max(0, ($p_prop - 1) * $limit);
+
+$sqlProposals = "
+    SELECT p.*, i.item_code, i.item_name, i.specification, i.unit, i.stock_qty
+    FROM water_proposals p
+    JOIN water_items i ON p.item_id = i.id
+    WHERE " . implode(' AND ', $whereP) . "
+    ORDER BY (p.status = 'Chờ cấp phát') DESC, p.id DESC
+    LIMIT " . intval($limit) . " OFFSET " . intval($offset_prop) . "
+";
+$stmtPropList = $pdo->prepare($sqlProposals);
+$stmtPropList->execute($paramsP);
+$proposals = $stmtPropList->fetchAll();
+
+// ==================== 6. TRUY VẤN DỮ LIỆU KHO & LỊCH SỬ ====================
+// Danh mục nước uống
+$whereW = ["1=1"]; $paramsW = [];
+if (!empty($search_water)) {
+    $whereW[] = "(i.item_code LIKE :s1 OR i.item_name LIKE :s2 OR i.specification LIKE :s3)";
+    $paramsW[':s1'] = "%$search_water%"; $paramsW[':s2'] = "%$search_water%"; $paramsW[':s3'] = "%$search_water%";
+}
+$countStmt = $pdo->prepare("SELECT COUNT(*) FROM water_items i WHERE " . implode(' AND ', $whereW));
+$countStmt->execute($paramsW);
+$total_water = $countStmt->fetchColumn();
+$pages_water = ceil($total_water / $limit) ?: 1;
+if ($p_water > $pages_water) $p_water = $pages_water;
+$offset_water = max(0, ($p_water - 1) * $limit);
+
+$sqlW = "
+    SELECT i.*, COALESCE((SELECT SUM(r.quantity) FROM water_requests r WHERE r.item_id = i.id), 0) AS total_exported 
+    FROM water_items i 
+    WHERE " . implode(' AND ', $whereW) . " 
+    ORDER BY i.item_code ASC, i.item_name ASC 
+    LIMIT " . intval($limit) . " OFFSET " . intval($offset_water) . "
+";
+$stmtW = $pdo->prepare($sqlW); $stmtW->execute($paramsW);
+$items = $stmtW->fetchAll();
+
+$allItemsForModal = $pdo->query("SELECT * FROM water_items ORDER BY item_code ASC, item_name ASC")->fetchAll();
+
+// Lịch sử cấp phát
+$f_hist_search = trim($_GET['f_hist_search'] ?? '');
+$f_hist_dept   = trim($_GET['f_hist_dept'] ?? '');
+$f_hist_mode   = trim($_GET['f_hist_mode'] ?? 'month');
+$f_hist_date   = trim($_GET['f_hist_date'] ?? $today);
+$f_hist_week   = trim($_GET['f_hist_week'] ?? date('Y-\WW'));
+$f_hist_month  = trim($_GET['f_hist_month'] ?? date('Y-m'));
+$f_hist_year   = trim($_GET['f_hist_year'] ?? date('Y'));
+
+$whereH = ["1=1"];
+$paramsH = [];
+
+if (!empty($f_hist_search)) {
+    $whereH[] = "(r.request_code LIKE :hs1 
+                 OR DATE_FORMAT(r.created_at, '%d%m%Y%H%i%s') LIKE :hs2 
+                 OR r.receiver_name LIKE :hs3 
+                 OR i.item_name LIKE :hs4)";
+    $paramsH[':hs1'] = "%$f_hist_search%";
+    $paramsH[':hs2'] = "%$f_hist_search%";
+    $paramsH[':hs3'] = "%$f_hist_search%";
+    $paramsH[':hs4'] = "%$f_hist_search%";
+}
+
+if (!empty($f_hist_dept)) {
+    $whereH[] = "r.department = :hdept";
+    $paramsH[':hdept'] = $f_hist_dept;
+}
+
+if ($f_hist_mode === 'day') {
+    $whereH[] = "r.request_date = :hd";
+    $paramsH[':hd'] = $f_hist_date;
+} elseif ($f_hist_mode === 'week') {
+    $yw = substr($f_hist_week, 0, 4);
+    $ww = substr($f_hist_week, 6);
+    $dto = new DateTime();
+    $dto->setISODate(intval($yw), intval($ww));
+    $ws = $dto->format('Y-m-d');
+    $dto->modify('+6 days');
+    $we = $dto->format('Y-m-d');
+    $whereH[] = "r.request_date BETWEEN :hws AND :hwe";
+    $paramsH[':hws'] = $ws;
+    $paramsH[':hwe'] = $we;
+} elseif ($f_hist_mode === 'month') {
+    $whereH[] = "DATE_FORMAT(r.request_date, '%Y-%m') = :hm";
+    $paramsH[':hm'] = $f_hist_month;
+} elseif ($f_hist_mode === 'year') {
+    $whereH[] = "DATE_FORMAT(r.request_date, '%Y') = :hy";
+    $paramsH[':hy'] = $f_hist_year;
+}
+
+$countHistStmt = $pdo->prepare("
+    SELECT COUNT(*), SUM(r.quantity) AS sum_q, SUM(r.has_bottle_return) AS sum_b 
+    FROM water_requests r 
+    JOIN water_items i ON r.item_id = i.id 
+    WHERE " . implode(' AND ', $whereH)
+);
+$countHistStmt->execute($paramsH);
+$histSumData = $countHistStmt->fetch();
+$total_history = intval($histSumData['COUNT(*)'] ?? 0);
+$total_hist_qty = intval($histSumData['sum_q'] ?? 0);
+$total_hist_bot = intval($histSumData['sum_b'] ?? 0);
+
+$pages_hist = ceil($total_history / $limit) ?: 1;
+if ($p_hist > $pages_hist) $p_hist = $pages_hist;
+$offset_hist = max(0, ($p_hist - 1) * $limit);
+
+$sqlH = "
+    SELECT r.*, i.item_code, i.item_name, i.specification, i.unit 
+    FROM water_requests r 
+    JOIN water_items i ON r.item_id = i.id 
+    WHERE " . implode(' AND ', $whereH) . " 
+    ORDER BY r.id DESC 
+    LIMIT " . intval($limit) . " OFFSET " . intval($offset_hist) . "
+";
+$stmtH = $pdo->prepare($sqlH); $stmtH->execute($paramsH);
+$history = $stmtH->fetchAll();
+
+include 'header.php';
+?>
+
+<style>
+    .water-wrapper { max-width: 1420px; margin: 25px auto; padding: 0 16px; }
+    .water-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 20px; }
+    .water-title { font-size: 1.55rem; font-weight: 800; color: #0f172a; }
+
+    .proposal-notice-box { background: #ffffff; border: 2px solid #0284c7; border-radius: 10px; padding: 18px 20px; margin-bottom: 25px; box-shadow: 0 4px 12px rgba(2,132,199,0.08); }
+    .notice-title { font-size: 1.15rem; font-weight: 800; color: #0369a1; display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 10px; }
+    
+    .filter-bar { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+    .filter-bar input, .filter-bar select { padding: 7px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.86rem; outline: none; background:#fff; }
+
+    .table-proposal { width: 100%; border-collapse: collapse; font-size: 0.88rem; min-width: 1100px; }
+    .table-proposal th, .table-proposal td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
+    .table-proposal th { background: #f0f9ff; color: #0369a1; font-weight: 700; }
+    
+    .btn-quick-open { background: #10b981; color: #ffffff; border: none; padding: 6px 12px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 0.82rem; }
+    .btn-quick-open:hover { background: #059669; }
+    .btn-reject-p { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; padding: 6px 10px; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.82rem; }
+    
+    .badge-status-p { padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 700; display: inline-block; }
+    .b-approved { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+    .b-rejected { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
+
+    .btn-action { background: #0284c7; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+    .btn-export { background: #10b981; color: #fff; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; }
+    .btn-export:hover { background: #059669; }
+    
+    .data-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); overflow-x: auto; margin-bottom: 12px; }
+    .water-table { width: 100%; border-collapse: collapse; text-align: left; min-width: 1100px; font-size: 0.88rem; }
+    .water-table th, .water-table td { padding: 11px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+    .water-table th { background: #f8fafc; color: #475569; font-weight: 600; }
+
+    .btn-tbl-edit { background: #f1f5f9; color: #0284c7; border: 1px solid #cbd5e1; padding: 4px 8px; border-radius: 4px; font-weight: 600; font-size: 0.8rem; cursor: pointer; }
+    .btn-tbl-del { background: #fee2e2; color: #dc2626; border: 1px solid #fecaca; padding: 4px 8px; border-radius: 4px; font-weight: 600; font-size: 0.8rem; cursor: pointer; }
+
+    .pagination-wrapper { display: flex; justify-content: center; align-items: center; gap: 6px; margin: 12px 0 25px; }
+    .page-link { display: inline-flex; align-items: center; justify-content: center; min-width: 34px; height: 34px; padding: 0 8px; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; color: #334155; font-size: 0.88rem; font-weight: 600; text-decoration: none; }
+    .page-link.active { background-color: #0284c7; color: #fff; border-color: #0284c7; }
+    .page-link.disabled { color: #cbd5e1; border-color: #e2e8f0; cursor: not-allowed; }
+
+    .more-dropdown { position: relative; display: inline-block; }
+    .more-menu { display: none; position: absolute; right: 0; top: 105%; background: #fff; min-width: 200px; box-shadow: 0 10px 25px rgba(0,0,0,0.12); border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px 0; z-index: 100; }
+    .more-menu.show { display: block; }
+    .menu-item-btn { width: 100%; background: none; border: none; text-align: left; padding: 9px 16px; font-size: 0.88rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.5); z-index: 1000; align-items: center; justify-content: center; padding: 15px; }
+    .modal-box { background: #fff; width: 100%; max-width: 540px; border-radius: 8px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.15); }
+    .modal-header { padding: 14px 20px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-weight: 700; display: flex; justify-content: space-between; align-items: center; }
+    .modal-body { padding: 20px; display: flex; flex-direction: column; gap: 12px; max-height: 80vh; overflow-y: auto; }
+    .modal-body label { font-size: 0.85rem; font-weight: 600; color: #334155; display: block; margin-bottom: 4px; }
+    .modal-body input, .modal-body select, .modal-body textarea { width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; outline: none; }
+    
+    .alert-box { padding: 12px 16px; border-radius: 6px; font-size: 0.9rem; margin-bottom: 16px; }
+    .alert-success { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+    .alert-danger { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+</style>
+
+<div class="water-wrapper">
+    <div class="water-header">
+        <div>
+            <h1 class="water-title">Quản Lý & Cấp Phát Nước Uống</h1>
+            <p style="font-size: 0.88rem; color: #64748b; margin-top: 4px;">
+                Tiếp nhận đề xuất công nhân, cấp phát phòng ban, quản lý tồn kho và đổi trả vỏ.
+            </p>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center;">
+            <a href="de-xuat-nuoc-uong.php" target="_blank" class="btn-action" style="background:#8b5cf6;">🔗 Mở Form Đề Xuất Nước</a>
+            <button class="btn-action" style="background:#10b981;" onclick="openModal('modal-import')">📦 Nhập Kho</button>
+            <button class="btn-action" onclick="openModal('modal-manual-give')">+ Cấp Phát Thủ Công</button>
+            
+            <div class="more-dropdown">
+                <button type="button" class="btn-action" style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1;" onclick="toggleMoreMenu(event)">
+                    ⚙️ Xem Thêm ▾
+                </button>
+                <div class="more-menu" id="more_dropdown_menu">
+                    <button type="button" class="menu-item-btn" onclick="openModal('modal-set-stock'); toggleMoreMenu();">
+                        ⚙️ Tùy Chỉnh Tồn Kho
+                    </button>
+                    <form method="POST" action="cap-phat-nuoc-uong.php" onsubmit="return confirm('CẢNH BÁO: Reset toàn bộ dữ liệu và đưa tồn kho về 0?');" style="margin:0;">
+                        <input type="hidden" name="action" value="reset_all_data">
+                        <button type="submit" class="menu-item-btn" style="color:#dc2626;">🔄 Reset Về 0</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <?php if ($message): ?><div class="alert-box alert-success"><?= htmlspecialchars($message) ?></div><?php endif; ?>
+    <?php if ($error): ?><div class="alert-box alert-danger"><?= htmlspecialchars($error) ?></div><?php endif; ?>
+
+    <!-- ==================== KHỐI 1: DANH SÁCH ĐỀ XUẤT NƯỚC UỐNG ==================== -->
+    <div class="proposal-notice-box">
+        <div class="notice-title">
+            <span>📬 DANH SÁCH ĐỀ XUẤT NƯỚC UỐNG (Tổng: <?= $total_proposals ?> đề xuất)</span>
+            <div style="display:flex; gap:8px;">
+                <a href="cap-phat-nuoc-uong.php?export_proposals_full=1" class="btn-export" title="Xuất toàn bộ danh sách đề xuất">
+                    📊 Xuất Excel Đề Xuất
+                </a>
+            </div>
+        </div>
+
+        <!-- Bộ lọc Đề xuất -->
+        <form method="GET" action="cap-phat-nuoc-uong.php" class="filter-bar">
+            <input type="text" name="f_prop_search" value="<?= htmlspecialchars($f_prop_search) ?>" placeholder="🔍 Tìm mã yêu cầu, người nhận, loại nước..." style="width: 250px;">
+
+            <label style="font-size:0.85rem; font-weight:700; color:#334155;">Xem theo:</label>
+            <select name="f_prop_mode" id="prop_mode_sel" onchange="togglePropInputs(this.value)">
+                <option value="day" <?= $f_prop_mode === 'day' ? 'selected' : '' ?>>Theo Ngày</option>
+                <option value="week" <?= $f_prop_mode === 'week' ? 'selected' : '' ?>>Theo Tuần</option>
+                <option value="month" <?= $f_prop_mode === 'month' ? 'selected' : '' ?>>Theo Tháng</option>
+                <option value="year" <?= $f_prop_mode === 'year' ? 'selected' : '' ?>>Theo Năm</option>
+            </select>
+
+            <input type="date" name="f_prop_date" id="prop_input_day" value="<?= htmlspecialchars($f_prop_date) ?>" style="display:<?= $f_prop_mode === 'day' ? 'inline-block' : 'none' ?>;">
+            <input type="week" name="f_prop_week" id="prop_input_week" value="<?= htmlspecialchars($f_prop_week) ?>" style="display:<?= $f_prop_mode === 'week' ? 'inline-block' : 'none' ?>;">
+            <input type="month" name="f_prop_month" id="prop_input_month" value="<?= htmlspecialchars($f_prop_month) ?>" style="display:<?= $f_prop_mode === 'month' ? 'inline-block' : 'none' ?>;">
+            <select name="f_prop_year" id="prop_input_year" style="display:<?= $f_prop_mode === 'year' ? 'inline-block' : 'none' ?>; width:95px;">
+                <?php for($y = date('Y'); $y >= 2024; $y--): ?>
+                    <option value="<?= $y ?>" <?= $f_prop_year == $y ? 'selected' : '' ?>><?= $y ?></option>
+                <?php endfor; ?>
+            </select>
+
+            <label style="font-size:0.85rem; font-weight:700; color:#334155;">Phòng ban:</label>
+            <select name="f_prop_dept">
+                <option value="">-- Tất cả phòng ban --</option>
+                <?php foreach ($DEFAULT_DEPARTMENTS as $d): ?>
+                    <option value="<?= htmlspecialchars($d) ?>" <?= $f_prop_dept === $d ? 'selected' : '' ?>><?= htmlspecialchars($d) ?></option>
+                <?php endforeach; ?>
+            </select>
+
+            <button type="submit" class="btn-action" style="padding: 7px 14px;">Lọc Đề Xuất</button>
+            <?php if ($f_prop_search || $f_prop_dept || $f_prop_mode !== 'month' || $f_prop_month !== date('Y-m')): ?>
+                <a href="cap-phat-nuoc-uong.php" style="font-size:0.85rem; color:#64748b; text-decoration:none;">Xóa lọc</a>
+            <?php endif; ?>
+        </form>
+        
+        <div style="overflow-x:auto;">
+            <table class="table-proposal">
+                <thead>
+                    <tr>
+                        <th style="width:40px; text-align:center;">STT</th>
+                        <th style="width:135px;">Mã Yêu Cầu</th>
+                        <th style="width:145px;">Thời Gian Gửi</th>
+                        <th>Người Đại Diện Nhận</th>
+                        <th>Phòng Ban</th>
+                        <th>Loại Nước Cần</th>
+                        <th style="width:70px; text-align:center;">Số Lượng</th>
+                        <th style="width:85px; text-align:center;">Trả Vỏ?</th>
+                        <th>Vị Trí Nhận / Ghi Chú</th>
+                        <th style="width:150px; text-align:center;">Trạng Thái / Thao Tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (!empty($proposals)): ?>
+                        <?php 
+                        $sttP = $offset_prop + 1;
+                        $pageSumQtyP = 0; $pageSumBotP = 0;
+                        foreach ($proposals as $p): 
+                            $is19L = is19LBottle($p['item_name'], $p['specification']);
+                            $pCode = getDisplayCode($p);
+                            $pageSumQtyP += intval($p['quantity']);
+                            $pageSumBotP += intval($p['return_bottle_count']);
+                        ?>
+                            <tr style="<?= $p['status'] !== 'Chờ cấp phát' ? 'background:#f8fafc; opacity:0.85;' : '' ?>">
+                                <td style="text-align:center;"><b><?= $sttP++ ?></b></td>
+                                <td><span style="background:#e0f2fe; color:#0369a1; padding:2px 6px; border-radius:4px; font-weight:700; font-size:0.8rem;"><?= htmlspecialchars($pCode) ?></span></td>
+                                <td><?= date('d/m/Y H:i:s', strtotime($p['created_at'])) ?></td>
+                                <td>
+                                    <strong><?= htmlspecialchars($p['receiver_name']) ?></strong>
+                                    <?= $p['employee_id'] ? ("<br><span style='font-size:0.75rem; color:#64748b;'>ID: #{$p['employee_id']}</span>") : '' ?>
+                                </td>
+                                <td><b><?= htmlspecialchars($p['department']) ?></b></td>
+                                <td>
+                                    <strong><?= htmlspecialchars($p['item_name']) ?></strong> 
+                                    <span style="font-size:0.8rem; color:#64748b;">(<?= htmlspecialchars($p['specification'] ?: '—') ?>)</span>
+                                </td>
+                                <td style="text-align:center; font-weight:bold; color:#0284c7; font-size:1rem;"><?= $p['quantity'] ?></td>
+                                <td style="text-align:center;">
+                                    <?php if ($is19L): ?>
+                                        <?php if ($p['return_bottle_count'] > 0): ?>
+                                            <span style="background:#ffedd5; color:#c2410c; padding:2px 6px; border-radius:4px; font-weight:bold; font-size:0.8rem;">
+                                                ↩️ <?= $p['return_bottle_count'] ?> vỏ
+                                            </span>
+                                        <?php else: ?>
+                                            <span style="color:#94a3b8; font-size:0.8rem;">0 vỏ</span>
+                                        <?php endif; ?>
+                                    <?php else: ?>
+                                        <span style="color:#cbd5e1; font-size:0.8rem;">— (Chai)</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td style="color:#334155; font-size:0.85rem;">
+                                    📍 <i><?= htmlspecialchars($p['delivery_location'] ?: '—') ?></i>
+                                </td>
+                                <td style="text-align:center;">
+                                    <?php if ($p['status'] === 'Chờ cấp phát'): ?>
+                                        <div style="display:flex; gap:5px; justify-content:center;">
+                                            <button type="button" class="btn-quick-open" onclick='openConfirmProposalModal(<?= json_encode($p, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>, "<?= $pCode ?>")'>
+                                                ⚡ Cấp Phát
+                                            </button>
+                                            <button type="button" class="btn-reject-p" onclick='openRejectModal(<?= $p['id'] ?>)'>
+                                                Từ chối
+                                            </button>
+                                        </div>
+                                    <?php elseif ($p['status'] === 'Đã cấp phát'): ?>
+                                        <span class="badge-status-p b-approved">✓ Đã cấp phát</span>
+                                    <?php else: ?>
+                                        <span class="badge-status-p b-rejected" title="<?= htmlspecialchars($p['reject_reason'] ?: 'Từ chối') ?>">
+                                            ✗ Đã từ chối <?= $p['reject_reason'] ? ('(' . htmlspecialchars($p['reject_reason']) . ')') : '' ?>
+                                        </span>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <tr><td colspan="10" style="text-align:center; padding:25px; color:#64748b;">Không có dữ liệu đề xuất nước uống phù hợp.</td></tr>
+                    <?php endif; ?>
+                </tbody>
+                <?php if (!empty($proposals)): ?>
+                    <tfoot>
+                        <tr style="background:#f8fafc; font-weight:bold;">
+                            <td colspan="6" style="text-align:right;">TỔNG CỘNG TRANG NÀY (TOÀN BỘ: <?= $total_prop_qty ?> sp / <?= $total_prop_bot ?> vỏ):</td>
+                            <td style="text-align:center; color:#0284c7;"><?= $pageSumQtyP ?></td>
+                            <td style="text-align:center; color:#c2410c;"><?= $pageSumBotP ?> vỏ</td>
+                            <td colspan="2"></td>
+                        </tr>
+                    </tfoot>
+                <?php endif; ?>
+            </table>
+        </div>
+        <?php renderPaginationBar($p_prop, $pages_prop, 'p_prop'); ?>
+    </div>
+
+    <!-- ==================== KHỐI 2: DANH MỤC & TỒN KHO NƯỚC UỐNG ==================== -->
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
+        <h3 style="font-size:1.1rem; color:#334155; margin:0;">💧 Danh Mục & Tồn Kho Nước Uống (Tổng: <?= $total_water ?> loại)</h3>
+        
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <a href="cap-phat-nuoc-uong.php?export_stock_full=1" class="btn-export" title="Xuất báo cáo Tồn đầu kỳ, Tổng nhập, Đã cấp, Tồn thực tế">
+                📊 Xuất Excel Tồn Kho Đầy Đủ
+            </a>
+            <form method="GET" action="cap-phat-nuoc-uong.php" style="display:flex; gap:8px; align-items:center; margin:0;">
+                <input type="text" name="search_water" value="<?= htmlspecialchars($search_water) ?>" placeholder="🔍 Tìm mã hoặc tên nước..." style="padding:6px 12px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.85rem; width:200px; outline:none;">
+                <button type="submit" class="btn-action" style="padding:6px 12px; font-size:0.85rem;">Tìm</button>
+                <?php if (!empty($search_water)): ?>
+                    <a href="cap-phat-nuoc-uong.php" style="padding:6px 10px; font-size:0.85rem; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:6px; text-decoration:none; color:#475569;">Hủy</a>
+                <?php endif; ?>
+            </form>
+            <button type="button" class="btn-action" style="background:#8b5cf6; padding:6px 12px; font-size:0.85rem;" onclick="openModal('modal-add-item')">+ Thêm Loại Nước</button>
+        </div>
+    </div>
+
+    <div class="data-card">
+        <table class="water-table">
+            <thead>
+                <tr>
+                    <th style="width:45px; text-align:center;">STT</th>
+                    <th style="width:100px;">Mã SP</th>
+                    <th>Tên Loại Nước</th>
+                    <th>Quy Cách</th>
+                    <th style="width:75px;">ĐVT</th>
+                    <th>Tồn Đầu Kỳ</th>
+                    <th>Tổng Nhập</th>
+                    <th>Tổng Đã Cấp</th>
+                    <th>Tồn Kho Thực Tế</th>
+                    <th style="width:115px; text-align:center;">Thao Tác</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (!empty($items)): ?>
+                    <?php $sttW = $offset_water + 1; foreach ($items as $it): ?>
+                        <tr>
+                            <td style="text-align:center;"><strong><?= $sttW++ ?></strong></td>
+                            <td><span style="background:#f1f5f9; padding:2px 6px; border-radius:4px; font-weight:700;"><?= htmlspecialchars($it['item_code'] ?: '—') ?></span></td>
+                            <td><strong><?= htmlspecialchars($it['item_name']) ?></strong></td>
+                            <td><?= htmlspecialchars($it['specification'] ?: '—') ?></td>
+                            <td><?= htmlspecialchars($it['unit']) ?></td>
+                            <td><?= $it['initial_stock'] ?></td>
+                            <td><?= $it['total_imported'] ?></td>
+                            <td style="color:#ea580c; font-weight:700;"><?= $it['total_exported'] ?></td>
+                            <td style="color:#0284c7; font-weight:800; font-size:1rem;"><?= $it['stock_qty'] ?> <?= htmlspecialchars($it['unit']) ?></td>
+                            <td style="text-align:center;">
+                                <div style="display:flex; gap:5px; justify-content:center;">
+                                    <button type="button" class="btn-tbl-edit" onclick='openEditItemModal(<?= json_encode($it, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>)'>Sửa</button>
+                                    <form method="POST" action="cap-phat-nuoc-uong.php" onsubmit="return confirm('Bạn có chắc muốn xóa loại nước [<?= htmlspecialchars($it['item_name']) ?>] khỏi kho?');" style="margin:0;">
+                                        <input type="hidden" name="action" value="delete_item">
+                                        <input type="hidden" name="item_id" value="<?= $it['id'] ?>">
+                                        <button type="submit" class="btn-tbl-del">Xóa</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <tr><td colspan="10" style="text-align:center; padding:25px;">Chưa có sản phẩm nước uống nào trong kho.</td></tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+    <?php renderPaginationBar($p_water, $pages_water, 'p_water'); ?>
+
+    <!-- ==================== KHỐI 3: LỊCH SỬ CẤP PHÁT NƯỚC ==================== -->
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
+        <h3 style="font-size:1.1rem; color:#334155; margin:0;">📜 Lịch Sử Cấp Phát Nước (Tổng: <?= $total_history ?> lượt)</h3>
+        <div style="display:flex; gap:8px;">
+            <a href="cap-phat-nuoc-uong.php?export_report=1&f_hist_search=<?= urlencode($f_hist_search) ?>&f_hist_dept=<?= urlencode($f_hist_dept) ?>&f_hist_mode=<?= urlencode($f_hist_mode) ?>&f_hist_date=<?= urlencode($f_hist_date) ?>&f_hist_week=<?= urlencode($f_hist_week) ?>&f_hist_month=<?= urlencode($f_hist_month) ?>&f_hist_year=<?= urlencode($f_hist_year) ?>" class="btn-export">
+                📊 Xuất Excel Báo Cáo Cấp Phát
+            </a>
+        </div>
+    </div>
+
+    <!-- Bộ lọc Lịch sử -->
+    <form method="GET" action="cap-phat-nuoc-uong.php" class="filter-bar">
+        <input type="text" name="f_hist_search" value="<?= htmlspecialchars($f_hist_search) ?>" placeholder="🔍 Tìm mã cấp phát, người nhận, loại nước..." style="width: 250px;">
+
+        <label style="font-size:0.85rem; font-weight:700; color:#334155;">Xem theo:</label>
+        <select name="f_hist_mode" id="hist_mode_sel" onchange="toggleHistInputs(this.value)">
+            <option value="day" <?= $f_hist_mode === 'day' ? 'selected' : '' ?>>Theo Ngày</option>
+            <option value="week" <?= $f_hist_mode === 'week' ? 'selected' : '' ?>>Theo Tuần</option>
+            <option value="month" <?= $f_hist_mode === 'month' ? 'selected' : '' ?>>Theo Tháng</option>
+            <option value="year" <?= $f_hist_mode === 'year' ? 'selected' : '' ?>>Theo Năm</option>
+        </select>
+
+        <input type="date" name="f_hist_date" id="hist_input_day" value="<?= htmlspecialchars($f_hist_date) ?>" style="display:<?= $f_hist_mode === 'day' ? 'inline-block' : 'none' ?>;">
+        <input type="week" name="f_hist_week" id="hist_input_week" value="<?= htmlspecialchars($f_hist_week) ?>" style="display:<?= $f_hist_mode === 'week' ? 'inline-block' : 'none' ?>;">
+        <input type="month" name="f_hist_month" id="hist_input_month" value="<?= htmlspecialchars($f_hist_month) ?>" style="display:<?= $f_hist_mode === 'month' ? 'inline-block' : 'none' ?>;">
+        <select name="f_hist_year" id="hist_input_year" style="display:<?= $f_hist_mode === 'year' ? 'inline-block' : 'none' ?>; width:95px;">
+            <?php for($y = date('Y'); $y >= 2024; $y--): ?>
+                <option value="<?= $y ?>" <?= $f_hist_year == $y ? 'selected' : '' ?>><?= $y ?></option>
+            <?php endfor; ?>
+        </select>
+
+        <label style="font-size:0.85rem; font-weight:700; color:#334155;">Phòng ban:</label>
+        <select name="f_hist_dept">
+            <option value="">-- Tất cả phòng ban --</option>
+            <?php foreach ($DEFAULT_DEPARTMENTS as $d): ?>
+                <option value="<?= htmlspecialchars($d) ?>" <?= $f_hist_dept === $d ? 'selected' : '' ?>><?= htmlspecialchars($d) ?></option>
+            <?php endforeach; ?>
+        </select>
+
+        <button type="submit" class="btn-action" style="padding: 7px 14px;">Lọc Lịch Sử</button>
+        <?php if ($f_hist_search || $f_hist_dept || $f_hist_mode !== 'month' || $f_hist_month !== date('Y-m')): ?>
+            <a href="cap-phat-nuoc-uong.php" style="font-size:0.85rem; color:#64748b; text-decoration:none;">Xóa lọc</a>
+        <?php endif; ?>
+    </form>
+
+    <div class="data-card">
+        <table class="water-table">
+            <thead>
+                <tr>
+                    <th style="width:40px; text-align:center;">STT</th>
+                    <th style="width:135px;">Mã Cấp Phát</th>
+                    <th style="width:85px;">Ngày Cấp</th>
+                    <th style="width:145px; text-align:center;">Thời Gian Gửi</th>
+                    <th>Phòng Ban Nhận</th>
+                    <th>Người Nhận</th>
+                    <th>Loại Nước</th>
+                    <th style="width:75px; text-align:center;">Số Lượng</th>
+                    <th style="width:95px; text-align:center;">Đổi/Trả Vỏ</th>
+                    <th>Vị Trí Giao</th>
+                    <th>Ghi Chú</th>
+                    <th style="width:105px; text-align:center;">Thao Tác</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (!empty($history)): ?>
+                    <?php 
+                    $sttH = $offset_hist + 1;
+                    $pageSumQtyH = 0; $pageSumBotH = 0;
+                    foreach ($history as $h): 
+                        $is19L = is19LBottle($h['item_name'], $h['specification']);
+                        $timeFull = date('d/m/Y H:i:s', strtotime($h['created_at']));
+                        $retCount = intval($h['has_bottle_return']);
+                        $rCode = getDisplayCode($h);
+                        $pageSumQtyH += intval($h['quantity']);
+                        $pageSumBotH += $retCount;
+                    ?>
+                        <tr>
+                            <td style="text-align:center;"><b><?= $sttH++ ?></b></td>
+                            <td><span style="background:#f1f5f9; padding:2px 6px; border-radius:4px; font-weight:700; font-size:0.8rem;"><?= htmlspecialchars($rCode) ?></span></td>
+                            <td><?= date('d/m/Y', strtotime($h['request_date'])) ?></td>
+                            <td style="text-align:center; font-weight:600; color:#475569;"><?= $timeFull ?></td>
+                            <td><b><?= htmlspecialchars($h['department']) ?></b></td>
+                            <td><strong><?= htmlspecialchars($h['receiver_name'] ?: '—') ?></strong></td>
+                            <td><?= htmlspecialchars($h['item_name']) ?> (<?= htmlspecialchars($h['specification'] ?: '—') ?>)</td>
+                            <td style="color:#0284c7; font-weight:700; text-align:center;"><?= $h['quantity'] ?> <?= htmlspecialchars($h['unit']) ?></td>
+                            <td style="text-align:center;">
+                                <?php if ($is19L): ?>
+                                    <?php if ($retCount > 0): ?>
+                                        <span style="background:#ffedd5; color:#c2410c; padding:2px 7px; border-radius:4px; font-weight:700; font-size:0.8rem;">
+                                            ↩️ <?= $retCount ?> vỏ
+                                        </span>
+                                    <?php else: ?>
+                                        <span style="color:#94a3b8; font-size:0.8rem;">0 vỏ</span>
+                                    <?php endif; ?>
+                                <?php else: ?>
+                                    <span style="color:#cbd5e1;">—</span>
+                                <?php endif; ?>
+                            </td>
+                            <td style="color:#475569; font-size:0.83rem;"><?= htmlspecialchars($h['delivery_location'] ?: '—') ?></td>
+                            <td style="color:#64748b; font-size:0.83rem;"><?= htmlspecialchars($h['notes'] ?: '') ?></td>
+                            <td style="text-align:center;">
+                                <div style="display:flex; gap:5px; justify-content:center;">
+                                    <button type="button" class="btn-tbl-edit" onclick='openEditHistoryModal(<?= json_encode($h, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>)'>Sửa</button>
+                                    <form method="POST" action="cap-phat-nuoc-uong.php" onsubmit="return confirm('Bạn có chắc muốn xóa bản ghi này? Số lượng nước sẽ được hoàn trả lại vào kho.');" style="margin:0;">
+                                        <input type="hidden" name="action" value="delete_request">
+                                        <input type="hidden" name="request_id" value="<?= $h['id'] ?>">
+                                        <button type="submit" class="btn-tbl-del">Xóa</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <tr><td colspan="12" style="text-align:center; padding:25px;">Chưa có lịch sử cấp phát nước uống phù hợp.</td></tr>
+                <?php endif; ?>
+            </tbody>
+            <?php if (!empty($history)): ?>
+                <tfoot>
+                    <tr style="background:#f8fafc; font-weight:bold;">
+                        <td colspan="7" style="text-align:right;">TỔNG CỘNG TRANG NÀY (TOÀN BỘ: <?= $total_hist_qty ?> sp / <?= $total_hist_bot ?> vỏ):</td>
+                        <td style="text-align:center; color:#0284c7;"><?= $pageSumQtyH ?></td>
+                        <td style="text-align:center; color:#c2410c;"><?= $pageSumBotH ?> vỏ</td>
+                        <td colspan="3"></td>
+                    </tr>
+                </tfoot>
+            <?php endif; ?>
+        </table>
+    </div>
+    <?php renderPaginationBar($p_hist, $pages_hist, 'p_hist'); ?>
+</div>
+
+<!-- ==================== CÁC BẢNG MODAL ==================== -->
+
+<!-- MODAL 1: XÁC NHẬN CẤP PHÁT ĐỀ XUẤT -->
+<div id="modal-confirm-proposal" class="modal-overlay">
+    <div class="modal-box">
+        <form method="POST" action="cap-phat-nuoc-uong.php" id="formConfirmProposal" onsubmit="return handleConfirmDelivery();">
+            <input type="hidden" name="action" value="approve_proposal">
+            <input type="hidden" name="proposal_id" id="cfp_proposal_id">
+
+            <div class="modal-header">
+                <span>📋 Xác Nhận & Cấp Phát Nước Cho Đề Xuất</span>
+                <span style="cursor:pointer;" onclick="closeModal('modal-confirm-proposal')">&times;</span>
+            </div>
+
+            <div class="modal-body">
+                <div style="background:#f0f9ff; border:1px solid #bae6fd; padding:10px 14px; border-radius:6px; font-size:0.85rem; color:#0369a1;">
+                    Thời gian gửi đề xuất: <strong id="cfp_time"></strong>
+                </div>
+
+                <div>
+                    <label>Mã yêu cầu đề xuất:</label>
+                    <input type="text" id="cfp_request_code" style="background:#f8fafc; font-weight:bold; color:#0284c7;" readonly>
+                </div>
+
+                <div>
+                    <label>Người đại diện nhận: *</label>
+                    <input type="text" name="receiver_name" id="cfp_receiver_name" required>
+                </div>
+
+                <div>
+                    <label>Phòng ban / Bộ phận nhận: *</label>
+                    <select name="department" id="cfp_department" required>
+                        <?php foreach ($DEFAULT_DEPARTMENTS as $d): ?>
+                            <option value="<?= htmlspecialchars($d) ?>"><?= htmlspecialchars($d) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
+                <div>
+                    <label>Loại nước cấp phát: *</label>
+                    <select name="item_id" id="cfp_item_id" onchange="toggleCfpBottleBox(this)" required>
+                        <?php foreach ($allItemsForModal as $it): 
+                            $b19 = is19LBottle($it['item_name'], $it['specification']) ? '1' : '0';
+                        ?>
+                            <option value="<?= $it['id'] ?>" data-is19l="<?= $b19 ?>">
+                                <?= htmlspecialchars($it['item_name']) ?> (<?= htmlspecialchars($it['specification'] ?: '—') ?>) - Tồn kho: <?= $it['stock_qty'] . ' ' . $it['unit'] ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
+                <div>
+                    <label>Số lượng cấp phát thực tế: *</label>
+                    <input type="number" name="quantity" id="cfp_quantity" min="1" required>
+                </div>
+
+                <div id="cfp_bottle_wrapper" style="background:#fff7ed; border:1px solid #fed7aa; padding:12px; border-radius:6px;">
+                    <label style="color:#c2410c; margin-bottom:4px;">↩️ Số lượng vỏ bình gửi trả lại (Loại 19L):</label>
+                    <input type="number" name="return_bottle_count" id="cfp_return_bottle_count" min="0" value="0">
+                </div>
+
+                <div>
+                    <label>Vị trí nhận hàng / Giao nước:</label>
+                    <input type="text" name="delivery_location" id="cfp_delivery_location">
+                </div>
+
+                <div>
+                    <label>Ghi chú của người cấp phát:</label>
+                    <input type="text" name="notes" id="cfp_notes" placeholder="Nhập ghi chú hoặc bỏ trống...">
+                </div>
+            </div>
+
+            <div class="modal-footer" style="padding:12px 20px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end; gap:8px;">
+                <button type="button" class="btn-action" style="background:#e2e8f0; color:#475569;" onclick="closeModal('modal-confirm-proposal')">Hủy</button>
+                <button type="submit" class="btn-action" style="background:#10b981;">Xác Nhận Cấp Phát</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL TỪ CHỐI ĐỀ XUẤT -->
+<div id="modal-reject-proposal" class="modal-overlay">
+    <div class="modal-box" style="max-width: 440px;">
+        <form method="POST" action="cap-phat-nuoc-uong.php">
+            <input type="hidden" name="action" value="reject_proposal">
+            <input type="hidden" name="proposal_id" id="rej_proposal_id">
+
+            <div class="modal-header">
+                <span style="color:#b91c1c;">✗ Từ Chối Yêu Cầu Đề Xuất</span>
+                <span style="cursor:pointer;" onclick="closeModal('modal-reject-proposal')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div>
+                    <label>Lý do từ chối: *</label>
+                    <textarea name="reject_reason" rows="3" required placeholder="Nhập lý do từ chối (VD: Tạm thời hết bình 19L, liên hệ lại sau...)"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer" style="padding:12px 20px; display:flex; justify-content:flex-end; gap:8px;">
+                <button type="button" class="btn-action" style="background:#e2e8f0; color:#475569;" onclick="closeModal('modal-reject-proposal')">Hủy</button>
+                <button type="submit" class="btn-reject-p" style="padding: 8px 14px;">Xác Nhận Từ Chối</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL SỬA LỊCH SỬ CẤP PHÁT -->
+<div id="modal-edit-history" class="modal-overlay">
+    <div class="modal-box">
+        <form method="POST" action="cap-phat-nuoc-uong.php">
+            <input type="hidden" name="action" value="update_request">
+            <input type="hidden" name="request_id" id="eh_request_id">
+
+            <div class="modal-header">
+                <span>✏️ Chỉnh Sửa Lịch Sử Cấp Phát Nước</span>
+                <span style="cursor:pointer;" onclick="closeModal('modal-edit-history')">&times;</span>
+            </div>
+
+            <div class="modal-body">
+                <div>
+                    <label>Ngày cấp phát *</label>
+                    <input type="date" name="request_date" id="eh_request_date" required>
+                </div>
+                <div>
+                    <label>Phòng ban nhận *</label>
+                    <select name="department" id="eh_department" required>
+                        <?php foreach ($DEFAULT_DEPARTMENTS as $d): ?>
+                            <option value="<?= htmlspecialchars($d) ?>"><?= htmlspecialchars($d) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div>
+                    <label>Người đại diện nhận</label>
+                    <input type="text" name="receiver_name" id="eh_receiver_name">
+                </div>
+                <div>
+                    <label>Loại nước *</label>
+                    <select name="item_id" id="eh_item_id" onchange="toggleEhBottle(this)" required>
+                        <?php foreach ($allItemsForModal as $it): 
+                            $b19 = is19LBottle($it['item_name'], $it['specification']) ? '1' : '0';
+                        ?>
+                            <option value="<?= $it['id'] ?>" data-is19l="<?= $b19 ?>">
+                                <?= htmlspecialchars($it['item_name']) ?> (<?= htmlspecialchars($it['specification'] ?: '—') ?>) - Tồn: <?= $it['stock_qty'] . ' ' . $it['unit'] ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div>
+                    <label>Số lượng cấp *</label>
+                    <input type="number" name="quantity" id="eh_quantity" min="1" required>
+                </div>
+                <div id="eh_bottle_wrapper" style="background:#fff7ed; border:1px solid #fed7aa; padding:12px; border-radius:6px;">
+                    <label style="color:#c2410c; margin-bottom:4px;">↩️ Số lượng vỏ bình đổi/trả lại (19L):</label>
+                    <input type="number" name="return_bottle_count" id="eh_return_bottle_count" min="0" value="0">
+                </div>
+                <div>
+                    <label>Vị trí nhận / Giao hàng</label>
+                    <input type="text" name="delivery_location" id="eh_delivery_location">
+                </div>
+                <div>
+                    <label>Ghi chú của người phát</label>
+                    <input type="text" name="notes" id="eh_notes">
+                </div>
+            </div>
+
+            <div class="modal-footer" style="padding:12px 20px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end; gap:8px;">
+                <button type="button" class="btn-action" style="background:#e2e8f0; color:#475569;" onclick="closeModal('modal-edit-history')">Hủy</button>
+                <button type="submit" class="btn-action" style="background:#0284c7;">Lưu Thay Đổi</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL SỬA THÔNG TIN SẢN PHẨM NƯỚC -->
+<div id="modal-edit-item" class="modal-overlay">
+    <div class="modal-box">
+        <form method="POST" action="cap-phat-nuoc-uong.php">
+            <input type="hidden" name="action" value="update_item">
+            <input type="hidden" name="item_id" id="edit_item_id">
+
+            <div class="modal-header">
+                <span>✏️ Chỉnh Sửa Loại Nước Uống</span>
+                <span style="cursor:pointer;" onclick="closeModal('modal-edit-item')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div><label>Mã sản phẩm</label><input type="text" name="item_code" id="edit_item_code"></div>
+                <div><label>Tên loại nước *</label><input type="text" name="item_name" id="edit_item_name" required></div>
+                <div><label>Quy cách đóng gói</label><input type="text" name="specification" id="edit_item_spec"></div>
+                <div><label>Đơn vị tính *</label><input type="text" name="unit" id="edit_item_unit" required></div>
+                <div><label>Tồn kho đầu kỳ</label><input type="number" name="initial_stock" id="edit_item_init" min="0"></div>
+            </div>
+            <div class="modal-footer" style="padding:12px 20px; display:flex; justify-content:flex-end; gap:8px;">
+                <button type="button" class="btn-action" style="background:#e2e8f0; color:#475569;" onclick="closeModal('modal-edit-item')">Hủy</button>
+                <button type="submit" class="btn-action" style="background:#0284c7;">Lưu Cập Nhật</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL NHẬP THÊM KHO -->
+<div id="modal-import" class="modal-overlay">
+    <div class="modal-box">
+        <form method="POST" action="cap-phat-nuoc-uong.php">
+            <input type="hidden" name="action" value="import_stock">
+            <div class="modal-header"><span>Nhập Kho Nước Uống</span><span style="cursor:pointer;" onclick="closeModal('modal-import')">&times;</span></div>
+            <div class="modal-body">
+                <div>
+                    <label>Chọn loại nước *</label>
+                    <select name="item_id" required>
+                        <?php foreach ($allItemsForModal as $it): ?>
+                            <option value="<?= $it['id'] ?>"><?= htmlspecialchars($it['item_name']) ?> (Tồn: <?= $it['stock_qty'] . ' ' . $it['unit'] ?>)</option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div>
+                    <label>Số lượng nhập thêm *</label>
+                    <input type="number" name="add_qty" min="1" value="10" required>
+                </div>
+            </div>
+            <div class="modal-footer" style="padding:12px 20px; display:flex; justify-content:flex-end; gap:8px;">
+                <button type="button" class="btn-action" style="background:#e2e8f0; color:#475569;" onclick="closeModal('modal-import')">Hủy</button>
+                <button type="submit" class="btn-action" style="background:#10b981;">Nhập Kho</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL CẤP PHÁT THỦ CÔNG -->
+<div id="modal-manual-give" class="modal-overlay">
+    <div class="modal-box">
+        <form method="POST" action="cap-phat-nuoc-uong.php">
+            <input type="hidden" name="action" value="add_manual_request">
+            <div class="modal-header"><span>Cấp Phát Nước Cho Phòng Ban</span><span style="cursor:pointer;" onclick="closeModal('modal-manual-give')">&times;</span></div>
+            <div class="modal-body">
+                <div>
+                    <label>Ngày cấp phát *</label>
+                    <input type="date" name="request_date" value="<?= $today ?>" required>
+                </div>
+                <div>
+                    <label>Phòng ban nhận *</label>
+                    <select name="department" required>
+                        <?php foreach ($DEFAULT_DEPARTMENTS as $d): ?>
+                            <option value="<?= htmlspecialchars($d) ?>"><?= htmlspecialchars($d) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div>
+                    <label>Người đại diện nhận</label>
+                    <input type="text" name="receiver_name" placeholder="Họ tên người nhận...">
+                </div>
+                <div>
+                    <label>Chọn loại nước *</label>
+                    <select name="item_id" id="mg_item_select" onchange="toggleMgBottle(this)" required>
+                        <?php foreach ($allItemsForModal as $it): 
+                            $b19 = is19LBottle($it['item_name'], $it['specification']) ? '1' : '0';
+                        ?>
+                            <option value="<?= $it['id'] ?>" data-is19l="<?= $b19 ?>"><?= htmlspecialchars($it['item_name']) ?> (Tồn: <?= $it['stock_qty'] . ' ' . $it['unit'] ?>)</option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div>
+                    <label>Số lượng cấp *</label>
+                    <input type="number" name="quantity" min="1" value="1" required>
+                </div>
+                <div id="mg_bottle_box" style="background:#fff7ed; border:1px solid #fed7aa; padding:12px; border-radius:6px;">
+                    <label style="color:#c2410c; margin-bottom:4px;">↩️ Số lượng vỏ bình gửi trả (19L):</label>
+                    <input type="number" name="return_bottle_count" min="0" value="0">
+                </div>
+                <div>
+                    <label>Vị trí nhận / Ghi chú</label>
+                    <input type="text" name="delivery_location" placeholder="VD: Cây nước xưởng 2...">
+                </div>
+                <div>
+                    <label>Ghi chú của người phát</label>
+                    <input type="text" name="notes" placeholder="Nhập ghi chú hoặc bỏ trống...">
+                </div>
+            </div>
+            <div class="modal-footer" style="padding:12px 20px; display:flex; justify-content:flex-end; gap:8px;">
+                <button type="button" class="btn-action" style="background:#e2e8f0; color:#475569;" onclick="closeModal('modal-manual-give')">Hủy</button>
+                <button type="submit" class="btn-action">Cấp Phát</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL THÊM SẢN PHẨM MỚI -->
+<div id="modal-add-item" class="modal-overlay">
+    <div class="modal-box">
+        <form method="POST" action="cap-phat-nuoc-uong.php">
+            <input type="hidden" name="action" value="add_item">
+            <div class="modal-header"><span>Thêm Loại Nước Uống Mới</span><span style="cursor:pointer;" onclick="closeModal('modal-add-item')">&times;</span></div>
+            <div class="modal-body">
+                <div><label>Mã sản phẩm</label><input type="text" name="item_code" placeholder="VD: N-LAVIE19L, N-CHAI330ML"></div>
+                <div><label>Tên loại nước *</label><input type="text" name="item_name" placeholder="VD: Nước khoáng Lavie..." required></div>
+                <div><label>Quy cách đóng gói</label><input type="text" name="specification" placeholder="VD: Bình 19L có vòi, Thùng 24 chai 330ml..."></div>
+                <div><label>Đơn vị tính *</label><input type="text" name="unit" value="Bình" required></div>
+                <div><label>Tồn kho ban đầu</label><input type="number" name="initial_stock" min="0" value="0"></div>
+            </div>
+            <div class="modal-footer" style="padding:12px 20px; display:flex; justify-content:flex-end; gap:8px;">
+                <button type="button" class="btn-action" style="background:#e2e8f0; color:#475569;" onclick="closeModal('modal-add-item')">Hủy</button>
+                <button type="submit" class="btn-action" style="background:#8b5cf6;">Thêm Mới</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL TÙY CHỈNH TỒN KHO -->
+<div id="modal-set-stock" class="modal-overlay">
+    <div class="modal-box">
+        <form method="POST" action="cap-phat-nuoc-uong.php">
+            <input type="hidden" name="action" value="manual_set_stock">
+            <div class="modal-header"><span>Tùy Chỉnh Tồn Kho Thực Tế</span><span style="cursor:pointer;" onclick="closeModal('modal-set-stock')">&times;</span></div>
+            <div class="modal-body">
+                <div>
+                    <label>Chọn loại nước *</label>
+                    <select name="item_id" required>
+                        <?php foreach ($allItemsForModal as $it): ?>
+                            <option value="<?= $it['id'] ?>"><?= htmlspecialchars($it['item_name']) ?> (Hiện có: <?= $it['stock_qty'] ?>)</option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div><label>Số lượng tồn kho thực tế mới *</label><input type="number" name="new_qty" min="0" value="0" required></div>
+            </div>
+            <div class="modal-footer" style="padding:12px 20px; display:flex; justify-content:flex-end; gap:8px;">
+                <button type="button" class="btn-action" style="background:#e2e8f0; color:#475569;" onclick="closeModal('modal-set-stock')">Hủy</button>
+                <button type="submit" class="btn-action">Lưu Tồn Kho</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+function toggleMoreMenu(e) { if(e) e.stopPropagation(); document.getElementById('more_dropdown_menu').classList.toggle('show'); }
+window.onclick = function(e) {
+    if (e.target.classList.contains('modal-overlay')) e.target.style.display = 'none';
+    const menu = document.getElementById('more_dropdown_menu');
+    if (menu && menu.classList.contains('show') && !e.target.closest('.more-dropdown')) menu.classList.remove('show');
+}
+
+// Chuyển đổi input Ngày / Tuần / Tháng / Năm cho bảng Đề Xuất
+function togglePropInputs(mode) {
+    document.getElementById('prop_input_day').style.display   = (mode === 'day') ? 'inline-block' : 'none';
+    document.getElementById('prop_input_week').style.display  = (mode === 'week') ? 'inline-block' : 'none';
+    document.getElementById('prop_input_month').style.display = (mode === 'month') ? 'inline-block' : 'none';
+    document.getElementById('prop_input_year').style.display  = (mode === 'year') ? 'inline-block' : 'none';
+}
+
+// Chuyển đổi input Ngày / Tuần / Tháng / Năm cho bảng Lịch Sử Cấp Phát
+function toggleHistInputs(mode) {
+    document.getElementById('hist_input_day').style.display   = (mode === 'day') ? 'inline-block' : 'none';
+    document.getElementById('hist_input_week').style.display  = (mode === 'week') ? 'inline-block' : 'none';
+    document.getElementById('hist_input_month').style.display = (mode === 'month') ? 'inline-block' : 'none';
+    document.getElementById('hist_input_year').style.display  = (mode === 'year') ? 'inline-block' : 'none';
+}
+
+// Kiểm tra hiển thị ô trả vỏ trong Modal xác nhận đề xuất
+function toggleCfpBottleBox(selectElem) {
+    const selectedOpt = selectElem.options[selectElem.selectedIndex];
+    const is19L = selectedOpt ? selectedOpt.getAttribute('data-is19l') : '0';
+    const wrapper = document.getElementById('cfp_bottle_wrapper');
+    if (is19L === '1') {
+        wrapper.style.display = 'block';
+    } else {
+        wrapper.style.display = 'none';
+        document.getElementById('cfp_return_bottle_count').value = 0;
+    }
+}
+
+// Kiểm tra hiển thị ô trả vỏ trong Modal cấp phát thủ công
+function toggleMgBottle(selectElem) {
+    const selectedOpt = selectElem.options[selectElem.selectedIndex];
+    const is19L = selectedOpt ? selectedOpt.getAttribute('data-is19l') : '0';
+    const box = document.getElementById('mg_bottle_box');
+    if (is19L === '1') {
+        box.style.display = 'block';
+    } else {
+        box.style.display = 'none';
+        box.querySelector('input').value = 0;
+    }
+}
+
+// Kiểm tra hiển thị ô trả vỏ trong Modal chỉnh sửa lịch sử
+function toggleEhBottle(selectElem) {
+    const selectedOpt = selectElem.options[selectElem.selectedIndex];
+    const is19L = selectedOpt ? selectedOpt.getAttribute('data-is19l') : '0';
+    const box = document.getElementById('eh_bottle_wrapper');
+    if (is19L === '1') {
+        box.style.display = 'block';
+    } else {
+        box.style.display = 'none';
+        document.getElementById('eh_return_bottle_count').value = 0;
+    }
+}
+
+// Mở modal xác nhận đề xuất trước khi cấp
+function openConfirmProposalModal(p, code) {
+    document.getElementById('cfp_proposal_id').value = p.id;
+    document.getElementById('cfp_time').innerText = p.created_at;
+    document.getElementById('cfp_request_code').value = code || p.request_code || '';
+    document.getElementById('cfp_receiver_name').value = p.receiver_name;
+    document.getElementById('cfp_department').value = p.department;
+    document.getElementById('cfp_item_id').value = p.item_id;
+    document.getElementById('cfp_quantity').value = p.quantity;
+    document.getElementById('cfp_delivery_location').value = p.delivery_location || '';
+    document.getElementById('cfp_notes').value = '';
+
+    const str = ((p.item_name || '') + ' ' + (p.specification || '')).toLowerCase();
+    const is19L = (str.includes('19l') || str.includes('19 l') || str.includes('19 lít') || str.includes('20l'));
+    
+    const wrapper = document.getElementById('cfp_bottle_wrapper');
+    const inpReturn = document.getElementById('cfp_return_bottle_count');
+
+    if (is19L) {
+        wrapper.style.display = 'block';
+        inpReturn.value = parseInt(p.return_bottle_count) || 0;
+    } else {
+        wrapper.style.display = 'none';
+        inpReturn.value = 0;
+    }
+
+    openModal('modal-confirm-proposal');
+}
+
+// Mở modal từ chối đề xuất
+function openRejectModal(proposalId) {
+    document.getElementById('rej_proposal_id').value = proposalId;
+    openModal('modal-reject-proposal');
+}
+
+// Mở modal chỉnh sửa loại nước trong danh mục kho
+function openEditItemModal(it) {
+    document.getElementById('edit_item_id').value = it.id;
+    document.getElementById('edit_item_code').value = it.item_code || '';
+    document.getElementById('edit_item_name').value = it.item_name || '';
+    document.getElementById('edit_item_spec').value = it.specification || '';
+    document.getElementById('edit_item_unit').value = it.unit || 'Bình';
+    document.getElementById('edit_item_init').value = it.initial_stock || 0;
+    openModal('modal-edit-item');
+}
+
+// Mở modal chỉnh sửa lịch sử cấp phát
+function openEditHistoryModal(h) {
+    document.getElementById('eh_request_id').value = h.id;
+    document.getElementById('eh_request_date').value = h.request_date;
+    document.getElementById('eh_department').value = h.department;
+    document.getElementById('eh_receiver_name').value = h.receiver_name || '';
+    document.getElementById('eh_item_id').value = h.item_id;
+    document.getElementById('eh_quantity').value = h.quantity;
+    document.getElementById('eh_delivery_location').value = h.delivery_location || '';
+    document.getElementById('eh_notes').value = h.notes || '';
+
+    const str = ((h.item_name || '') + ' ' + (h.specification || '')).toLowerCase();
+    const is19L = (str.includes('19l') || str.includes('19 l') || str.includes('19 lít') || str.includes('20l'));
+    const box = document.getElementById('eh_bottle_wrapper');
+    const inp = document.getElementById('eh_return_bottle_count');
+
+    if (is19L) {
+        box.style.display = 'block';
+        inp.value = parseInt(h.has_bottle_return) || 0;
+    } else {
+        box.style.display = 'none';
+        inp.value = 0;
+    }
+
+    openModal('modal-edit-history');
+}
+
+function handleConfirmDelivery() {
+    return confirm("Bạn có muốn cấp phát nước uống cho yêu cầu này không?");
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const mgSel = document.getElementById('mg_item_select');
+    if (mgSel) toggleMgBottle(mgSel);
+});
+</script>
+
+<?php include 'footer.php'; ?>

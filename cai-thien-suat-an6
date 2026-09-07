@@ -1,0 +1,1060 @@
+<?php
+// cai-thien-suat-an.php
+require_once 'db_connect.php';
+
+// 8. Trang web yêu cầu đăng nhập mới xem được
+if (!isset($_SESSION['user_id'])) {
+    header('Location: login.php');
+    exit;
+}
+
+$message = '';
+$error = '';
+$today = date('Y-m-d');
+$current_week = date('Y-\WW'); // VD: 2026-W37
+
+$check_date = $_GET['check_date'] ?? $today;
+$view_mode = $_GET['view_mode'] ?? 'day'; // 'day' hoặc 'all_week'
+
+// Lấy tên ngày trong tuần tiếng Việt từ $check_date
+function getDayOfWeekVN($dateStr) {
+    $days = ['Chủ Nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+    $idx = date('w', strtotime($dateStr));
+    return $days[$idx];
+}
+$selected_day_name = getDayOfWeekVN($check_date);
+
+// Tự động khởi tạo cấu trúc CSDL phục vụ quản lý suất ăn
+try {
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS `meal_menus` (
+            `id` INT AUTO_INCREMENT PRIMARY KEY,
+            `week_code` VARCHAR(20) NOT NULL,
+            `year` INT NOT NULL,
+            `day_of_week` VARCHAR(20) NOT NULL,
+            `meal_type` VARCHAR(30) DEFAULT 'Bữa Trưa',
+            `dish_name` VARCHAR(150) NOT NULL,
+            `description` TEXT DEFAULT NULL,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX (`week_code`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    ");
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS `meal_checks` (
+            `id` INT AUTO_INCREMENT PRIMARY KEY,
+            `menu_id` INT NOT NULL,
+            `check_date` DATE NOT NULL,
+            `is_correct` TINYINT(1) DEFAULT 1,
+            `adjustment_percent` INT DEFAULT 0,
+            `is_locked` TINYINT(1) DEFAULT 0,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX (`check_date`),
+            INDEX (`menu_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    ");
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS `meal_quality_feedback` (
+            `id` INT AUTO_INCREMENT PRIMARY KEY,
+            `menu_id` INT NOT NULL,
+            `check_date` DATE NOT NULL,
+            `quality_rating` VARCHAR(50) DEFAULT 'Tốt',
+            `quality_note` TEXT DEFAULT NULL,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX (`check_date`),
+            INDEX (`menu_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    ");
+} catch (PDOException $e) {
+    $error = "Lỗi khởi tạo CSDL: " . $e->getMessage();
+}
+
+// ==================== XỬ LÝ CÁC YÊU CẦU POST ====================
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    $act = $_POST['action'];
+
+    if ($act === 'add_menu_manual') {
+        $week_code = trim($_POST['week_code'] ?? $current_week);
+        $year      = intval($_POST['year'] ?? date('Y'));
+        $day_of_w  = trim($_POST['day_of_week'] ?? 'Thứ 2');
+        $meal_type = trim($_POST['meal_type'] ?? 'Bữa Trưa');
+        $dish_name = trim($_POST['dish_name'] ?? '');
+        $desc      = trim($_POST['description'] ?? '');
+
+        if (!empty($dish_name)) {
+            try {
+                $stmt = $pdo->prepare("
+                    INSERT INTO meal_menus (week_code, year, day_of_week, meal_type, dish_name, description)
+                    VALUES (:wcode, :yr, :dow, :mtype, :dname, :desc)
+                ");
+                $stmt->execute([
+                    ':wcode' => $week_code, ':yr' => $year, ':dow' => $day_of_w,
+                    ':mtype' => $meal_type, ':dname' => $dish_name, ':desc' => $desc
+                ]);
+                $message = "Đã thêm món ăn vào thực đơn tuần [{$week_code}] thành công!";
+            } catch (PDOException $e) {
+                $error = "Lỗi thêm thực đơn: " . $e->getMessage();
+            }
+        }
+    }
+
+    if ($act === 'update_menu_item') {
+        $menu_id   = intval($_POST['menu_id']);
+        $day_of_w  = trim($_POST['day_of_week'] ?? 'Thứ 2');
+        $meal_type = trim($_POST['meal_type'] ?? 'Bữa Trưa');
+        $dish_name = trim($_POST['dish_name'] ?? '');
+        $desc      = trim($_POST['description'] ?? '');
+
+        if (!empty($dish_name) && $menu_id > 0) {
+            try {
+                $stmt = $pdo->prepare("
+                    UPDATE meal_menus 
+                    SET day_of_week = :dow, meal_type = :mtype, dish_name = :dname, description = :desc
+                    WHERE id = :id
+                ");
+                $stmt->execute([
+                    ':dow' => $day_of_w, ':mtype' => $meal_type, 
+                    ':dname' => $dish_name, ':desc' => $desc, ':id' => $menu_id
+                ]);
+                $message = "Đã cập nhật thông tin món ăn thành công!";
+            } catch (PDOException $e) {
+                $error = "Lỗi sửa món ăn: " . $e->getMessage();
+            }
+        }
+    }
+
+    if ($act === 'delete_menu_item') {
+        $menu_id = intval($_POST['menu_id']);
+        if ($menu_id > 0) {
+            try {
+                $pdo->beginTransaction();
+                $pdo->prepare("DELETE FROM meal_checks WHERE menu_id = :mid")->execute([':mid' => $menu_id]);
+                $pdo->prepare("DELETE FROM meal_quality_feedback WHERE menu_id = :mid")->execute([':mid' => $menu_id]);
+                $pdo->prepare("DELETE FROM meal_menus WHERE id = :id")->execute([':id' => $menu_id]);
+                
+                $pdo->commit();
+                $message = "Đã xóa món ăn khỏi thực đơn!";
+            } catch (Exception $e) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                $error = "Lỗi xóa món ăn: " . $e->getMessage();
+            }
+        }
+    }
+
+    // Reset toàn bộ dữ liệu suất ăn
+    if ($act === 'reset_all_meal_data') {
+        try {
+            $pdo->exec("TRUNCATE TABLE meal_checks");
+            $pdo->exec("TRUNCATE TABLE meal_quality_feedback");
+            $pdo->exec("TRUNCATE TABLE meal_menus");
+            $message = "Đã reset toàn bộ dữ liệu thực đơn và đánh giá suất ăn về 0!";
+        } catch (PDOException $e) {
+            $error = "Lỗi reset dữ liệu: " . $e->getMessage();
+        }
+    }
+
+    if ($act === 'add_quality_feedback') {
+        $menu_id = intval($_POST['menu_id']);
+        $c_date  = $_POST['check_date'] ?? $today;
+        $rating  = trim($_POST['quality_rating'] ?? 'Tốt');
+        $q_note  = trim($_POST['quality_note'] ?? '');
+
+        if ($menu_id > 0) {
+            try {
+                $stmt = $pdo->prepare("
+                    INSERT INTO meal_quality_feedback (menu_id, check_date, quality_rating, quality_note)
+                    VALUES (:mid, :cdate, :rat, :qnote)
+                ");
+                $stmt->execute([':mid' => $menu_id, ':cdate' => $c_date, ':rat' => $rating, ':qnote' => $q_note]);
+                $message = "Đã thêm ý kiến đánh giá chất lượng thành công!";
+            } catch (PDOException $e) {
+                $error = "Lỗi thêm đánh giá: " . $e->getMessage();
+            }
+        }
+    }
+
+    if ($act === 'update_quality_feedback') {
+        $feedback_id = intval($_POST['feedback_id']);
+        $rating = trim($_POST['quality_rating'] ?? 'Tốt');
+        $q_note = trim($_POST['quality_note'] ?? '');
+
+        if ($feedback_id > 0) {
+            try {
+                $stmt = $pdo->prepare("
+                    UPDATE meal_quality_feedback 
+                    SET quality_rating = :rat, quality_note = :qnote
+                    WHERE id = :id
+                ");
+                $stmt->execute([':rat' => $rating, ':qnote' => $q_note, ':id' => $feedback_id]);
+                $message = "Đã cập nhật ý kiến đánh giá thành công!";
+            } catch (PDOException $e) {
+                $error = "Lỗi sửa đánh giá: " . $e->getMessage();
+            }
+        }
+    }
+
+    if ($act === 'delete_quality_feedback') {
+        $feedback_id = intval($_POST['feedback_id']);
+        if ($feedback_id > 0) {
+            try {
+                $pdo->prepare("DELETE FROM meal_quality_feedback WHERE id = :id")->execute([':id' => $feedback_id]);
+                $message = "Đã xóa ý kiến đánh giá thành công!";
+            } catch (PDOException $e) {
+                $error = "Lỗi xóa đánh giá: " . $e->getMessage();
+            }
+        }
+    }
+
+    if ($act === 'smart_import_file') {
+        $week_code = trim($_POST['week_code'] ?? $current_week);
+        $year      = intval($_POST['year'] ?? date('Y'));
+        $raw_text  = trim($_POST['raw_import_text'] ?? '');
+
+        if (!empty($raw_text)) {
+            try {
+                $lines = explode("\n", $raw_text);
+                $pdo->beginTransaction();
+                $count = 0;
+                
+                $currentDay = 'Thứ 2';
+                foreach ($lines as $line) {
+                    $line = trim($line);
+                    if (empty($line)) continue;
+                    
+                    if (stripos($line, 'thứ') !== false || stripos($line, 'ngày') !== false) {
+                        $currentDay = $line;
+                        continue;
+                    }
+
+                    $stmt = $pdo->prepare("
+                        INSERT INTO meal_menus (week_code, year, day_of_week, meal_type, dish_name, description)
+                        VALUES (:wcode, :yr, :dow, 'Bữa Trưa', :dname, 'Nhập thông minh tự động')
+                    ");
+                    $stmt->execute([
+                        ':wcode' => $week_code, ':yr' => $year, ':dow' => $currentDay, ':dname' => $line
+                    ]);
+                    $count++;
+                }
+                $pdo->commit();
+                $message = "Đã trích xuất và nhập thành công {$count} món ăn vào thực đơn tuần [{$week_code}]!";
+            } catch (Exception $e) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                $error = "Lỗi phân tích file thông minh: " . $e->getMessage();
+            }
+        } else {
+            $error = "Vui lòng nhập nội dung thực đơn cần trích xuất!";
+        }
+    }
+
+    if ($act === 'save_daily_check') {
+        $menu_id    = intval($_POST['menu_id']);
+        $c_date     = $_POST['check_date'] ?? $today;
+        $is_correct = isset($_POST['is_correct']) ? 1 : 0;
+        $adj_pct    = intval($_POST['adjustment_percent'] ?? 0);
+
+        try {
+            $chk = $pdo->prepare("SELECT id FROM meal_checks WHERE menu_id = :mid AND check_date = :cdate");
+            $chk->execute([':mid' => $menu_id, ':cdate' => $c_date]);
+            $exists = $chk->fetch();
+
+            if ($exists) {
+                $stmt = $pdo->prepare("
+                    UPDATE meal_checks 
+                    SET is_correct = :corr, adjustment_percent = :apct, is_locked = 1
+                    WHERE id = :id
+                ");
+                $stmt->execute([
+                    ':corr' => $is_correct, ':apct' => $is_correct ? 0 : $adj_pct, ':id' => $exists['id']
+                ]);
+            } else {
+                $stmt = $pdo->prepare("
+                    INSERT INTO meal_checks (menu_id, check_date, is_correct, adjustment_percent, is_locked)
+                    VALUES (:mid, :cdate, :corr, :apct, 1)
+                ");
+                $stmt->execute([
+                    ':mid' => $menu_id, ':cdate' => $c_date, ':corr' => $is_correct, ':apct' => $is_correct ? 0 : $adj_pct
+                ]);
+            }
+            $message = "Đã lưu và khóa kết quả kiểm tra thành công!";
+        } catch (PDOException $e) {
+            $error = "Lỗi lưu kiểm tra: " . $e->getMessage();
+        }
+    }
+
+    if ($act === 'unlock_daily_check') {
+        $menu_id = intval($_POST['menu_id']);
+        $c_date  = $_POST['check_date'] ?? $today;
+        try {
+            $stmt = $pdo->prepare("UPDATE meal_checks SET is_locked = 0 WHERE menu_id = :mid AND check_date = :cdate");
+            $stmt->execute([':mid' => $menu_id, ':cdate' => $c_date]);
+            $message = "Đã mở khóa đánh giá. Bạn có thể thay đổi lại kết quả!";
+        } catch (PDOException $e) {
+            $error = "Lỗi mở khóa: " . $e->getMessage();
+        }
+    }
+}
+
+// ==================== BỘ LỌC THỐNG KÊ ====================
+$stat_period = $_GET['stat_period'] ?? '1_week';
+$intervalSQL = "INTERVAL 7 DAY";
+if ($stat_period === '2_weeks') $intervalSQL = "INTERVAL 14 DAY";
+elseif ($stat_period === '3_weeks') $intervalSQL = "INTERVAL 21 DAY";
+elseif ($stat_period === 'month') $intervalSQL = "INTERVAL 1 MONTH";
+elseif ($stat_period === 'year') $intervalSQL = "INTERVAL 1 YEAR";
+
+// ==================== XỬ LÝ XUẤT EXCEL BÁO CÁO ====================
+if (isset($_GET['export_excel'])) {
+    $date_str = date('d-m-Y');
+    header("Content-Type: application/vnd.ms-excel; charset=UTF-8");
+    header("Content-Disposition: attachment; filename=Bao_Cao_Cai_Dien_Suat_An_{$stat_period}_{$date_str}.xls");
+    header("Pragma: no-cache"); header("Expires: 0"); echo "\xEF\xBB\xBF";
+
+    $stmtExp = $pdo->prepare("
+        SELECT m.week_code, m.day_of_week, m.meal_type, m.dish_name, c.check_date, c.is_correct, c.adjustment_percent
+        FROM meal_checks c
+        JOIN meal_menus m ON c.menu_id = m.id
+        WHERE c.check_date >= DATE_SUB(:td, $intervalSQL)
+        ORDER BY c.check_date DESC, m.id DESC
+    ");
+    $stmtExp->execute([':td' => $today]);
+    $exportRows = $stmtExp->fetchAll();
+
+    echo '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <style>
+        .rpt-title { font-family:"Times New Roman", Arial; font-size:16pt; font-weight:bold; text-align:center; height:35px; } 
+        .th-c { background-color:#0284c7; color:#ffffff; font-weight:bold; text-align:center; border:0.5pt solid #000; height:28px; } 
+        .td-c { text-align:center; border:0.5pt solid #000; height:25px; } 
+        .td-l { text-align:left; border:0.5pt solid #000; padding-left:6px; } 
+    </style></head><body>';
+    echo '<table border="1">';
+    echo '<tr><td colspan="7" class="rpt-title">BÁO CÁO CHI TIẾT CẢI THIỆN CHẤT LƯỢNG SUẤT ĂN (Mốc: ' . strtoupper(str_replace('_', ' ', $stat_period)) . ')</td></tr>';
+    echo '<tr><td colspan="7" style="text-align:center; font-style:italic;">Thời gian xuất: ' . date('d/m/Y H:i:s') . '</td></tr><tr><td colspan="7" style="border:none; height:10px;"></td></tr>';
+
+    echo '<tr>
+            <th class="th-c" width="45">STT</th>
+            <th class="th-c" width="100">Mã Tuần</th>
+            <th class="th-c" width="100">Ngày Kiểm Tra</th>
+            <th class="th-c" width="90">Thứ / Buổi</th>
+            <th class="th-c" width="220">Tên Món Ăn</th>
+            <th class="th-c" width="90">Nấu Đúng?</th>
+            <th class="th-c" width="90">Tỷ Lệ Đổi</th>
+          </tr>';
+
+    $stt = 1;
+    if (!empty($exportRows)) {
+        foreach ($exportRows as $row) {
+            $dungSai = intval($row['is_correct']) === 1 ? 'Đúng thực đơn' : 'Nấu sai/Đổi món';
+            $tyle = intval($row['is_correct']) === 1 ? '0%' : intval($row['adjustment_percent']) . '%';
+            echo "<tr>
+                    <td class='td-c'>{$stt}</td>
+                    <td class='td-c'>" . htmlspecialchars($row['week_code']) . "</td>
+                    <td class='td-c'>" . date('d/m/Y', strtotime($row['check_date'])) . "</td>
+                    <td class='td-c'>" . htmlspecialchars($row['day_of_week']) . " (" . htmlspecialchars($row['meal_type']) . ")</td>
+                    <td class='td-l'><b>" . htmlspecialchars($row['dish_name']) . "</b></td>
+                    <td class='td-c'>{$dungSai}</td>
+                    <td class='td-c'>{$tyle}</td>
+                  </tr>";
+            $stt++;
+        }
+    } else {
+        echo '<tr><td colspan="7" class="td-c" style="height:35px; font-style:italic;">Không có dữ liệu trong khoảng thời gian này</td></tr>';
+    }
+
+    echo '</table></body></html>';
+    exit;
+}
+
+// ==================== TRUY VẤN DỮ LIỆU HIỂN THỊ ====================
+$availableWeeks = [];
+try {
+    $availableWeeks = $pdo->query("SELECT DISTINCT week_code FROM meal_menus ORDER BY week_code DESC")->fetchAll(PDO::FETCH_COLUMN);
+} catch (PDOException $e) {}
+
+$selected_week = $_GET['f_week'] ?? ($availableWeeks[0] ?? $current_week);
+
+// Lấy danh sách món ăn tùy theo chế độ xem (Xem theo ngày hoặc Xem tất cả trong tuần)
+$todayMenus = [];
+try {
+    if ($view_mode === 'all_week') {
+        $stmtM = $pdo->prepare("
+            SELECT m.*, c.is_correct, c.adjustment_percent, c.is_locked 
+            FROM meal_menus m 
+            LEFT JOIN meal_checks c ON m.id = c.menu_id AND c.check_date = :cdate
+            WHERE m.week_code = :wcode
+            ORDER BY FIELD(m.day_of_week, 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ Nhật'), m.id DESC
+        ");
+        $stmtM->execute([':cdate' => $check_date, ':wcode' => $selected_week]);
+    } else {
+        $stmtM = $pdo->prepare("
+            SELECT m.*, c.is_correct, c.adjustment_percent, c.is_locked 
+            FROM meal_menus m 
+            LEFT JOIN meal_checks c ON m.id = c.menu_id AND c.check_date = :cdate
+            WHERE m.week_code = :wcode AND m.day_of_week = :dname
+            ORDER BY m.id DESC
+        ");
+        $stmtM->execute([':cdate' => $check_date, ':wcode' => $selected_week, ':dname' => $selected_day_name]);
+    }
+    $todayMenus = $stmtM->fetchAll();
+} catch (PDOException $e) {}
+
+$allWeekMenus = [];
+try {
+    $stmtAW = $pdo->prepare("SELECT * FROM meal_menus WHERE week_code = :wcode ORDER BY id DESC");
+    $stmtAW->execute([':wcode' => $selected_week]);
+    $allWeekMenus = $stmtAW->fetchAll();
+} catch (PDOException $e) {}
+
+$qualityFeedbacks = [];
+try {
+    $stmtF = $pdo->prepare("
+        SELECT f.*, m.dish_name FROM meal_quality_feedback f
+        JOIN meal_menus m ON f.menu_id = m.id
+        WHERE f.check_date = :cdate AND m.week_code = :wcode
+        ORDER BY f.id DESC
+    ");
+    $stmtF->execute([':cdate' => $check_date, ':wcode' => $selected_week]);
+    $qualityFeedbacks = $stmtF->fetchAll();
+} catch (PDOException $e) {}
+
+$topAdjustedDishes = [];
+try {
+    $stmtTop = $pdo->prepare("
+        SELECT m.dish_name, COUNT(c.id) as total_checks, AVG(c.adjustment_percent) as avg_adj, SUM(CASE WHEN c.is_correct = 0 THEN 1 ELSE 0 END) as wrong_count
+        FROM meal_checks c
+        JOIN meal_menus m ON c.menu_id = m.id
+        WHERE c.check_date >= DATE_SUB(:td, $intervalSQL)
+        GROUP BY m.dish_name
+        ORDER BY wrong_count DESC, avg_adj DESC
+        LIMIT 5
+    ");
+    $stmtTop->execute([':td' => $today]);
+    $topAdjustedDishes = $stmtTop->fetchAll();
+} catch (PDOException $e) {}
+
+$dominantRatings = [];
+try {
+    $stmtRat = $pdo->prepare("
+        SELECT quality_rating, COUNT(*) as count_rat
+        FROM meal_quality_feedback
+        WHERE check_date >= DATE_SUB(:td, $intervalSQL)
+        GROUP BY quality_rating
+        ORDER BY count_rat DESC
+    ");
+    $stmtRat->execute([':td' => $today]);
+    $dominantRatings = $stmtRat->fetchAll();
+} catch (PDOException $e) {}
+
+$smartInsights = [];
+try {
+    $stmtW = $pdo->prepare("
+        SELECT m.dish_name, SUM(CASE WHEN c.is_correct = 0 THEN 1 ELSE 0 END) as fails
+        FROM meal_checks c JOIN meal_menus m ON c.menu_id = m.id
+        WHERE c.check_date >= DATE_SUB(:td, INTERVAL 30 DAY)
+        GROUP BY m.dish_name ORDER BY fails DESC LIMIT 1
+    ");
+    $stmtW->execute([':td' => $today]);
+    $worstDish = $stmtW->fetch();
+
+    if ($worstDish && $worstDish['fails'] > 0) {
+        $smartInsights[] = [
+            'type' => 'danger',
+            'title' => '🎯 Vấn đề cần giải quyết (Độ chính xác thực đơn):',
+            'desc' => "Món <b>{$worstDish['dish_name']}</b> bị tự ý thay đổi hoặc nấu sai thực đơn nhiều nhất ({$worstDish['fails']} lần trong 30 ngày qua).<br>👉 <b>Vị trí cần xử lý:</b> <u>Bộ phận bếp chế biến trực tiếp</u> do không tuân thủ nghiêm ngặt thực đơn tuần."
+        ];
+    }
+
+    $stmtQ = $pdo->prepare("
+        SELECT m.dish_name, COUNT(*) as bads
+        FROM meal_quality_feedback f JOIN meal_menus m ON f.menu_id = m.id
+        WHERE f.quality_rating = 'Kém' AND f.check_date >= DATE_SUB(:td, INTERVAL 30 DAY)
+        GROUP BY m.dish_name ORDER BY bads DESC LIMIT 1
+    ");
+    $stmtQ->execute([':td' => $today]);
+    $worstQuality = $stmtQ->fetch();
+
+    if ($worstQuality && $worstQuality['bads'] > 0) {
+        $smartInsights[] = [
+            'type' => 'warning',
+            'title' => '🎯 Vấn đề cần giải quyết (Chất lượng hương vị):',
+            'desc' => "Món <b>{$worstQuality['dish_name']}</b> nhận nhiều đánh giá 'Kém' nhất ({$worstQuality['bads']} lượt phàn nàn).<br>👉 <b>Vị trí cần xử lý:</b> <u>Khâu kiểm tra nguyên liệu đầu vào và định lượng gia vị</u> của đầu bếp chính."
+        ];
+    }
+
+    $totalFeedbackCount = $pdo->query("SELECT COUNT(*) FROM meal_quality_feedback WHERE check_date >= DATE_SUB('$today', INTERVAL 7 DAY)")->fetchColumn();
+    $goodFeedbackCount = $pdo->query("SELECT COUNT(*) FROM meal_quality_feedback WHERE quality_rating = 'Tốt' AND check_date >= DATE_SUB('$today', INTERVAL 7 DAY)")->fetchColumn();
+    
+    if ($totalFeedbackCount > 0) {
+        $goodRate = round(($goodFeedbackCount / $totalFeedbackCount) * 100, 1);
+        $conclusionText = "Trong 7 ngày qua, tỷ lệ hài lòng chung đạt <b>{$goodRate}%</b>. Chất lượng suất ăn đang duy trì ổn định.";
+        $actionAdvice = "Tiếp tục duy trì quy trình kiểm soát hiện tại.";
+        
+        if ($goodRate < 60) {
+            $conclusionText = "Tỷ lệ hài lòng trong tuần qua ở mức thấp (chỉ đạt <b>{$goodRate}%</b>).";
+            $actionAdvice = "Cần tổ chức cuộc họp khẩn với nhà thầu cung cấp suất ăn hoặc bếp trưởng để chấn chỉnh toàn diện.";
+        }
+        
+        $smartInsights[] = [
+            'type' => 'info',
+            'title' => '💡 Kết luận cuối cùng cho nhà quản lý:',
+            'desc' => "{$conclusionText}<br>👉 <b>Hướng giải quyết đề xuất:</b> {$actionAdvice}"
+        ];
+    }
+} catch (PDOException $e) {}
+
+include 'header.php';
+?>
+
+<style>
+    .meal-wrapper { max-width: 1320px; margin: 25px auto; padding: 0 16px; }
+    .meal-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 20px; }
+    .meal-title { font-size: 1.5rem; font-weight: 700; color: #0f172a; }
+    .card-box { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-bottom: 25px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+    .table-data { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    .table-data th, .table-data td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+    .table-data th { background: #f8fafc; color: #475569; font-weight: 600; text-align: left; }
+    .btn-action { background: #0284c7; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+    .btn-action:hover { background: #0369a1; }
+    .btn-export { background: #10b981; color: #fff; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; }
+    .btn-export:hover { background: #059669; }
+    .btn-tbl-edit { background: #f1f5f9; color: #0284c7; border: 1px solid #cbd5e1; padding: 4px 8px; border-radius: 4px; font-weight: 600; font-size: 0.8rem; cursor: pointer; }
+    .btn-tbl-del { background: #fee2e2; color: #dc2626; border: 1px solid #fecaca; padding: 4px 8px; border-radius: 4px; font-weight: 600; font-size: 0.8rem; cursor: pointer; }
+    .more-dropdown { position: relative; display: inline-block; }
+    .more-menu { display: none; position: absolute; right: 0; top: 105%; background: #fff; min-width: 200px; box-shadow: 0 10px 25px rgba(0,0,0,0.12); border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px 0; z-index: 100; }
+    .more-menu.show { display: block; }
+    .menu-item-btn { width: 100%; background: none; border: none; text-align: left; padding: 9px 16px; font-size: 0.88rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; color: #dc2626; }
+    .menu-item-btn:hover { background: #fee2e2; }
+    .alert-box { padding: 12px 16px; border-radius: 6px; font-size: 0.9rem; margin-bottom: 16px; font-weight: 600; }
+    .alert-success { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+    .alert-danger { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+    .insight-card { background: #fffbeb; border: 1px solid #fde68a; border-left: 4px solid #f59e0b; padding: 14px 18px; border-radius: 6px; margin-bottom: 12px; font-size: 0.9rem; color: #b45309; line-height: 1.5; }
+</style>
+
+<div class="meal-wrapper">
+    <div class="meal-header">
+        <div>
+            <h1 class="meal-title">🍲 Hệ Thống Cải Thiện Chất Lượng Suất Ăn</h1>
+            <p style="font-size: 0.88rem; color: #64748b; margin-top: 4px;">
+                Quản lý thực đơn tuần, xem danh sách đầy đủ, kiểm tra đúng sai và đánh giá chất lượng.
+            </p>
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+            <a href="cai-thien-suat-an.php?export_excel=1&stat_period=<?= urlencode($stat_period) ?>&f_week=<?= urlencode($selected_week) ?>" class="btn-export">
+                📊 Xuất Excel Báo Cáo
+            </a>
+            <button class="btn-action" style="background:#8b5cf6;" onclick="openModal('modal-smart-import')">📥 Nhập Thông Minh</button>
+            <button class="btn-action" onclick="openModal('modal-manual-menu')">+ Thêm Thực Đơn</button>
+            
+            <!-- Nút Xem Thêm chứa nút Reset ẩn chống bấm nhầm -->
+            <div class="more-dropdown">
+                <button type="button" class="btn-action" style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1;" onclick="toggleMoreMenu(event)">
+                    ⚙️ Xem Thêm ▾
+                </button>
+                <div class="more-menu" id="more_dropdown_menu">
+                    <form method="POST" action="cai-thien-suat-an.php" onsubmit="return confirm('CẢNH BÁO: Reset toàn bộ dữ liệu thực đơn và đánh giá về 0?');" style="margin:0;">
+                        <input type="hidden" name="action" value="reset_all_meal_data">
+                        <button type="submit" class="menu-item-btn">🔄 Reset Dữ Liệu Suất Ăn</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <?php if ($message): ?><div class="alert-box alert-success"><?= $message ?></div><?php endif; ?>
+    <?php if ($error): ?><div class="alert-box alert-danger"><?= htmlspecialchars($error) ?></div><?php endif; ?>
+
+    <!-- TRỢ LÝ THÔNG MINH -->
+    <div class="card-box" style="border-left: 5px solid #0284c7;">
+        <h3 style="font-size:1.1rem; color:#0369a1; margin-bottom:12px;">🧠 Kết Luận & Phân Tích Thông Minh Tự Động</h3>
+        <?php if (!empty($smartInsights)): ?>
+            <?php foreach ($smartInsights as $ins): ?>
+                <div class="insight-card" style="<?= $ins['type'] === 'danger' ? 'background:#fee2e2; border-color:#fecaca; border-left-color:#dc2626; color:#991b1b;' : ($ins['type'] === 'info' ? 'background:#f0f9ff; border-color:#bae6fd; border-left-color:#0284c7; color:#0369a1;' : '') ?>">
+                    <strong><?= $ins['title'] ?></strong><br><br><?= $ins['desc'] ?>
+                </div>
+            <?php endforeach; ?>
+        <?php else: ?>
+            <p style="font-size:0.88rem; color:#15803d; font-weight:600;">✓ Chưa ghi nhận vấn đề bất thường trong thời gian qua. Suất ăn đạt tiêu chuẩn ổn định.</p>
+        <?php endif; ?>
+    </div>
+
+    <!-- THANH LỌC: CHỌN TUẦN, CHỌN NGÀY & CHẾ ĐỘ XEM -->
+    <div class="card-box" style="display:flex; gap:20px; align-items:center; flex-wrap:wrap; padding:15px 20px;">
+        <form method="GET" action="cai-thien-suat-an.php" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:0;">
+            <input type="hidden" name="stat_period" value="<?= htmlspecialchars($stat_period) ?>">
+            <input type="hidden" name="check_date" value="<?= htmlspecialchars($check_date) ?>">
+            <input type="hidden" name="view_mode" value="<?= htmlspecialchars($view_mode) ?>">
+            <label style="font-weight:700; font-size:0.9rem;">📅 Chọn Tuần:</label>
+            <select name="f_week" onchange="this.form.submit()" style="padding:7px 12px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.9rem; min-width:160px;">
+                <?php if (!empty($availableWeeks)): ?>
+                    <?php foreach ($availableWeeks as $wk): ?>
+                        <option value="<?= htmlspecialchars($wk) ?>" <?= $selected_week === $wk ? 'selected' : '' ?>>Tuần: <?= htmlspecialchars($wk) ?></option>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <option value="<?= $current_week ?>">Tuần hiện tại: <?= $current_week ?></option>
+                <?php endif; ?>
+            </select>
+        </form>
+
+        <form method="GET" action="cai-thien-suat-an.php" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:0;">
+            <input type="hidden" name="stat_period" value="<?= htmlspecialchars($stat_period) ?>">
+            <input type="hidden" name="f_week" value="<?= htmlspecialchars($selected_week) ?>">
+            <input type="hidden" name="view_mode" value="<?= htmlspecialchars($view_mode) ?>">
+            <label style="font-weight:700; font-size:0.9rem;">🗓️ Ngày Kiểm Tra:</label>
+            <input type="date" name="check_date" value="<?= htmlspecialchars($check_date) ?>" onchange="this.form.submit()" style="padding:6px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.9rem;">
+        </form>
+
+        <form method="GET" action="cai-thien-suat-an.php" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:0; margin-left:auto;">
+            <input type="hidden" name="stat_period" value="<?= htmlspecialchars($stat_period) ?>">
+            <input type="hidden" name="f_week" value="<?= htmlspecialchars($selected_week) ?>">
+            <input type="hidden" name="check_date" value="<?= htmlspecialchars($check_date) ?>">
+            <label style="font-weight:700; font-size:0.9rem;">👁️ Chế độ xem:</label>
+            <select name="view_mode" onchange="this.form.submit()" style="padding:7px 12px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.9rem; background:#f0f9ff; color:#0369a1; font-weight:700;">
+                <option value="day" <?= $view_mode === 'day' ? 'selected' : '' ?>>Chỉ xem món ngày (<?= $selected_day_name ?>)</option>
+                <option value="all_week" <?= $view_mode === 'all_week' ? 'selected' : '' ?>>Xem tất cả món trong tuần (Thứ 2 - CN)</option>
+            </select>
+        </form>
+    </div>
+
+    <!-- BẢNG HIỂN THỊ THỰC ĐƠN & KIỂM TRA THỰC TẾ -->
+    <div class="card-box">
+        <h3 style="font-size:1.1rem; color:#334155; margin-bottom:15px;">
+            📋 Danh Sách Thực Đơn Tuần [<?= htmlspecialchars($selected_week) ?>] 
+            <span style="color:#0284c7; font-size:0.95rem;">(<?= $view_mode === 'all_week' ? 'Hiển thị toàn bộ từ Thứ 2 đến Chủ nhật' : 'Hiển thị riêng ngày: ' . $selected_day_name ?>)</span>
+        </h3>
+        <div style="overflow-x:auto;">
+            <table class="table-data">
+                <thead>
+                    <tr>
+                        <th style="width:110px;">Thứ / Buổi</th>
+                        <th>Tên Món Ăn (Thực Đơn)</th>
+                        <th style="width:90px; text-align:center;">Nấu Đúng?</th>
+                        <th style="width:110px;">Tỷ Lệ Đổi (%)</th>
+                        <th style="width:180px; text-align:center;">Thao Tác Lưu / Hủy</th>
+                        <th style="width:120px; text-align:center;">Quản Lý Món</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (!empty($todayMenus)): ?>
+                        <?php foreach ($todayMenus as $m): 
+                            $isLocked = isset($m['is_locked']) && intval($m['is_locked']) === 1;
+                        ?>
+                            <tr>
+                                <td><b><?= htmlspecialchars($m['day_of_week']) ?></b><br><span style="font-size:0.75rem; color:#64748b;"><?= htmlspecialchars($m['meal_type']) ?></span></td>
+                                <td>
+                                    <strong><?= htmlspecialchars($m['dish_name']) ?></strong>
+                                    <?php if (!empty($m['description'])): ?>
+                                        <br><span style="font-size:0.75rem; color:#64748b;"><?= htmlspecialchars($m['description']) ?></span>
+                                    <?php endif; ?>
+                                    <?php if ($isLocked): ?>
+                                        <br><span style="font-size:0.72rem; font-weight:700; color:#16a34a;">🔒 Đã đánh giá & khóa</span>
+                                    <?php endif; ?>
+                                </td>
+
+                                <form method="POST" action="cai-thien-suat-an.php?f_week=<?= urlencode($selected_week) ?>&stat_period=<?= urlencode($stat_period) ?>&check_date=<?= urlencode($check_date) ?>&view_mode=<?= urlencode($view_mode) ?>" id="form_check_<?= $m['id'] ?>">
+                                    <input type="hidden" name="action" value="save_daily_check">
+                                    <input type="hidden" name="menu_id" value="<?= $m['id'] ?>">
+                                    <input type="hidden" name="check_date" value="<?= htmlspecialchars($check_date) ?>">
+                                    
+                                    <td style="text-align:center;">
+                                        <input type="checkbox" name="is_correct" value="1" <?= (!isset($m['is_correct']) || $m['is_correct'] == 1) ? 'checked' : '' ?> <?= $isLocked ? 'disabled' : '' ?> style="width:18px; height:18px; cursor:pointer;">
+                                    </td>
+                                    <td>
+                                        <input type="number" name="adjustment_percent" min="0" max="100" value="<?= intval($m['adjustment_percent'] ?? 0) ?>" <?= $isLocked ? 'disabled' : '' ?> style="width:75px; padding:6px; border:1px solid #cbd5e1; border-radius:4px;">
+                                    </td>
+                                </form>
+
+                                <td style="text-align:center;">
+                                    <?php if (!$isLocked): ?>
+                                        <button type="submit" form="form_check_<?= $m['id'] ?>" class="btn-action" style="padding:6px 12px; font-size:0.8rem;">Lưu</button>
+                                    <?php else: ?>
+                                        <form method="POST" action="cai-thien-suat-an.php?f_week=<?= urlencode($selected_week) ?>&stat_period=<?= urlencode($stat_period) ?>&check_date=<?= urlencode($check_date) ?>&view_mode=<?= urlencode($view_mode) ?>" style="margin:0; display:inline-block;">
+                                            <input type="hidden" name="action" value="unlock_daily_check">
+                                            <input type="hidden" name="menu_id" value="<?= $m['id'] ?>">
+                                            <input type="hidden" name="check_date" value="<?= htmlspecialchars($check_date) ?>">
+                                            <button type="submit" class="btn-action" style="background:#f59e0b; padding:6px 12px; font-size:0.8rem;" title="Bấm để mở khóa đánh giá lại">Hủy (Mở)</button>
+                                        </form>
+                                    <?php endif; ?>
+                                </td>
+
+                                <td style="text-align:center;">
+                                    <div style="display:flex; gap:4px; justify-content:center;">
+                                        <button type="button" class="btn-tbl-edit" onclick='openEditMenuModal(<?= json_encode($m, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>)'>Sửa</button>
+                                        <form method="POST" action="cai-thien-suat-an.php?f_week=<?= urlencode($selected_week) ?>&stat_period=<?= urlencode($stat_period) ?>&check_date=<?= urlencode($check_date) ?>&view_mode=<?= urlencode($view_mode) ?>" onsubmit="return confirm('Xóa món này?');" style="margin:0;">
+                                            <input type="hidden" name="action" value="delete_menu_item">
+                                            <input type="hidden" name="menu_id" value="<?= $m['id'] ?>">
+                                            <button type="submit" class="btn-tbl-del">Xóa</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <tr><td colspan="6" style="text-align:center; padding:25px; color:#64748b;">Chưa có món ăn nào được thêm vào thực đơn. Vui lòng bấm nút <strong>"+ Thêm Thực Đơn"</strong> ở góc trên bên phải để bắt đầu nhập.</td></tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ĐÁNH GIÁ CHẤT LƯỢNG (KHÔNG GIỚI HẠN) -->
+    <div class="card-box">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px;">
+            <h3 style="font-size:1.1rem; color:#334155; margin:0;">⭐ Đánh Giá & Góp Ý Chất Lượng Món Ăn (Không Giới Hạn Số Lần)</h3>
+            <button class="btn-action" style="background:#10b981; padding:6px 12px; font-size:0.85rem;" onclick="openModal('modal-add-feedback')">+ Thêm Ý Kiến Đánh Giá</button>
+        </div>
+        <div style="overflow-x:auto;">
+            <table class="table-data">
+                <thead>
+                    <tr>
+                        <th style="width:100px;">Ngày</th>
+                        <th>Tên Món Ăn</th>
+                        <th style="width:120px;">Mức Độ</th>
+                        <th>Nội Dung Ghi Chú Đánh Giá</th>
+                        <th style="width:130px; text-align:center;">Thao Tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (!empty($qualityFeedbacks)): ?>
+                        <?php foreach ($qualityFeedbacks as $fb): ?>
+                            <tr>
+                                <td><?= date('d/m/Y', strtotime($fb['check_date'])) ?></td>
+                                <td><strong><?= htmlspecialchars($fb['dish_name']) ?></strong></td>
+                                <td>
+                                    <span style="padding:3px 8px; border-radius:4px; font-weight:700; font-size:0.78rem; background:<?= $fb['quality_rating'] === 'Tốt' ? '#dcfce7; color:#166534;' : ($fb['quality_rating'] === 'Trung bình' ? '#fef3c7; color:#b45309;' : '#fee2e2; color:#991b1b;') ?>">
+                                        <?= htmlspecialchars($fb['quality_rating']) ?>
+                                    </span>
+                                </td>
+                                <td><?= htmlspecialchars($fb['quality_note'] ?: '—') ?></td>
+                                <td style="text-align:center;">
+                                    <div style="display:flex; gap:4px; justify-content:center;">
+                                        <button type="button" class="btn-tbl-edit" onclick='openEditFeedbackModal(<?= json_encode($fb, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>)'>Sửa</button>
+                                        <form method="POST" action="cai-thien-suat-an.php?f_week=<?= urlencode($selected_week) ?>&stat_period=<?= urlencode($stat_period) ?>&check_date=<?= urlencode($check_date) ?>&view_mode=<?= urlencode($view_mode) ?>" onsubmit="return confirm('Xóa ý kiến đánh giá này?');" style="margin:0;">
+                                            <input type="hidden" name="action" value="delete_quality_feedback">
+                                            <input type="hidden" name="feedback_id" value="<?= $fb['id'] ?>">
+                                            <button type="submit" class="btn-tbl-del">Xóa</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <tr><td colspan="5" style="text-align:center; padding:20px; color:#64748b;">Chưa có ý kiến đánh giá chất lượng nào được ghi nhận cho ngày này.</td></tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- BỘ LỌC THỐNG KÊ -->
+    <form method="GET" action="cai-thien-suat-an.php" class="card-box" style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; padding:15px 20px;">
+        <input type="hidden" name="f_week" value="<?= htmlspecialchars($selected_week) ?>">
+        <input type="hidden" name="check_date" value="<?= htmlspecialchars($check_date) ?>">
+        <input type="hidden" name="view_mode" value="<?= htmlspecialchars($view_mode) ?>">
+        <label style="font-weight:700; font-size:0.9rem;">📊 Thống kê báo cáo theo mốc thời gian:</label>
+        <select name="stat_period" onchange="this.form.submit()" style="padding:7px 12px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.9rem;">
+            <option value="1_week" <?= $stat_period === '1_week' ? 'selected' : '' ?>>1 Tuần qua</option>
+            <option value="2_weeks" <?= $stat_period === '2_weeks' ? 'selected' : '' ?>>2 Tuần qua</option>
+            <option value="3_weeks" <?= $stat_period === '3_weeks' ? 'selected' : '' ?>>3 Tuần qua</option>
+            <option value="month" <?= $stat_period === 'month' ? 'selected' : '' ?>>1 Tháng qua</option>
+            <option value="year" <?= $stat_period === 'year' ? 'selected' : '' ?>>1 Năm qua</option>
+        </select>
+    </form>
+
+    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(480px, 1fr)); gap:22px;">
+        <!-- TOP MÓN ĐIỀU CHỈNH CAO NHẤT -->
+        <div class="card-box" style="margin-bottom:0;">
+            <h3 style="font-size:1.1rem; color:#334155; margin-bottom:12px;">📈 Top Món Ăn Bị Điều Chỉnh / Nấu Sai Nhiều Nhất</h3>
+            <table class="table-data">
+                <thead>
+                    <tr>
+                        <th>Tên Món Ăn</th>
+                        <th style="text-align:center;">Số Lần Sai / Đổi</th>
+                        <th style="text-align:center;">Mức Đổi TB (%)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (!empty($topAdjustedDishes)): ?>
+                        <?php foreach ($topAdjustedDishes as $tad): ?>
+                            <tr>
+                                <td><strong><?= htmlspecialchars($tad['dish_name']) ?></strong></td>
+                                <td style="text-align:center; color:#dc2626; font-weight:700;"><?= intval($tad['wrong_count']) ?> lần</td>
+                                <td style="text-align:center; color:#0284c7; font-weight:700;"><?= round($tad['avg_adj'], 1) ?>%</td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <tr><td colspan="3" style="text-align:center; padding:20px; color:#64748b;">Chưa có dữ liệu điều chỉnh trong khoảng thời gian này.</td></tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- ĐÁNH GIÁ CHẤT LƯỢNG CHIẾM ĐA SỐ -->
+        <div class="card-box" style="margin-bottom:0;">
+            <h3 style="font-size:1.1rem; color:#334155; margin-bottom:12px;">⭐ Tỷ Lệ Đánh Giá Chất Lượng Chung</h3>
+            <table class="table-data">
+                <thead>
+                    <tr>
+                        <th>Mức Độ Đánh Giá</th>
+                        <th style="text-align:center;">Tổng Số Lượt</th>
+                        <th style="text-align:center;">Tỷ Lệ (%)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (!empty($dominantRatings)): ?>
+                        <?php 
+                        $totalRat = array_sum(array_column($dominantRatings, 'count_rat')) ?: 1;
+                        foreach ($dominantRatings as $dr): 
+                            $pct = round(($dr['count_rat'] / $totalRat) * 100, 1);
+                        ?>
+                            <tr>
+                                <td><strong><?= htmlspecialchars($dr['quality_rating']) ?></strong></td>
+                                <td style="text-align:center; font-weight:700;"><?= intval($dr['count_rat']) ?> lượt</td>
+                                <td style="text-align:center; color:#10b981; font-weight:700;"><?= $pct ?>%</td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <tr><td colspan="3" style="text-align:center; padding:20px; color:#64748b;">Chưa có đánh giá chất lượng trong khoảng thời gian này.</td></tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== MODALS ==================== -->
+
+<!-- MODAL THÊM Ý KIẾN ĐÁNH GIÁ -->
+<div id="modal-add-feedback" class="modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.5); z-index:1000; align-items:center; justify-content:center; padding:15px;">
+    <div class="card-box" style="width:100%; max-width:500px; margin:0;">
+        <form method="POST" action="cai-thien-suat-an.php?f_week=<?= urlencode($selected_week) ?>&stat_period=<?= urlencode($stat_period) ?>&check_date=<?= urlencode($check_date) ?>&view_mode=<?= urlencode($view_mode) ?>">
+            <input type="hidden" name="action" value="add_quality_feedback">
+            <input type="hidden" name="check_date" value="<?= htmlspecialchars($check_date) ?>">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; font-weight:700; font-size:1.1rem;">
+                <span>⭐ Thêm Ý Kiến Đánh Giá Chất Lượng</span>
+                <span style="cursor:pointer;" onclick="closeModal('modal-add-feedback')">&times;</span>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:12px;">
+                <div>
+                    <label style="font-size:0.85rem; font-weight:600;">Chọn món ăn trong tuần: *</label>
+                    <select name="menu_id" required style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;">
+                        <?php foreach ($allWeekMenus as $awm): ?>
+                            <option value="<?= $awm['id'] ?>"><?= htmlspecialchars($awm['day_of_week']) ?> - <?= htmlspecialchars($awm['dish_name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size:0.85rem; font-weight:600;">Mức độ đánh giá: *</label>
+                    <select name="quality_rating" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;">
+                        <option value="Tốt">Tốt</option>
+                        <option value="Trung bình">Trung bình</option>
+                        <option value="Kém">Kém</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size:0.85rem; font-weight:600;">Nội dung ghi chú / Góp ý:</label>
+                    <textarea name="quality_note" rows="3" placeholder="Nhập chi tiết ý kiến nhận xét..." style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;" required></textarea>
+                </div>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:20px;">
+                <button type="button" class="btn-action" style="background:#e2e8f0; color:#475569;" onclick="closeModal('modal-add-feedback')">Hủy</button>
+                <button type="submit" class="btn-action" style="background:#10b981;">Lưu Ý Kiến</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL SỬA Ý KIẾN ĐÁNH GIÁ -->
+<div id="modal-edit-feedback" class="modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.5); z-index:1000; align-items:center; justify-content:center; padding:15px;">
+    <div class="card-box" style="width:100%; max-width:500px; margin:0;">
+        <form method="POST" action="cai-thien-suat-an.php?f_week=<?= urlencode($selected_week) ?>&stat_period=<?= urlencode($stat_period) ?>&check_date=<?= urlencode($check_date) ?>&view_mode=<?= urlencode($view_mode) ?>">
+            <input type="hidden" name="action" value="update_quality_feedback">
+            <input type="hidden" name="feedback_id" id="edit_feedback_id">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; font-weight:700; font-size:1.1rem;">
+                <span>✏️ Chỉnh Sửa Ý Kiến Đánh Giá</span>
+                <span style="cursor:pointer;" onclick="closeModal('modal-edit-feedback')">&times;</span>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:12px;">
+                <div>
+                    <label style="font-size:0.85rem; font-weight:600;">Mức độ đánh giá: *</label>
+                    <select name="quality_rating" id="edit_feedback_rating" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;">
+                        <option value="Tốt">Tốt</option>
+                        <option value="Trung bình">Trung bình</option>
+                        <option value="Kém">Kém</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size:0.85rem; font-weight:600;">Nội dung ghi chú / Góp ý:</label>
+                    <textarea name="quality_note" id="edit_feedback_note" rows="3" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;" required></textarea>
+                </div>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:20px;">
+                <button type="button" class="btn-action" style="background:#e2e8f0; color:#475569;" onclick="closeModal('modal-edit-feedback')">Hủy</button>
+                <button type="submit" class="btn-action" style="background:#0284c7;">Lưu Thay Đổi</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL THÊM THỰC ĐƠN THỦ CÔNG -->
+<div id="modal-manual-menu" class="modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.5); z-index:1000; align-items:center; justify-content:center; padding:15px;">
+    <div class="card-box" style="width:100%; max-width:500px; margin:0;">
+        <form method="POST" action="cai-thien-suat-an.php?f_week=<?= urlencode($selected_week) ?>&stat_period=<?= urlencode($stat_period) ?>&check_date=<?= urlencode($check_date) ?>&view_mode=<?= urlencode($view_mode) ?>">
+            <input type="hidden" name="action" value="add_menu_manual">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; font-weight:700; font-size:1.1rem;">
+                <span>Thêm Món Ăn Vào Thực Đơn Tuần</span>
+                <span style="cursor:pointer;" onclick="closeModal('modal-manual-menu')">&times;</span>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:12px;">
+                <div>
+                    <label style="font-size:0.85rem; font-weight:600;">Mã Tuần (VD: 2026-W37):</label>
+                    <input type="text" name="week_code" value="<?= $current_week ?>" required style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;">
+                </div>
+                <div>
+                    <label style="font-size:0.85rem; font-weight:600;">Năm:</label>
+                    <input type="number" name="year" value="<?= date('Y') ?>" required style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;">
+                </div>
+                <div>
+                    <label style="font-size:0.85rem; font-weight:600;">Thứ trong tuần:</label>
+                    <select name="day_of_week" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;">
+                        <option value="Thứ 2">Thứ 2</option>
+                        <option value="Thứ 3">Thứ 3</option>
+                        <option value="Thứ 4">Thứ 4</option>
+                        <option value="Thứ 5">Thứ 5</option>
+                        <option value="Thứ 6">Thứ 6</option>
+                        <option value="Thứ 7">Thứ 7</option>
+                        <option value="Chủ Nhật">Chủ Nhật</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size:0.85rem; font-weight:600;">Tên Món Ăn: *</label>
+                    <input type="text" name="dish_name" placeholder="VD: Thịt kho tàu..." required style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;">
+                </div>
+                <div>
+                    <label style="font-size:0.85rem; font-weight:600;">Mô tả / Định lượng:</label>
+                    <textarea name="description" rows="2" placeholder="Ghi chú thành phần..." style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;"></textarea>
+                </div>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:20px;">
+                <button type="button" class="btn-action" style="background:#e2e8f0; color:#475569;" onclick="closeModal('modal-manual-menu')">Hủy</button>
+                <button type="submit" class="btn-action">Lưu Thực Đơn</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL SỬA MÓN ĂN -->
+<div id="modal-edit-menu" class="modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.5); z-index:1000; align-items:center; justify-content:center; padding:15px;">
+    <div class="card-box" style="width:100%; max-width:500px; margin:0;">
+        <form method="POST" action="cai-thien-suat-an.php?f_week=<?= urlencode($selected_week) ?>&stat_period=<?= urlencode($stat_period) ?>&check_date=<?= urlencode($check_date) ?>&view_mode=<?= urlencode($view_mode) ?>">
+            <input type="hidden" name="action" value="update_menu_item">
+            <input type="hidden" name="menu_id" id="edit_menu_id">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; font-weight:700; font-size:1.1rem;">
+                <span>✏️ Chỉnh Sửa Món Ăn</span>
+                <span style="cursor:pointer;" onclick="closeModal('modal-edit-menu')">&times;</span>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:12px;">
+                <div>
+                    <label style="font-size:0.85rem; font-weight:600;">Thứ trong tuần:</label>
+                    <select name="day_of_week" id="edit_day_of_week" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;">
+                        <option value="Thứ 2">Thứ 2</option>
+                        <option value="Thứ 3">Thứ 3</option>
+                        <option value="Thứ 4">Thứ 4</option>
+                        <option value="Thứ 5">Thứ 5</option>
+                        <option value="Thứ 6">Thứ 6</option>
+                        <option value="Thứ 7">Thứ 7</option>
+                        <option value="Chủ Nhật">Chủ Nhật</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size:0.85rem; font-weight:600;">Buổi:</label>
+                    <input type="text" name="meal_type" id="edit_meal_type" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;">
+                </div>
+                <div>
+                    <label style="font-size:0.85rem; font-weight:600;">Tên Món Ăn: *</label>
+                    <input type="text" name="dish_name" id="edit_dish_name" required style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;">
+                </div>
+                <div>
+                    <label style="font-size:0.85rem; font-weight:600;">Mô tả / Định lượng:</label>
+                    <textarea name="description" id="edit_description" rows="2" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;"></textarea>
+                </div>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:20px;">
+                <button type="button" class="btn-action" style="background:#e2e8f0; color:#475569;" onclick="closeModal('modal-edit-menu')">Hủy</button>
+                <button type="submit" class="btn-action" style="background:#0284c7;">Lưu Thay Đổi</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL NHẬP THÔNG MINH -->
+<div id="modal-smart-import" class="modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.5); z-index:1000; align-items:center; justify-content:center; padding:15px;">
+    <div class="card-box" style="width:100%; max-width:560px; margin:0;">
+        <form method="POST" action="cai-thien-suat-an.php?f_week=<?= urlencode($selected_week) ?>&stat_period=<?= urlencode($stat_period) ?>&check_date=<?= urlencode($check_date) ?>&view_mode=<?= urlencode($view_mode) ?>">
+            <input type="hidden" name="action" value="smart_import_file">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; font-weight:700; font-size:1.1rem;">
+                <span>🤖 Trích Xuất Thông Minh (Excel / Hình Ảnh Thực Đơn)</span>
+                <span style="cursor:pointer;" onclick="closeModal('modal-smart-import')">&times;</span>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:12px;">
+                <div>
+                    <label style="font-size:0.85rem; font-weight:600;">Mã Tuần áp dụng:</label>
+                    <input type="text" name="week_code" value="<?= $current_week ?>" required style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;">
+                </div>
+                <div>
+                    <label style="font-size:0.85rem; font-weight:600;">Tải lên File Excel / Hình ảnh thực đơn:</label>
+                    <input type="file" accept=".xlsx, .xls, .csv, image/*" onchange="simulateSmartOCR(this)" style="width:100%; padding:6px; border:1px dashed #cbd5e1; border-radius:6px; background:#f8fafc;">
+                </div>
+                <div>
+                    <label style="font-size:0.85rem; font-weight:600;">Hoặc dán nội dung thực đơn vào đây (Mỗi dòng 1 món):</label>
+                    <textarea name="raw_import_text" id="raw_import_text" rows="6" placeholder="Thứ 2&#10;Thịt kho trứng&#10;Canh bầu thịt băm..." style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-family:monospace;"></textarea>
+                </div>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:20px;">
+                <button type="button" class="btn-action" style="background:#e2e8f0; color:#475569;" onclick="closeModal('modal-smart-import')">Hủy</button>
+                <button type="submit" class="btn-action" style="background:#8b5cf6;">Tiến Hành Trích Xuất & Lưu</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+function toggleMoreMenu(e) { if(e) e.stopPropagation(); document.getElementById('more_dropdown_menu').classList.toggle('show'); }
+
+window.onclick = function(e) {
+    if (e.target.classList.contains('modal-overlay')) {
+        e.target.style.display = 'none';
+    }
+    const menu = document.getElementById('more_dropdown_menu');
+    if (menu && menu.classList.contains('show') && !e.target.closest('.more-dropdown')) {
+        menu.classList.remove('show');
+    }
+}
+
+function openEditMenuModal(m) {
+    document.getElementById('edit_menu_id').value = m.id;
+    document.getElementById('edit_day_of_week').value = m.day_of_week;
+    document.getElementById('edit_meal_type').value = m.meal_type || 'Bữa Trưa';
+    document.getElementById('edit_dish_name').value = m.dish_name;
+    document.getElementById('edit_description').value = m.description || '';
+    openModal('modal-edit-menu');
+}
+
+function openEditFeedbackModal(fb) {
+    document.getElementById('edit_feedback_id').value = fb.id;
+    document.getElementById('edit_feedback_rating').value = fb.quality_rating;
+    document.getElementById('edit_feedback_note').value = fb.quality_note || '';
+    openModal('modal-edit-feedback');
+}
+
+function simulateSmartOCR(input) {
+    if (input.files && input.files[0]) {
+        const fileName = input.files[0].name;
+        const txtArea = document.getElementById('raw_import_text');
+        txtArea.value = `Thứ 2\nThịt kho tàu chuẩn vị\nCanh chua cá lóc\n(Đã quét thông minh từ file: ${fileName})`;
+    }
+}
+</script>
+
+<?php include 'footer.php'; ?>

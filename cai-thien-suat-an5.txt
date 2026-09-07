@@ -420,8 +420,10 @@ try {
     $dominantRatings = $stmtRat->fetchAll();
 } catch (PDOException $e) {}
 
+// ==================== THUẬT TOÁN KẾT LUẬN & ĐÁNH GIÁ THÔNG MINH ====================
 $smartInsights = [];
 try {
+    // 1. Phân tích độ chính xác thực đơn (Nấu sai/Đổi món)
     $stmtW = $pdo->prepare("
         SELECT m.dish_name, SUM(CASE WHEN c.is_correct = 0 THEN 1 ELSE 0 END) as fails
         FROM meal_checks c JOIN meal_menus m ON c.menu_id = m.id
@@ -434,11 +436,12 @@ try {
     if ($worstDish && $worstDish['fails'] > 0) {
         $smartInsights[] = [
             'type' => 'danger',
-            'title' => 'Cảnh báo sai lệch thực đơn:',
-            'desc' => "Món <b>{$worstDish['dish_name']}</b> bị thay đổi hoặc nấu sai thực đơn nhiều nhất ({$worstDish['fails']} lần trong tháng). Vị trí cần giải quyết: <u>Bộ phận bếp chế biến trực tiếp</u>."
+            'title' => '🎯 Vấn đề cần giải quyết (Độ chính xác thực đơn):',
+            'desc' => "Món <b>{$worstDish['dish_name']}</b> bị tự ý thay đổi hoặc nấu sai thực đơn nhiều nhất ({$worstDish['fails']} lần trong 30 ngày qua).<br>👉 <b>Vị trí cần xử lý:</b> <u>Bộ phận bếp chế biến trực tiếp</u> do không tuân thủ nghiêm ngặt thực đơn tuần."
         ];
     }
 
+    // 2. Phân tích chất lượng dựa trên phản hồi 'Kém'
     $stmtQ = $pdo->prepare("
         SELECT m.dish_name, COUNT(*) as bads
         FROM meal_quality_feedback f JOIN meal_menus m ON f.menu_id = m.id
@@ -451,24 +454,29 @@ try {
     if ($worstQuality && $worstQuality['bads'] > 0) {
         $smartInsights[] = [
             'type' => 'warning',
-            'title' => 'Cảnh báo chất lượng hương vị:',
-            'desc' => "Món <b>{$worstQuality['dish_name']}</b> nhận nhiều đánh giá 'Kém' nhất ({$worstQuality['bads']} lượt). Vị trí cần giải quyết: <u>Khâu kiểm tra nguyên liệu đầu vào và định lượng gia vị</u>."
+            'title' => '🎯 Vấn đề cần giải quyết (Chất lượng hương vị):',
+            'desc' => "Món <b>{$worstQuality['dish_name']}</b> nhận nhiều đánh giá 'Kém' nhất ({$worstQuality['bads']} lượt phàn nàn).<br>👉 <b>Vị trí cần xử lý:</b> <u>Khâu kiểm tra nguyên liệu đầu vào và định lượng gia vị</u> của đầu bếp chính."
         ];
     }
 
+    // 3. Kết luận tổng quan thông minh
     $totalFeedbackCount = $pdo->query("SELECT COUNT(*) FROM meal_quality_feedback WHERE check_date >= DATE_SUB('$today', INTERVAL 7 DAY)")->fetchColumn();
     $goodFeedbackCount = $pdo->query("SELECT COUNT(*) FROM meal_quality_feedback WHERE quality_rating = 'Tốt' AND check_date >= DATE_SUB('$today', INTERVAL 7 DAY)")->fetchColumn();
     
     if ($totalFeedbackCount > 0) {
         $goodRate = round(($goodFeedbackCount / $totalFeedbackCount) * 100, 1);
         $conclusionText = "Trong 7 ngày qua, tỷ lệ hài lòng chung đạt <b>{$goodRate}%</b>. Chất lượng suất ăn đang duy trì ổn định.";
+        $actionAdvice = "Tiếp tục duy trì quy trình kiểm soát hiện tại.";
+        
         if ($goodRate < 60) {
-            $conclusionText = "Tỷ lệ hài lòng trong tuần qua thấp (chỉ đạt <b>{$goodRate}%</b>). Hệ thống đánh giá chất lượng toàn diện đang ở mức <b>CẦN CẢI THIỆN GẤP</b>.";
+            $conclusionText = "Tỷ lệ hài lòng trong tuần qua ở mức thấp (chỉ đạt <b>{$goodRate}%</b>).";
+            $actionAdvice = "Cần tổ chức cuộc họp khẩn với nhà thầu cung cấp suất ăn hoặc bếp trưởng để chấn chỉnh toàn diện.";
         }
+        
         $smartInsights[] = [
             'type' => 'info',
-            'title' => 'Kết luận thông minh chung tuần qua:',
-            'desc' => $conclusionText
+            'title' => '💡 Kết luận cuối cùng cho nhà quản lý:',
+            'desc' => "{$conclusionText}<br>👉 <b>Hướng giải quyết đề xuất:</b> {$actionAdvice}"
         ];
     }
 } catch (PDOException $e) {}
@@ -493,7 +501,7 @@ include 'header.php';
     .alert-box { padding: 12px 16px; border-radius: 6px; font-size: 0.9rem; margin-bottom: 16px; font-weight: 600; }
     .alert-success { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
     .alert-danger { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
-    .insight-card { background: #fffbeb; border: 1px solid #fde68a; border-left: 4px solid #f59e0b; padding: 14px 18px; border-radius: 6px; margin-bottom: 12px; font-size: 0.9rem; color: #b45309; }
+    .insight-card { background: #fffbeb; border: 1px solid #fde68a; border-left: 4px solid #f59e0b; padding: 14px 18px; border-radius: 6px; margin-bottom: 12px; font-size: 0.9rem; color: #b45309; line-height: 1.5; }
 </style>
 
 <div class="meal-wrapper">
@@ -516,13 +524,13 @@ include 'header.php';
     <?php if ($message): ?><div class="alert-box alert-success"><?= $message ?></div><?php endif; ?>
     <?php if ($error): ?><div class="alert-box alert-danger"><?= htmlspecialchars($error) ?></div><?php endif; ?>
 
-    <!-- TRỢ LÝ THÔNG MINH -->
+    <!-- KHỐI ĐÁNH GIÁ & KẾT LUẬN THÔNG MINH (CHỈ RÕ VẤN ĐỀ CẦN GIẢI QUYẾT Ở ĐÂU) -->
     <div class="card-box" style="border-left: 5px solid #0284c7;">
-        <h3 style="font-size:1.1rem; color:#0369a1; margin-bottom:12px;">🧠 Kết Luận & Phân Tích Thông Minh Tự Động</h3>
+        <h3 style="font-size:1.1rem; color:#0369a1; margin-bottom:12px;">🧠 Kết Luận & Phân Tích Thông Minh (Xác Định Vấn Đề Cần Giải Quyết)</h3>
         <?php if (!empty($smartInsights)): ?>
             <?php foreach ($smartInsights as $ins): ?>
                 <div class="insight-card" style="<?= $ins['type'] === 'danger' ? 'background:#fee2e2; border-color:#fecaca; border-left-color:#dc2626; color:#991b1b;' : ($ins['type'] === 'info' ? 'background:#f0f9ff; border-color:#bae6fd; border-left-color:#0284c7; color:#0369a1;' : '') ?>">
-                    <strong><?= $ins['title'] ?></strong> <?= $ins['desc'] ?>
+                    <strong><?= $ins['title'] ?></strong><br><?= $ins['desc'] ?>
                 </div>
             <?php endforeach; ?>
         <?php else: ?>
@@ -593,7 +601,6 @@ include 'header.php';
                                     <?php endif; ?>
                                 </td>
 
-                                <!-- Form lưu trạng thái -->
                                 <form method="POST" action="cai-thien-suat-an.php?f_week=<?= urlencode($selected_week) ?>&stat_period=<?= urlencode($stat_period) ?>&check_date=<?= urlencode($check_date) ?>" id="form_check_<?= $m['id'] ?>">
                                     <input type="hidden" name="action" value="save_daily_check">
                                     <input type="hidden" name="menu_id" value="<?= $m['id'] ?>">
@@ -611,7 +618,6 @@ include 'header.php';
                                     <?php if (!$isLocked): ?>
                                         <button type="submit" form="form_check_<?= $m['id'] ?>" class="btn-action" style="padding:6px 12px; font-size:0.8rem;">Lưu</button>
                                     <?php else: ?>
-                                        <!-- Nút Hủy (Mở khóa để đánh giá lại) -->
                                         <form method="POST" action="cai-thien-suat-an.php?f_week=<?= urlencode($selected_week) ?>&stat_period=<?= urlencode($stat_period) ?>&check_date=<?= urlencode($check_date) ?>" style="margin:0; display:inline-block;">
                                             <input type="hidden" name="action" value="unlock_daily_check">
                                             <input type="hidden" name="menu_id" value="<?= $m['id'] ?>">
@@ -634,7 +640,7 @@ include 'header.php';
                             </tr>
                         <?php endforeach; ?>
                     <?php else: ?>
-                        <tr><td colspan="6" style="text-align:center; padding:25px; color:#64748b;">Không có món ăn nào được lên lịch cho ngày <strong><?= $selected_day_name ?></strong> trong tuần này. Bạn có thể thêm món bằng nút "Thêm Thực Đơn".</td></tr>
+                        <tr><td colspan="6" style="text-align:center; padding:25px; color:#64748b;">Không có món ăn nào được lên lịch cho ngày <strong><?= $selected_day_name ?></strong> trong tuần này.</td></tr>
                     <?php endif; ?>
                 </tbody>
             </table>
@@ -767,7 +773,7 @@ include 'header.php';
 
 <!-- ==================== MODALS ==================== -->
 
-<!-- MODAL THÊM Ý KIẾN ĐÁNH GIÁ CHẤT LƯỢNG -->
+<!-- MODAL THÊM Ý KIẾN ĐÁNH GIÁ -->
 <div id="modal-add-feedback" class="modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.5); z-index:1000; align-items:center; justify-content:center; padding:15px;">
     <div class="card-box" style="width:100%; max-width:500px; margin:0;">
         <form method="POST" action="cai-thien-suat-an.php?f_week=<?= urlencode($selected_week) ?>&stat_period=<?= urlencode($stat_period) ?>&check_date=<?= urlencode($check_date) ?>">

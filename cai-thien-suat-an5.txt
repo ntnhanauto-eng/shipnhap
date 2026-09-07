@@ -46,7 +46,7 @@ try {
             `check_date` DATE NOT NULL,
             `is_correct` TINYINT(1) DEFAULT 1,
             `adjustment_percent` INT DEFAULT 0,
-            `is_locked` TINYINT(1) DEFAULT 0, -- Khóa không cho đánh giá lại nếu đã lưu
+            `is_locked` TINYINT(1) DEFAULT 0,
             `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             INDEX (`check_date`),
             INDEX (`menu_id`)
@@ -73,7 +73,6 @@ try {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $act = $_POST['action'];
 
-    // 1. Nhập thủ công thực đơn 1 tuần
     if ($act === 'add_menu_manual') {
         $week_code = trim($_POST['week_code'] ?? $current_week);
         $year      = intval($_POST['year'] ?? date('Y'));
@@ -99,7 +98,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
     }
 
-    // Sửa món ăn trong thực đơn
     if ($act === 'update_menu_item') {
         $menu_id   = intval($_POST['menu_id']);
         $day_of_w  = trim($_POST['day_of_week'] ?? 'Thứ 2');
@@ -125,7 +123,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
     }
 
-    // Xóa món ăn khỏi thực đơn
     if ($act === 'delete_menu_item') {
         $menu_id = intval($_POST['menu_id']);
         if ($menu_id > 0) {
@@ -144,7 +141,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
     }
 
-    // Thêm đánh giá chất lượng không giới hạn
     if ($act === 'add_quality_feedback') {
         $menu_id = intval($_POST['menu_id']);
         $c_date  = $_POST['check_date'] ?? $today;
@@ -165,7 +161,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
     }
 
-    // Sửa đánh giá chất lượng
     if ($act === 'update_quality_feedback') {
         $feedback_id = intval($_POST['feedback_id']);
         $rating = trim($_POST['quality_rating'] ?? 'Tốt');
@@ -186,7 +181,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
     }
 
-    // Xóa đánh giá chất lượng
     if ($act === 'delete_quality_feedback') {
         $feedback_id = intval($_POST['feedback_id']);
         if ($feedback_id > 0) {
@@ -199,7 +193,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
     }
 
-    // Trích xuất thông minh từ File Excel / Hình ảnh
     if ($act === 'smart_import_file') {
         $week_code = trim($_POST['week_code'] ?? $current_week);
         $year      = intval($_POST['year'] ?? date('Y'));
@@ -241,7 +234,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
     }
 
-    // Kiểm tra hàng ngày: Lưu và Khóa cứng không cho đánh giá lại trừ khi bấm Hủy (mở khóa)
     if ($act === 'save_daily_check') {
         $menu_id    = intval($_POST['menu_id']);
         $c_date     = $_POST['check_date'] ?? $today;
@@ -277,7 +269,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
     }
 
-    // Mở khóa (Hủy trạng thái khóa để đánh giá lại)
     if ($act === 'unlock_daily_check') {
         $menu_id = intval($_POST['menu_id']);
         $c_date  = $_POST['check_date'] ?? $today;
@@ -369,7 +360,6 @@ try {
 
 $selected_week = $_GET['f_week'] ?? ($availableWeeks[0] ?? $current_week);
 
-// Chỉ lấy các món ăn thuộc ngày đã chọn ($check_date tương ứng với $selected_day_name)
 $todayMenus = [];
 try {
     $stmtM = $pdo->prepare("
@@ -383,7 +373,6 @@ try {
     $todayMenus = $stmtM->fetchAll();
 } catch (PDOException $e) {}
 
-// Lấy tất cả món trong tuần để phục vụ modal thêm đánh giá chất lượng
 $allWeekMenus = [];
 try {
     $stmtAW = $pdo->prepare("SELECT * FROM meal_menus WHERE week_code = :wcode ORDER BY id DESC");
@@ -391,7 +380,6 @@ try {
     $allWeekMenus = $stmtAW->fetchAll();
 } catch (PDOException $e) {}
 
-// Lấy danh sách đánh giá chất lượng trong ngày chọn
 $qualityFeedbacks = [];
 try {
     $stmtF = $pdo->prepare("
@@ -404,7 +392,6 @@ try {
     $qualityFeedbacks = $stmtF->fetchAll();
 } catch (PDOException $e) {}
 
-// Top món bị điều chỉnh cao nhất
 $topAdjustedDishes = [];
 try {
     $stmtTop = $pdo->prepare("
@@ -420,7 +407,6 @@ try {
     $topAdjustedDishes = $stmtTop->fetchAll();
 } catch (PDOException $e) {}
 
-// Đánh giá chất lượng chiếm đa số
 $dominantRatings = [];
 try {
     $stmtRat = $pdo->prepare("
@@ -434,7 +420,6 @@ try {
     $dominantRatings = $stmtRat->fetchAll();
 } catch (PDOException $e) {}
 
-// Thuật toán kết luận thông minh
 $smartInsights = [];
 try {
     $stmtW = $pdo->prepare("
@@ -648,7 +633,6 @@ include 'header.php';
                                 </td>
                             </tr>
                         <?php endforeach; ?>
-                    <?-- Nếu ngày đó chưa được xếp món ăn --?>
                     <?php else: ?>
                         <tr><td colspan="6" style="text-align:center; padding:25px; color:#64748b;">Không có món ăn nào được lên lịch cho ngày <strong><?= $selected_day_name ?></strong> trong tuần này. Bạn có thể thêm món bằng nút "Thêm Thực Đơn".</td></tr>
                     <?php endif; ?>
@@ -761,6 +745,7 @@ include 'header.php';
                 </thead>
                 <tbody>
                     <?php if (!empty($dominantRatings)): ?>
+                        <?>
                         <?php 
                         $totalRat = array_sum(array_column($dominantRatings, 'count_rat')) ?: 1;
                         foreach ($dominantRatings as $dr): 

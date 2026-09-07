@@ -15,7 +15,7 @@ $current_week = date('Y-\WW'); // VD: 2026-W37
 
 $check_date = $_GET['check_date'] ?? $today;
 $view_mode = $_GET['view_mode'] ?? 'all_week'; 
-$f_week = $_GET['f_week'] ?? 'all'; // Mặc định là 'all' để hiển thị toàn bộ món đã nhập
+$f_week = $_GET['f_week'] ?? 'all'; // Mặc định hiển thị tất cả tuần để thấy ngay món vừa thêm
 
 // Lấy tên ngày trong tuần tiếng Việt từ $check_date
 function getDayOfWeekVN($dateStr) {
@@ -93,7 +93,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     ':wcode' => $week_code, ':yr' => $year, ':dow' => $day_of_w,
                     ':mtype' => $meal_type, ':dname' => $dish_name, ':desc' => $desc
                 ]);
-                $message = "Đã thêm món ăn vào hệ thống thành công!";
+                $message = "Đã thêm món ăn vào thực đơn thành công!";
             } catch (PDOException $e) {
                 $error = "Lỗi thêm thực đơn: " . $e->getMessage();
             }
@@ -149,7 +149,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $pdo->exec("TRUNCATE TABLE meal_checks");
             $pdo->exec("TRUNCATE TABLE meal_quality_feedback");
             $pdo->exec("TRUNCATE TABLE meal_menus");
-            $message = "Đã reset toàn bộ dữ liệu thực đơn và đánh giá suất ăn về 0!";
+            $message = "Đã reset toàn bộ dữ liệu thực đơn và đánh giá về 0!";
         } catch (PDOException $e) {
             $error = "Lỗi reset dữ liệu: " . $e->getMessage();
         }
@@ -238,7 +238,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $count++;
                 }
                 $pdo->commit();
-                $message = "Đã trích xuất và nhập thành công {$count} món ăn vào thực đơn!";
+                $message = "Đã trích xuất và nhập thành công {$count} món ăn!";
             } catch (Exception $e) {
                 if ($pdo->inTransaction()) $pdo->rollBack();
                 $error = "Lỗi phân tích file thông minh: " . $e->getMessage();
@@ -372,17 +372,28 @@ try {
     $availableWeeks = $pdo->query("SELECT DISTINCT week_code FROM meal_menus ORDER BY week_code DESC")->fetchAll(PDO::FETCH_COLUMN);
 } catch (PDOException $e) {}
 
-// Lấy danh sách món ăn: Nếu $f_week === 'all' thì hiển thị tất cả các món đã có trong CSDL
+// Truy vấn danh sách món ăn: Hỗ trợ xem tất cả tuần hoặc lọc theo tuần và ngày
 $todayMenus = [];
 try {
     if ($f_week === 'all') {
-        $stmtM = $pdo->prepare("
-            SELECT m.*, c.is_correct, c.adjustment_percent, c.is_locked 
-            FROM meal_menus m 
-            LEFT JOIN meal_checks c ON m.id = c.menu_id AND c.check_date = :cdate
-            ORDER BY m.id DESC
-        ");
-        $stmtM->execute([':cdate' => $check_date]);
+        if ($view_mode === 'all_week') {
+            $stmtM = $pdo->prepare("
+                SELECT m.*, c.is_correct, c.adjustment_percent, c.is_locked 
+                FROM meal_menus m 
+                LEFT JOIN meal_checks c ON m.id = c.menu_id AND c.check_date = :cdate
+                ORDER BY m.id DESC
+            ");
+            $stmtM->execute([':cdate' => $check_date]);
+        } else {
+            $stmtM = $pdo->prepare("
+                SELECT m.*, c.is_correct, c.adjustment_percent, c.is_locked 
+                FROM meal_menus m 
+                LEFT JOIN meal_checks c ON m.id = c.menu_id AND c.check_date = :cdate
+                WHERE TRIM(LOWER(m.day_of_week)) = TRIM(LOWER(:dname))
+                ORDER BY m.id DESC
+            ");
+            $stmtM->execute([':cdate' => $check_date, ':dname' => $selected_day_name]);
+        }
     } else {
         if ($view_mode === 'all_week') {
             $stmtM = $pdo->prepare("
@@ -782,6 +793,7 @@ include 'header.php';
     </form>
 
     <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(480px, 1fr)); gap:22px;">
+        <!-- TOP MÓN ĐIỀU CHỈNH CAO NHẤT -->
         <div class="card-box" style="margin-bottom:0;">
             <h3 style="font-size:1.1rem; color:#334155; margin-bottom:12px;">📈 Top Món Ăn Bị Điều Chỉnh / Nấu Sai Nhiều Nhất</h3>
             <table class="table-data">
@@ -808,6 +820,7 @@ include 'header.php';
             </table>
         </div>
 
+        <!-- ĐÁNH GIÁ CHẤT LƯỢNG CHIẾM ĐA SỐ -->
         <div class="card-box" style="margin-bottom:0;">
             <h3 style="font-size:1.1rem; color:#334155; margin-bottom:12px;">⭐ Tỷ Lệ Đánh Giá Chất Lượng Chung</h3>
             <table class="table-data">

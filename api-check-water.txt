@@ -1,0 +1,18 @@
+<?php
+// api-check-water.php
+require_once 'db_connect.php';
+
+header('Content-Type: application/json; charset=utf-8');
+
+$pending_water_count = 0;
+try {
+    $stmt = $pdo->query("SELECT COUNT(*) FROM water_proposals WHERE status = 'Chờ cấp phát'");
+    $pending_water_count = intval($stmt->fetchColumn());
+} catch (PDOException $e) {
+    $pending_water_count = 0;
+}
+
+echo json_encode([
+    'success' => true,
+    'pending_water_count' => $pending_water_count
+]);

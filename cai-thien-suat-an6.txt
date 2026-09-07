@@ -14,7 +14,8 @@ $today = date('Y-m-d');
 $current_week = date('Y-\WW'); // VD: 2026-W37
 
 $check_date = $_GET['check_date'] ?? $today;
-$view_mode = $_GET['view_mode'] ?? 'all_week'; // Mặc định để 'all_week' để thấy ngay món vừa thêm
+$view_mode = $_GET['view_mode'] ?? 'all_week'; 
+$f_week = $_GET['f_week'] ?? 'all'; // Mặc định là 'all' để hiển thị toàn bộ món đã nhập
 
 // Lấy tên ngày trong tuần tiếng Việt từ $check_date
 function getDayOfWeekVN($dateStr) {
@@ -92,7 +93,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     ':wcode' => $week_code, ':yr' => $year, ':dow' => $day_of_w,
                     ':mtype' => $meal_type, ':dname' => $dish_name, ':desc' => $desc
                 ]);
-                $message = "Đã thêm món ăn vào thực đơn tuần [{$week_code}] thành công!";
+                $message = "Đã thêm món ăn vào hệ thống thành công!";
             } catch (PDOException $e) {
                 $error = "Lỗi thêm thực đơn: " . $e->getMessage();
             }
@@ -101,6 +102,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
     if ($act === 'update_menu_item') {
         $menu_id   = intval($_POST['menu_id']);
+        $week_code = trim($_POST['week_code'] ?? $current_week);
         $day_of_w  = trim($_POST['day_of_week'] ?? 'Thứ 2');
         $meal_type = trim($_POST['meal_type'] ?? 'Bữa Trưa');
         $dish_name = trim($_POST['dish_name'] ?? '');
@@ -110,11 +112,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             try {
                 $stmt = $pdo->prepare("
                     UPDATE meal_menus 
-                    SET day_of_week = :dow, meal_type = :mtype, dish_name = :dname, description = :desc
+                    SET week_code = :wcode, day_of_week = :dow, meal_type = :mtype, dish_name = :dname, description = :desc
                     WHERE id = :id
                 ");
                 $stmt->execute([
-                    ':dow' => $day_of_w, ':mtype' => $meal_type, 
+                    ':wcode' => $week_code, ':dow' => $day_of_w, ':mtype' => $meal_type, 
                     ':dname' => $dish_name, ':desc' => $desc, ':id' => $menu_id
                 ]);
                 $message = "Đã cập nhật thông tin món ăn thành công!";
@@ -236,7 +238,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $count++;
                 }
                 $pdo->commit();
-                $message = "Đã trích xuất và nhập thành công {$count} món ăn vào thực đơn tuần [{$week_code}]!";
+                $message = "Đã trích xuất và nhập thành công {$count} món ăn vào thực đơn!";
             } catch (Exception $e) {
                 if ($pdo->inTransaction()) $pdo->rollBack();
                 $error = "Lỗi phân tích file thông minh: " . $e->getMessage();
@@ -370,48 +372,71 @@ try {
     $availableWeeks = $pdo->query("SELECT DISTINCT week_code FROM meal_menus ORDER BY week_code DESC")->fetchAll(PDO::FETCH_COLUMN);
 } catch (PDOException $e) {}
 
-$selected_week = $_GET['f_week'] ?? ($availableWeeks[0] ?? $current_week);
-
+// Lấy danh sách món ăn: Nếu $f_week === 'all' thì hiển thị tất cả các món đã có trong CSDL
 $todayMenus = [];
 try {
-    if ($view_mode === 'all_week') {
+    if ($f_week === 'all') {
         $stmtM = $pdo->prepare("
             SELECT m.*, c.is_correct, c.adjustment_percent, c.is_locked 
             FROM meal_menus m 
             LEFT JOIN meal_checks c ON m.id = c.menu_id AND c.check_date = :cdate
-            WHERE m.week_code = :wcode
-            ORDER BY FIELD(TRIM(m.day_of_week), 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ Nhật'), m.id DESC
-        ");
-        $stmtM->execute([':cdate' => $check_date, ':wcode' => $selected_week]);
-    } else {
-        $stmtM = $pdo->prepare("
-            SELECT m.*, c.is_correct, c.adjustment_percent, c.is_locked 
-            FROM meal_menus m 
-            LEFT JOIN meal_checks c ON m.id = c.menu_id AND c.check_date = :cdate
-            WHERE m.week_code = :wcode AND TRIM(LOWER(m.day_of_week)) = TRIM(LOWER(:dname))
             ORDER BY m.id DESC
         ");
-        $stmtM->execute([':cdate' => $check_date, ':wcode' => $selected_week, ':dname' => $selected_day_name]);
+        $stmtM->execute([':cdate' => $check_date]);
+    } else {
+        if ($view_mode === 'all_week') {
+            $stmtM = $pdo->prepare("
+                SELECT m.*, c.is_correct, c.adjustment_percent, c.is_locked 
+                FROM meal_menus m 
+                LEFT JOIN meal_checks c ON m.id = c.menu_id AND c.check_date = :cdate
+                WHERE m.week_code = :wcode
+                ORDER BY FIELD(TRIM(m.day_of_week), 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ Nhật'), m.id DESC
+            ");
+            $stmtM->execute([':cdate' => $check_date, ':wcode' => $f_week]);
+        } else {
+            $stmtM = $pdo->prepare("
+                SELECT m.*, c.is_correct, c.adjustment_percent, c.is_locked 
+                FROM meal_menus m 
+                LEFT JOIN meal_checks c ON m.id = c.menu_id AND c.check_date = :cdate
+                WHERE m.week_code = :wcode AND TRIM(LOWER(m.day_of_week)) = TRIM(LOWER(:dname))
+                ORDER BY m.id DESC
+            ");
+            $stmtM->execute([':cdate' => $check_date, ':wcode' => $f_week, ':dname' => $selected_day_name]);
+        }
     }
     $todayMenus = $stmtM->fetchAll();
 } catch (PDOException $e) {}
 
 $allWeekMenus = [];
 try {
-    $stmtAW = $pdo->prepare("SELECT * FROM meal_menus WHERE week_code = :wcode ORDER BY id DESC");
-    $stmtAW->execute([':wcode' => $selected_week]);
-    $allWeekMenus = $stmtAW->fetchAll();
+    if ($f_week === 'all') {
+        $allWeekMenus = $pdo->query("SELECT * FROM meal_menus ORDER BY id DESC")->fetchAll();
+    } else {
+        $stmtAW = $pdo->prepare("SELECT * FROM meal_menus WHERE week_code = :wcode ORDER BY id DESC");
+        $stmtAW->execute([':wcode' => $f_week]);
+        $allWeekMenus = $stmtAW->fetchAll();
+    }
 } catch (PDOException $e) {}
 
 $qualityFeedbacks = [];
 try {
-    $stmtF = $pdo->prepare("
-        SELECT f.*, m.dish_name FROM meal_quality_feedback f
-        JOIN meal_menus m ON f.menu_id = m.id
-        WHERE f.check_date = :cdate AND m.week_code = :wcode
-        ORDER BY f.id DESC
-    ");
-    $stmtF->execute([':cdate' => $check_date, ':wcode' => $selected_week]);
+    if ($f_week === 'all') {
+        $stmtF = $pdo->prepare("
+            SELECT f.*, m.dish_name FROM meal_quality_feedback f
+            JOIN meal_menus m ON f.menu_id = m.id
+            WHERE f.check_date = :cdate
+            ORDER BY f.id DESC
+        ");
+        $stmtF->execute([':cdate' => $check_date]);
+    } else {
+        $stmtF = $pdo->prepare("
+            SELECT f.*, m.dish_name FROM meal_quality_feedback f
+            JOIN meal_menus m ON f.menu_id = m.id
+            WHERE f.check_date = :cdate AND m.week_code = :wcode
+            ORDER BY f.id DESC
+        ");
+        $stmtF->execute([':cdate' => $check_date, ':wcode' => $f_week]);
+    }
     $qualityFeedbacks = $stmtF->fetchAll();
 } catch (PDOException $e) {}
 
@@ -537,13 +562,12 @@ include 'header.php';
             </p>
         </div>
         <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-            <a href="cai-thien-suat-an.php?export_excel=1&stat_period=<?= urlencode($stat_period) ?>&f_week=<?= urlencode($selected_week) ?>" class="btn-export">
+            <a href="cai-thien-suat-an.php?export_excel=1&stat_period=<?= urlencode($stat_period) ?>&f_week=<?= urlencode($f_week) ?>" class="btn-export">
                 📊 Xuất Excel Báo Cáo
             </a>
             <button class="btn-action" style="background:#8b5cf6;" onclick="openModal('modal-smart-import')">📥 Nhập Thông Minh</button>
             <button class="btn-action" onclick="openModal('modal-manual-menu')">+ Thêm Thực Đơn</button>
             
-            <!-- Nút Xem Thêm chứa nút Reset ẩn chống bấm nhầm -->
             <div class="more-dropdown">
                 <button type="button" class="btn-action" style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1;" onclick="toggleMoreMenu(event)">
                     ⚙️ Xem Thêm ▾
@@ -561,7 +585,6 @@ include 'header.php';
     <?php if ($message): ?><div class="alert-box alert-success"><?= $message ?></div><?php endif; ?>
     <?php if ($error): ?><div class="alert-box alert-danger"><?= htmlspecialchars($error) ?></div><?php endif; ?>
 
-    <!-- TRỢ LÝ THÔNG MINH -->
     <div class="card-box" style="border-left: 5px solid #0284c7;">
         <h3 style="font-size:1.1rem; color:#0369a1; margin-bottom:12px;">🧠 Kết Luận & Phân Tích Thông Minh Tự Động</h3>
         <?php if (!empty($smartInsights)): ?>
@@ -582,20 +605,19 @@ include 'header.php';
             <input type="hidden" name="check_date" value="<?= htmlspecialchars($check_date) ?>">
             <input type="hidden" name="view_mode" value="<?= htmlspecialchars($view_mode) ?>">
             <label style="font-weight:700; font-size:0.9rem;">📅 Chọn Tuần:</label>
-            <select name="f_week" onchange="this.form.submit()" style="padding:7px 12px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.9rem; min-width:160px;">
+            <select name="f_week" onchange="this.form.submit()" style="padding:7px 12px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.9rem; min-width:180px;">
+                <option value="all" <?= $f_week === 'all' ? 'selected' : '' ?>>-- Hiển thị tất cả các tuần --</option>
                 <?php if (!empty($availableWeeks)): ?>
                     <?php foreach ($availableWeeks as $wk): ?>
-                        <option value="<?= htmlspecialchars($wk) ?>" <?= $selected_week === $wk ? 'selected' : '' ?>>Tuần: <?= htmlspecialchars($wk) ?></option>
+                        <option value="<?= htmlspecialchars($wk) ?>" <?= $f_week === $wk ? 'selected' : '' ?>>Tuần: <?= htmlspecialchars($wk) ?></option>
                     <?php endforeach; ?>
-                <?php else: ?>
-                    <option value="<?= $current_week ?>">Tuần hiện tại: <?= $current_week ?></option>
                 <?php endif; ?>
             </select>
         </form>
 
         <form method="GET" action="cai-thien-suat-an.php" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:0;">
             <input type="hidden" name="stat_period" value="<?= htmlspecialchars($stat_period) ?>">
-            <input type="hidden" name="f_week" value="<?= htmlspecialchars($selected_week) ?>">
+            <input type="hidden" name="f_week" value="<?= htmlspecialchars($f_week) ?>">
             <input type="hidden" name="view_mode" value="<?= htmlspecialchars($view_mode) ?>">
             <label style="font-weight:700; font-size:0.9rem;">🗓️ Ngày Kiểm Tra:</label>
             <input type="date" name="check_date" value="<?= htmlspecialchars($check_date) ?>" onchange="this.form.submit()" style="padding:6px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.9rem;">
@@ -603,7 +625,7 @@ include 'header.php';
 
         <form method="GET" action="cai-thien-suat-an.php" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:0; margin-left:auto;">
             <input type="hidden" name="stat_period" value="<?= htmlspecialchars($stat_period) ?>">
-            <input type="hidden" name="f_week" value="<?= htmlspecialchars($selected_week) ?>">
+            <input type="hidden" name="f_week" value="<?= htmlspecialchars($f_week) ?>">
             <input type="hidden" name="check_date" value="<?= htmlspecialchars($check_date) ?>">
             <label style="font-weight:700; font-size:0.9rem;">👁️ Chế độ xem:</label>
             <select name="view_mode" onchange="this.form.submit()" style="padding:7px 12px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.9rem; background:#f0f9ff; color:#0369a1; font-weight:700;">
@@ -616,8 +638,8 @@ include 'header.php';
     <!-- BẢNG HIỂN THỊ THỰC ĐƠN & KIỂM TRA THỰC TẾ -->
     <div class="card-box">
         <h3 style="font-size:1.1rem; color:#334155; margin-bottom:15px;">
-            📋 Danh Sách Thực Đơn Tuần [<?= htmlspecialchars($selected_week) ?>] 
-            <span style="color:#0284c7; font-size:0.95rem;">(<?= $view_mode === 'all_week' ? 'Hiển thị toàn bộ từ Thứ 2 đến Chủ nhật' : 'Hiển thị riêng ngày: ' . $selected_day_name ?>)</span>
+            📋 Danh Sách Thực Đơn 
+            <span style="color:#0284c7; font-size:0.95rem;">(<?= $f_week === 'all' ? 'Đang hiển thị toàn bộ món trong CSDL' : 'Tuần: ' . htmlspecialchars($f_week) . ($view_mode === 'all_week' ? ' (Thứ 2 - CN)' : ' (Ngày: ' . $selected_day_name . ')') ?>)</span>
         </h3>
         <div style="overflow-x:auto;">
             <table class="table-data">
@@ -643,12 +665,13 @@ include 'header.php';
                                     <?php if (!empty($m['description'])): ?>
                                         <br><span style="font-size:0.75rem; color:#64748b;"><?= htmlspecialchars($m['description']) ?></span>
                                     <?php endif; ?>
+                                    <br><span style="font-size:0.7rem; color:#94a3b8;">Mã Tuần: [<?= htmlspecialchars($m['week_code']) ?>]</span>
                                     <?php if ($isLocked): ?>
                                         <br><span style="font-size:0.72rem; font-weight:700; color:#16a34a;">🔒 Đã đánh giá & khóa</span>
                                     <?php endif; ?>
                                 </td>
 
-                                <form method="POST" action="cai-thien-suat-an.php?f_week=<?= urlencode($selected_week) ?>&stat_period=<?= urlencode($stat_period) ?>&check_date=<?= urlencode($check_date) ?>&view_mode=<?= urlencode($view_mode) ?>" id="form_check_<?= $m['id'] ?>">
+                                <form method="POST" action="cai-thien-suat-an.php?f_week=<?= urlencode($f_week) ?>&stat_period=<?= urlencode($stat_period) ?>&check_date=<?= urlencode($check_date) ?>&view_mode=<?= urlencode($view_mode) ?>" id="form_check_<?= $m['id'] ?>">
                                     <input type="hidden" name="action" value="save_daily_check">
                                     <input type="hidden" name="menu_id" value="<?= $m['id'] ?>">
                                     <input type="hidden" name="check_date" value="<?= htmlspecialchars($check_date) ?>">
@@ -665,7 +688,7 @@ include 'header.php';
                                     <?php if (!$isLocked): ?>
                                         <button type="submit" form="form_check_<?= $m['id'] ?>" class="btn-action" style="padding:6px 12px; font-size:0.8rem;">Lưu</button>
                                     <?php else: ?>
-                                        <form method="POST" action="cai-thien-suat-an.php?f_week=<?= urlencode($selected_week) ?>&stat_period=<?= urlencode($stat_period) ?>&check_date=<?= urlencode($check_date) ?>&view_mode=<?= urlencode($view_mode) ?>" style="margin:0; display:inline-block;">
+                                        <form method="POST" action="cai-thien-suat-an.php?f_week=<?= urlencode($f_week) ?>&stat_period=<?= urlencode($stat_period) ?>&check_date=<?= urlencode($check_date) ?>&view_mode=<?= urlencode($view_mode) ?>" style="margin:0; display:inline-block;">
                                             <input type="hidden" name="action" value="unlock_daily_check">
                                             <input type="hidden" name="menu_id" value="<?= $m['id'] ?>">
                                             <input type="hidden" name="check_date" value="<?= htmlspecialchars($check_date) ?>">
@@ -677,7 +700,7 @@ include 'header.php';
                                 <td style="text-align:center;">
                                     <div style="display:flex; gap:4px; justify-content:center;">
                                         <button type="button" class="btn-tbl-edit" onclick='openEditMenuModal(<?= json_encode($m, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>)'>Sửa</button>
-                                        <form method="POST" action="cai-thien-suat-an.php?f_week=<?= urlencode($selected_week) ?>&stat_period=<?= urlencode($stat_period) ?>&check_date=<?= urlencode($check_date) ?>&view_mode=<?= urlencode($view_mode) ?>" onsubmit="return confirm('Xóa món này?');" style="margin:0;">
+                                        <form method="POST" action="cai-thien-suat-an.php?f_week=<?= urlencode($f_week) ?>&stat_period=<?= urlencode($stat_period) ?>&check_date=<?= urlencode($check_date) ?>&view_mode=<?= urlencode($view_mode) ?>" onsubmit="return confirm('Xóa món này?');" style="margin:0;">
                                             <input type="hidden" name="action" value="delete_menu_item">
                                             <input type="hidden" name="menu_id" value="<?= $m['id'] ?>">
                                             <button type="submit" class="btn-tbl-del">Xóa</button>
@@ -726,7 +749,7 @@ include 'header.php';
                                 <td style="text-align:center;">
                                     <div style="display:flex; gap:4px; justify-content:center;">
                                         <button type="button" class="btn-tbl-edit" onclick='openEditFeedbackModal(<?= json_encode($fb, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>)'>Sửa</button>
-                                        <form method="POST" action="cai-thien-suat-an.php?f_week=<?= urlencode($selected_week) ?>&stat_period=<?= urlencode($stat_period) ?>&check_date=<?= urlencode($check_date) ?>&view_mode=<?= urlencode($view_mode) ?>" onsubmit="return confirm('Xóa ý kiến đánh giá này?');" style="margin:0;">
+                                        <form method="POST" action="cai-thien-suat-an.php?f_week=<?= urlencode($f_week) ?>&stat_period=<?= urlencode($stat_period) ?>&check_date=<?= urlencode($check_date) ?>&view_mode=<?= urlencode($view_mode) ?>" onsubmit="return confirm('Xóa ý kiến đánh giá này?');" style="margin:0;">
                                             <input type="hidden" name="action" value="delete_quality_feedback">
                                             <input type="hidden" name="feedback_id" value="<?= $fb['id'] ?>">
                                             <button type="submit" class="btn-tbl-del">Xóa</button>
@@ -745,7 +768,7 @@ include 'header.php';
 
     <!-- BỘ LỌC THỐNG KÊ -->
     <form method="GET" action="cai-thien-suat-an.php" class="card-box" style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; padding:15px 20px;">
-        <input type="hidden" name="f_week" value="<?= htmlspecialchars($selected_week) ?>">
+        <input type="hidden" name="f_week" value="<?= htmlspecialchars($f_week) ?>">
         <input type="hidden" name="check_date" value="<?= htmlspecialchars($check_date) ?>">
         <input type="hidden" name="view_mode" value="<?= htmlspecialchars($view_mode) ?>">
         <label style="font-weight:700; font-size:0.9rem;">📊 Thống kê báo cáo theo mốc thời gian:</label>
@@ -759,7 +782,6 @@ include 'header.php';
     </form>
 
     <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(480px, 1fr)); gap:22px;">
-        <!-- TOP MÓN ĐIỀU CHỈNH CAO NHẤT -->
         <div class="card-box" style="margin-bottom:0;">
             <h3 style="font-size:1.1rem; color:#334155; margin-bottom:12px;">📈 Top Món Ăn Bị Điều Chỉnh / Nấu Sai Nhiều Nhất</h3>
             <table class="table-data">
@@ -786,7 +808,6 @@ include 'header.php';
             </table>
         </div>
 
-        <!-- ĐÁNH GIÁ CHẤT LƯỢNG CHIẾM ĐA SỐ -->
         <div class="card-box" style="margin-bottom:0;">
             <h3 style="font-size:1.1rem; color:#334155; margin-bottom:12px;">⭐ Tỷ Lệ Đánh Giá Chất Lượng Chung</h3>
             <table class="table-data">
@@ -824,7 +845,7 @@ include 'header.php';
 <!-- MODAL THÊM Ý KIẾN ĐÁNH GIÁ -->
 <div id="modal-add-feedback" class="modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.5); z-index:1000; align-items:center; justify-content:center; padding:15px;">
     <div class="card-box" style="width:100%; max-width:500px; margin:0;">
-        <form method="POST" action="cai-thien-suat-an.php?f_week=<?= urlencode($selected_week) ?>&stat_period=<?= urlencode($stat_period) ?>&check_date=<?= urlencode($check_date) ?>&view_mode=<?= urlencode($view_mode) ?>">
+        <form method="POST" action="cai-thien-suat-an.php?f_week=<?= urlencode($f_week) ?>&stat_period=<?= urlencode($stat_period) ?>&check_date=<?= urlencode($check_date) ?>&view_mode=<?= urlencode($view_mode) ?>">
             <input type="hidden" name="action" value="add_quality_feedback">
             <input type="hidden" name="check_date" value="<?= htmlspecialchars($check_date) ?>">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; font-weight:700; font-size:1.1rem;">
@@ -833,10 +854,10 @@ include 'header.php';
             </div>
             <div style="display:flex; flex-direction:column; gap:12px;">
                 <div>
-                    <label style="font-size:0.85rem; font-weight:600;">Chọn món ăn trong tuần: *</label>
+                    <label style="font-size:0.85rem; font-weight:600;">Chọn món ăn trong danh sách: *</label>
                     <select name="menu_id" required style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;">
                         <?php foreach ($allWeekMenus as $awm): ?>
-                            <option value="<?= $awm['id'] ?>"><?= htmlspecialchars($awm['day_of_week']) ?> - <?= htmlspecialchars($awm['dish_name']) ?></option>
+                            <option value="<?= $awm['id'] ?>">[Tuần: <?= htmlspecialchars($awm['week_code']) ?>] <?= htmlspecialchars($awm['day_of_week']) ?> - <?= htmlspecialchars($awm['dish_name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -864,7 +885,7 @@ include 'header.php';
 <!-- MODAL SỬA Ý KIẾN ĐÁNH GIÁ -->
 <div id="modal-edit-feedback" class="modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.5); z-index:1000; align-items:center; justify-content:center; padding:15px;">
     <div class="card-box" style="width:100%; max-width:500px; margin:0;">
-        <form method="POST" action="cai-thien-suat-an.php?f_week=<?= urlencode($selected_week) ?>&stat_period=<?= urlencode($stat_period) ?>&check_date=<?= urlencode($check_date) ?>&view_mode=<?= urlencode($view_mode) ?>">
+        <form method="POST" action="cai-thien-suat-an.php?f_week=<?= urlencode($f_week) ?>&stat_period=<?= urlencode($stat_period) ?>&check_date=<?= urlencode($check_date) ?>&view_mode=<?= urlencode($view_mode) ?>">
             <input type="hidden" name="action" value="update_quality_feedback">
             <input type="hidden" name="feedback_id" id="edit_feedback_id">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; font-weight:700; font-size:1.1rem;">
@@ -893,10 +914,10 @@ include 'header.php';
     </div>
 </div>
 
-<!-- MODAL THÊM THỰC ĐƠN THỦ CÔNG (ĐÃ CÓ CHỌN THỨ TỰ ĐỘNG BẮT THEO NGÀY ĐANG CHỌN) -->
+<!-- MODAL THÊM THỰC ĐƠN THỦ CÔNG -->
 <div id="modal-manual-menu" class="modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.5); z-index:1000; align-items:center; justify-content:center; padding:15px;">
     <div class="card-box" style="width:100%; max-width:500px; margin:0;">
-        <form method="POST" action="cai-thien-suat-an.php?f_week=<?= urlencode($selected_week) ?>&stat_period=<?= urlencode($stat_period) ?>&check_date=<?= urlencode($check_date) ?>&view_mode=<?= urlencode($view_mode) ?>">
+        <form method="POST" action="cai-thien-suat-an.php?f_week=<?= urlencode($f_week) ?>&stat_period=<?= urlencode($stat_period) ?>&check_date=<?= urlencode($check_date) ?>&view_mode=<?= urlencode($view_mode) ?>">
             <input type="hidden" name="action" value="add_menu_manual">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; font-weight:700; font-size:1.1rem;">
                 <span>Thêm Món Ăn Vào Thực Đơn Tuần</span>
@@ -905,7 +926,7 @@ include 'header.php';
             <div style="display:flex; flex-direction:column; gap:12px;">
                 <div>
                     <label style="font-size:0.85rem; font-weight:600;">Mã Tuần (VD: 2026-W37):</label>
-                    <input type="text" name="week_code" value="<?= $selected_week ?>" required style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;">
+                    <input type="text" name="week_code" value="<?= $f_week !== 'all' ? $f_week : $current_week ?>" required style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;">
                 </div>
                 <div>
                     <label style="font-size:0.85rem; font-weight:600;">Năm:</label>
@@ -943,7 +964,7 @@ include 'header.php';
 <!-- MODAL SỬA MÓN ĂN -->
 <div id="modal-edit-menu" class="modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.5); z-index:1000; align-items:center; justify-content:center; padding:15px;">
     <div class="card-box" style="width:100%; max-width:500px; margin:0;">
-        <form method="POST" action="cai-thien-suat-an.php?f_week=<?= urlencode($selected_week) ?>&stat_period=<?= urlencode($stat_period) ?>&check_date=<?= urlencode($check_date) ?>&view_mode=<?= urlencode($view_mode) ?>">
+        <form method="POST" action="cai-thien-suat-an.php?f_week=<?= urlencode($f_week) ?>&stat_period=<?= urlencode($stat_period) ?>&check_date=<?= urlencode($check_date) ?>&view_mode=<?= urlencode($view_mode) ?>">
             <input type="hidden" name="action" value="update_menu_item">
             <input type="hidden" name="menu_id" id="edit_menu_id">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; font-weight:700; font-size:1.1rem;">
@@ -951,6 +972,10 @@ include 'header.php';
                 <span style="cursor:pointer;" onclick="closeModal('modal-edit-menu')">&times;</span>
             </div>
             <div style="display:flex; flex-direction:column; gap:12px;">
+                <div>
+                    <label style="font-size:0.85rem; font-weight:600;">Mã Tuần:</label>
+                    <input type="text" name="week_code" id="edit_week_code" required style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;">
+                </div>
                 <div>
                     <label style="font-size:0.85rem; font-weight:600;">Thứ trong tuần:</label>
                     <select name="day_of_week" id="edit_day_of_week" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;">
@@ -987,7 +1012,7 @@ include 'header.php';
 <!-- MODAL NHẬP THÔNG MINH -->
 <div id="modal-smart-import" class="modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.5); z-index:1000; align-items:center; justify-content:center; padding:15px;">
     <div class="card-box" style="width:100%; max-width:560px; margin:0;">
-        <form method="POST" action="cai-thien-suat-an.php?f_week=<?= urlencode($selected_week) ?>&stat_period=<?= urlencode($stat_period) ?>&check_date=<?= urlencode($check_date) ?>&view_mode=<?= urlencode($view_mode) ?>">
+        <form method="POST" action="cai-thien-suat-an.php?f_week=<?= urlencode($f_week) ?>&stat_period=<?= urlencode($stat_period) ?>&check_date=<?= urlencode($check_date) ?>&view_mode=<?= urlencode($view_mode) ?>">
             <input type="hidden" name="action" value="smart_import_file">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; font-weight:700; font-size:1.1rem;">
                 <span>🤖 Trích Xuất Thông Minh (Excel / Hình Ảnh Thực Đơn)</span>
@@ -996,7 +1021,7 @@ include 'header.php';
             <div style="display:flex; flex-direction:column; gap:12px;">
                 <div>
                     <label style="font-size:0.85rem; font-weight:600;">Mã Tuần áp dụng:</label>
-                    <input type="text" name="week_code" value="<?= $selected_week ?>" required style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;">
+                    <input type="text" name="week_code" value="<?= $f_week !== 'all' ? $f_week : $current_week ?>" required style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;">
                 </div>
                 <div>
                     <label style="font-size:0.85rem; font-weight:600;">Tải lên File Excel / Hình ảnh thực đơn:</label>
@@ -1032,6 +1057,7 @@ window.onclick = function(e) {
 
 function openEditMenuModal(m) {
     document.getElementById('edit_menu_id').value = m.id;
+    document.getElementById('edit_week_code').value = m.week_code || '';
     document.getElementById('edit_day_of_week').value = m.day_of_week;
     document.getElementById('edit_meal_type').value = m.meal_type || 'Bữa Trưa';
     document.getElementById('edit_dish_name').value = m.dish_name;

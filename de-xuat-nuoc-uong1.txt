@@ -121,9 +121,9 @@ try {
 // 5. Lấy danh sách phòng ban từ db_connect.php hoặc cơ sở dữ liệu
 if (!isset($departments) || !is_array($departments)) {
     $departments = [
-        'Ban Giám Đốc', 'Phòng Hành Chính - Nhân Sự', 'Phòng Kế Toán - Tài Chính', 
-        'Phòng Kỹ Thuật - IT', 'Phòng Kinh Doanh - Marketing', 'Phòng Quản Lý Chất Lượng (QA/QC)', 
-        'Bộ Phận Sản Xuất / Kho Vận', 'Bộ Phận Bếp & Dịch Vụ'
+        'Ban Giám Đốc', 'NHÂN SỰ/ Human Resources', 'CƠ ĐIỆN/ Maintenance Department', 
+        'DHSX/ Production Operations Department', 'QC', 'QA', 
+        'VẬT TƯ/ Materials Department', 'THỐNG KÊ/ Data Control', 'KHO/ Cold Storage Department', 'AN NINH/ Security', 'Ủ CHUA/ Fish silage'
     ];
 }
 try {

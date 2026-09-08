@@ -138,7 +138,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             ]);
             
             // Dùng PRG pattern: Lưu thông báo và chuyển hướng sang GET để tránh lặp submit khi refresh
-            $_SESSION['flash_message'] = "Đã gửi yêu cầu cấp nước uống thành công (Mã: $requestCode)! Nhân sự sẽ tiếp nhận và cấp phát sau 9h sáng thứ 2 hàng tuần. Trân trọng!";
+            $_SESSION['flash_message'] = "Đã gửi yêu cầu cấp nước uống thành công (Mã: $requestCode)! Nhân sự sẽ tiếp nhận và duyệt trước khi cấp phát sau 9h sáng thứ 2 hàng tuần. Vui lòng quay lại kiểm tra kết quả duyệt sớm nhất. Trân trọng!";
             header("Location: de-xuat-nuoc-uong.php");
             exit;
         } catch (PDOException $e) {

@@ -1,0 +1,52 @@
+<?php
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
+// 1. CẤU HÌNH SESSION RIÊNG BIỆT (Tránh trùng với website khác)
+if (session_status() === PHP_SESSION_NONE) {
+    session_name('HRM_PORTAL_SESSION'); // Tên định danh session riêng cho web Nhân Sự
+    session_set_cookie_params([
+        'lifetime' => 0,               // Hết hạn khi đóng trình duyệt
+        'path'     => '/',             // Áp dụng cho thư mục gốc/website này
+        'httponly' => true,            // Bảo vệ cookie khỏi JavaScript (chống XSS)
+        'samesite' => 'Lax'
+    ]);
+    session_start();
+}
+
+// 2. KẾT NỐI DATABASE
+$host = 'localhost';
+$db   = 'thanhnha12_nhansu';
+$user = 'thanhnha12_nhansu';
+$pass = 'am@'; // Thay mật khẩu của bạn vào đây
+$charset = 'utf8mb4';
+
+$dsn = "mysql:host=$host;dbname=$db;charset=$charset";
+$options = [
+    PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+    PDO::ATTR_EMULATE_PREPARES   => false,
+];
+
+try {
+    $pdo = new PDO($dsn, $user, $pass, $options);
+} catch (PDOException $e) {
+    die("Lỗi kết nối cơ sở dữ liệu: " . $e->getMessage());
+}
+// 3. DANH SÁCH PHÒNG BAN CHUẨN DÙNG CHUNG TOÀN HỆ THỐNG
+$DEFAULT_DEPARTMENTS = [
+    'Ban Giám Đốc',
+    'NHÂN SỰ/ Human Resources',
+    'CƠ ĐIỆN/ Maintenance Department',
+    'DHSX/ Production Operations Department',
+    'QC',
+    'QA',
+    'VẬT TƯ/ Materials Department',
+    'THỐNG KÊ/ Data Control',
+    'KHO/ Cold Storage Department',
+    'AN NINH/ Security',
+    'Ủ CHUA/ Fish silage'
+];
+
+?>

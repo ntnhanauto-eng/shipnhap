@@ -1,0 +1,24 @@
+$week_start_date = date('Y-m-d 00:00:00', strtotime('monday this week'));
+$week_end_date   = date('Y-m-d 23:59:59', strtotime('sunday this week'));
+
+$stmtWeek = $pdo->prepare("
+    SELECT 
+        COUNT(*) AS total_req,
+        COUNT(CASE WHEN status = 'Chờ duyệt' THEN 1 ELSE NULL END) AS total_wait,
+        COUNT(CASE WHEN status IN ('Đã duyệt', 'Đã cấp phát', 'Chờ cấp phát') THEN 1 ELSE NULL END) AS total_appr,
+        COUNT(CASE WHEN status = 'Từ chối' THEN 1 ELSE NULL END) AS total_rej
+    FROM water_proposals 
+    WHERE created_at BETWEEN :ws AND :we
+");
+$stmtWeek->execute([':ws' => $week_start_date, ':we' => $week_end_date]);
+$wData = $stmtWeek->fetch(PDO::FETCH_ASSOC);
+
+echo json_encode([
+    'success' => true,
+    'water_week_total' => intval($wData['total_req'] ?? 0),
+    'water_week_wait'  => intval($wData['total_wait'] ?? 0),
+    'water_week_appr'  => intval($wData['total_appr'] ?? 0),
+    'water_week_rej'   => intval($wData['total_rej'] ?? 0),
+    'pending_water_count' => intval($wData['total_wait'] ?? 0)
+]);
+exit;

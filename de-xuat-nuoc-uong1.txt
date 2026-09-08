@@ -1,0 +1,689 @@
+<?php
+// de-xuat-nuoc-uong.php
+// Trang công cộng - KHÔNG YÊU CẦU ĐĂNG NHẬP
+require_once 'db_connect.php';
+
+$message = '';
+$error = '';
+
+// 1. Tự động kiểm tra và đảm bảo các cột cần thiết trong CSDL
+try {
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS `water_proposals` (
+            `id` INT AUTO_INCREMENT PRIMARY KEY,
+            `request_code` VARCHAR(50) DEFAULT NULL,
+            `employee_id` INT DEFAULT NULL,
+            `receiver_name` VARCHAR(150) NOT NULL,
+            `department` VARCHAR(100) NOT NULL,
+            `item_id` INT NOT NULL,
+            `quantity` INT NOT NULL DEFAULT 1,
+            `approved_quantity` INT DEFAULT NULL,
+            `return_bottle_count` INT NOT NULL DEFAULT 0,
+            `delivery_location` TEXT DEFAULT NULL,
+            `approval_note` TEXT DEFAULT NULL,
+            `status` VARCHAR(50) DEFAULT 'Chờ duyệt',
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX (`item_id`),
+            INDEX (`status`),
+            INDEX (`created_at`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    ");
+
+    $cols = $pdo->query("SHOW COLUMNS FROM water_proposals")->fetchAll(PDO::FETCH_COLUMN);
+    if (!in_array('request_code', $cols)) {
+        $pdo->exec("ALTER TABLE water_proposals ADD COLUMN `request_code` VARCHAR(50) DEFAULT NULL AFTER `id`");
+    }
+    if (!in_array('approved_quantity', $cols) && !in_array('approved_qty', $cols)) {
+        $pdo->exec("ALTER TABLE water_proposals ADD COLUMN `approved_quantity` INT DEFAULT NULL AFTER `quantity`");
+    }
+    if (!in_array('approval_note', $cols) && !in_array('note', $cols)) {
+        $pdo->exec("ALTER TABLE water_proposals ADD COLUMN `approval_note` TEXT DEFAULT NULL AFTER `delivery_location`");
+    }
+} catch (PDOException $e) {}
+
+// 2. Xử lý gửi đề xuất
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'submit_proposal') {
+    $receiver_name  = trim($_POST['receiver_name'] ?? '');
+    $department     = trim($_POST['department'] ?? '');
+    $item_id        = intval($_POST['item_id'] ?? 0);
+    $quantity       = intval($_POST['quantity'] ?? 1);
+    $return_bottles = intval($_POST['return_bottle_count'] ?? 0);
+    $delivery_loc   = trim($_POST['delivery_location'] ?? '');
+    $employee_id    = !empty($_POST['employee_id']) ? intval($_POST['employee_id']) : null;
+
+    if (empty($receiver_name) || empty($department) || $item_id <= 0 || $quantity <= 0) {
+        $error = "Vui lòng điền đầy đủ họ tên, phòng ban và chọn loại nước cần đề xuất!";
+    } else {
+        try {
+            // Mã yêu cầu ghép trực tiếp từ Ngày Tháng Năm Giờ Phút Giây chuẩn theo cap-phat-nuoc-uong.php
+            $requestCode = date('YmdHis');
+
+            // Kiểm tra cột lưu mã trong DB để lưu đúng
+            $cols = $pdo->query("SHOW COLUMNS FROM water_proposals")->fetchAll(PDO::FETCH_COLUMN);
+            $reqCol = in_array('request_code', $cols) ? 'request_code' : (in_array('code', $cols) ? 'code' : null);
+
+            if ($reqCol) {
+                $stmt = $pdo->prepare("
+                    INSERT INTO water_proposals ({$reqCol}, employee_id, receiver_name, department, item_id, quantity, return_bottle_count, delivery_location, status)
+                    VALUES (:req_code, :emp_id, :rec_name, :dept, :item_id, :qty, :ret_b, :loc, 'Chờ duyệt')
+                ");
+                $stmt->execute([
+                    ':req_code' => $requestCode,
+                    ':emp_id'   => $employee_id,
+                    ':rec_name' => $receiver_name,
+                    ':dept'     => $department,
+                    ':item_id'  => $item_id,
+                    ':qty'      => $quantity,
+                    ':ret_b'    => max(0, $return_bottles),
+                    ':loc'      => $delivery_loc
+                ]);
+            } else {
+                $stmt = $pdo->prepare("
+                    INSERT INTO water_proposals (employee_id, receiver_name, department, item_id, quantity, return_bottle_count, delivery_location, status)
+                    VALUES (:emp_id, :rec_name, :dept, :item_id, :qty, :ret_b, :loc, 'Chờ duyệt')
+                ");
+                $stmt->execute([
+                    ':emp_id'   => $employee_id,
+                    ':rec_name' => $receiver_name,
+                    ':dept'     => $department,
+                    ':item_id'  => $item_id,
+                    ':qty'      => $quantity,
+                    ':ret_b'    => max(0, $return_bottles),
+                    ':loc'      => $delivery_loc
+                ]);
+            }
+            $message = "Đã gửi yêu cầu cấp nước uống thành công! Nhân sự sẽ tiếp nhận và cấp phát sau 9h sáng thứ 2 hàng tuần. Trân trọng!";
+        } catch (PDOException $e) {
+            $error = "Lỗi gửi yêu cầu: " . $e->getMessage();
+        }
+    }
+}
+
+// 3. Lấy danh sách đề xuất TRONG TUẦN HIỆN TẠI (Thứ 2 đến Chủ Nhật)
+$weeklyProposals = [];
+try {
+    $stmt = $pdo->query("
+        SELECT wp.*, wi.item_name, wi.specification, wi.unit 
+        FROM water_proposals wp
+        LEFT JOIN water_items wi ON wp.item_id = wi.id
+        WHERE YEARWEEK(wp.created_at, 1) = YEARWEEK(NOW(), 1)
+        ORDER BY wp.created_at DESC, wp.id DESC
+    ");
+    $weeklyProposals = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {}
+
+// 4. Lấy danh sách nhân viên để gợi ý tìm kiếm
+$employees = [];
+try {
+    $employees = $pdo->query("SELECT id, fullname, department FROM employees WHERE status = 'Đang làm việc' ORDER BY fullname ASC")->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {}
+
+// 5. Lấy danh sách phòng ban từ db_connect.php hoặc cơ sở dữ liệu
+if (!isset($departments) || !is_array($departments)) {
+    $departments = [
+        'Ban Giám Đốc', 'Phòng Hành Chính - Nhân Sự', 'Phòng Kế Toán - Tài Chính', 
+        'Phòng Kỹ Thuật - IT', 'Phòng Kinh Doanh - Marketing', 'Phòng Quản Lý Chất Lượng (QA/QC)', 
+        'Bộ Phận Sản Xuất / Kho Vận', 'Bộ Phận Bếp & Dịch Vụ'
+    ];
+}
+try {
+    $dbDepts = $pdo->query("SELECT DISTINCT department FROM employees WHERE department IS NOT NULL AND department != ''")->fetchAll(PDO::FETCH_COLUMN);
+    if (!empty($dbDepts)) {
+        $departments = array_unique(array_merge($departments, $dbDepts));
+    }
+} catch (PDOException $e) {}
+
+// 6. Lấy danh mục sản phẩm nước uống
+$waterItems = [];
+try {
+    $waterItems = $pdo->query("SELECT id, item_code, item_name, specification, unit, stock_qty FROM water_items ORDER BY item_code ASC, item_name ASC")->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {}
+?>
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Danh Sách & Phiếu Đề Xuất Cấp Nước Uống</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        body { background-color: #f1f5f9; color: #1e293b; padding: 20px 15px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        
+        .main-card { background: #ffffff; border-radius: 14px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); border: 1px solid #cbd5e1; overflow: hidden; }
+        .main-header { background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); color: #ffffff; padding: 24px 20px; text-align: center; }
+        .main-header h1 { font-size: 1.55rem; font-weight: 800; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .main-header p { font-size: 0.92rem; opacity: 0.95; }
+
+        .alert-wrap { padding: 15px 20px 0; }
+        .alert { padding: 14px 18px; border-radius: 8px; font-size: 0.95rem; font-weight: 600; text-align: center; margin-bottom: 12px; }
+        .alert-success { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+        .alert-danger { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+
+        .table-wrap { padding: 20px; overflow-x: auto; }
+        .data-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; min-width: 1050px; }
+        .data-table th, .data-table td { padding: 12px 14px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
+        .data-table th { background-color: #f8fafc; color: #334155; font-weight: 700; white-space: nowrap; border-top: 1px solid #e2e8f0; }
+        .data-table tbody tr:hover { background-color: #f8fafc; }
+        
+        .badge { display: inline-block; padding: 5px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: 700; text-align: center; white-space: nowrap; }
+        .badge-pending { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+        .badge-approved { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+        .badge-rejected { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+        
+        /* Cột S.L Duyệt có nút mũi tên bấm xem ghi chú */
+        .approved-cell { display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-weight: 700; }
+        .btn-toggle-note {
+            background: #e2e8f0; border: none; width: 20px; height: 20px; border-radius: 50%;
+            display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+            font-size: 0.65rem; color: #0284c7; transition: 0.2s; padding: 0; line-height: 1;
+        }
+        .btn-toggle-note:hover { background: #0284c7; color: #ffffff; }
+        .btn-toggle-note.active { transform: rotate(90deg); background: #0284c7; color: #ffffff; }
+        .note-dropdown-box {
+            display: none; background: #fffbeb; border: 1px dashed #f59e0b; color: #92400e;
+            padding: 5px 8px; border-radius: 6px; font-size: 0.78rem; margin-top: 6px; text-align: left;
+            line-height: 1.35; font-weight: normal;
+        }
+
+        .action-bar { padding: 20px; text-align: center; background: #f8fafc; border-top: 1px solid #e2e8f0; }
+        .btn-create-proposal {
+            background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+            color: #ffffff; border: none; padding: 15px 32px; border-radius: 10px;
+            font-size: 1.1rem; font-weight: 800; cursor: pointer;
+            box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35);
+            transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+            display: inline-flex; align-items: center; gap: 8px;
+        }
+        .btn-create-proposal:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(2, 132, 199, 0.45);
+            background: linear-gradient(135deg, #0369a1 0%, #075985 100%);
+        }
+
+        /* Modal Phiếu Đề Xuất */
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(15, 23, 42, 0.65);
+            display: none; justify-content: center; align-items: center;
+            z-index: 1000; padding: 15px; backdrop-filter: blur(3px);
+        }
+        .modal-card {
+            background: #ffffff; border-radius: 14px; width: 100%; max-width: 580px;
+            max-height: 92vh; overflow-y: auto; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+            animation: modalFadeIn 0.2s ease-out; position: relative;
+        }
+        @keyframes modalFadeIn { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
+        
+        .modal-card-header {
+            background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); color: #ffffff;
+            padding: 18px 20px; display: flex; justify-content: space-between; align-items: center;
+            position: sticky; top: 0; z-index: 10;
+        }
+        .modal-card-header h2 { font-size: 1.25rem; font-weight: 800; }
+        .modal-close-btn { background: none; border: none; color: #ffffff; font-size: 1.6rem; cursor: pointer; line-height: 1; }
+        
+        .proposal-body { padding: 22px; display: flex; flex-direction: column; gap: 15px; }
+        .form-group { display: flex; flex-direction: column; gap: 6px; position: relative; }
+        .form-group label { font-size: 0.9rem; font-weight: 700; color: #334155; }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%; padding: 11px 13px; border: 1px solid #cbd5e1; border-radius: 8px;
+            font-size: 0.95rem; outline: none; background: #fff; transition: border-color 0.2s;
+        }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            border-color: #0284c7; box-shadow: 0 0 0 3px rgba(2,132,199,0.15);
+        }
+        
+        .suggest-list {
+            position: absolute; top: 100%; left: 0; right: 0; background: #ffffff;
+            border: 1px solid #cbd5e1; border-radius: 8px; max-height: 180px;
+            overflow-y: auto; z-index: 50; display: none; box-shadow: 0 10px 15px rgba(0,0,0,0.1);
+            margin-top: 4px;
+        }
+        .suggest-item { padding: 10px 14px; cursor: pointer; border-bottom: 1px solid #f1f5f9; font-size: 0.9rem; }
+        .suggest-item:hover { background-color: #f0f9ff; color: #0284c7; }
+        .bottle-return-box { background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; padding: 14px; display: none; }
+        .hint-text { font-size: 0.78rem; color: #64748b; margin-top: 2px; }
+
+        .btn-submit {
+            background: #0284c7; color: #ffffff; border: none; padding: 13px;
+            border-radius: 8px; font-size: 1.05rem; font-weight: 800; cursor: pointer;
+            width: 100%; transition: background 0.2s; margin-top: 5px;
+        }
+        .btn-submit:hover { background: #0369a1; }
+
+        /* Modal xác nhận gửi đề xuất */
+        .confirm-modal-overlay {
+            position: fixed; inset: 0; background: rgba(15, 23, 42, 0.7);
+            display: none; justify-content: center; align-items: center;
+            z-index: 1100; padding: 16px; backdrop-filter: blur(2px);
+        }
+        .confirm-modal-box {
+            background: #ffffff; border-radius: 12px; width: 100%; max-width: 440px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.25); overflow: hidden;
+            animation: modalFadeIn 0.2s ease-out;
+        }
+        .confirm-modal-header { padding: 16px 20px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-weight: 800; font-size: 1.1rem; color: #0f172a; }
+        .confirm-modal-content { padding: 20px; font-size: 0.95rem; color: #475569; line-height: 1.6; }
+        .confirm-modal-actions { display: flex; gap: 10px; padding: 16px 20px; background: #f8fafc; border-top: 1px solid #e2e8f0; }
+        .btn-modal { flex: 1; padding: 11px 16px; border-radius: 8px; font-size: 0.95rem; font-weight: 700; border: none; cursor: pointer; transition: 0.2s; }
+        .btn-cancel { background: #e2e8f0; color: #334155; }
+        .btn-cancel:hover { background: #cbd5e1; }
+        .btn-confirm { background: #0284c7; color: #ffffff; }
+        .btn-confirm:hover { background: #0369a1; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="main-card">
+        <!-- Header -->
+        <div class="main-header">
+            <h1>DANH SÁCH ĐỀ XUẤT NƯỚC UỐNG</h1>
+            <p>Hệ thống theo dõi & tổng hợp nhu cầu cấp nước uống nội bộ trong tuần (Thứ 2 - Chủ Nhật)</p>
+        </div>
+
+        <!-- Thông báo kết quả -->
+        <?php if ($message || $error): ?>
+            <div class="alert-wrap">
+                <?php if ($message): ?>
+                    <div class="alert alert-success">
+                        <?= htmlspecialchars($message) ?>
+                        <div style="font-size: 0.88rem; margin-top: 6px;">Tự động cập nhật sau <strong id="timer">5</strong> giây...</div>
+                    </div>
+                <?php endif; ?>
+                <?php if ($error): ?>
+                    <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
+
+        <!-- 1. BẢNG DANH SÁCH ĐỀ XUẤT TRONG TUẦN -->
+        <div class="table-wrap">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width: 45px; text-align: center;">STT</th>
+                        <th style="width: 150px; text-align: center;">Mã Yêu Cầu</th>
+                        <th style="width: 130px;">Thời Gian Gửi</th>
+                        <th>Người Đại Diện Nhận</th>
+                        <th>Phòng Ban</th>
+                        <th>Loại Nước Cần</th>
+                        <th style="text-align: center; width: 95px;">S.L Yêu Cầu</th>
+                        <th style="text-align: center; width: 115px;">S.L Duyệt</th>
+                        <th style="text-align: center; width: 75px;">Trả Vỏ</th>
+                        <th>Vị Trí Nhận / Ghi Chú</th>
+                        <th style="text-align: center; width: 110px;">Trạng Thái</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (empty($weeklyProposals)): ?>
+                        <tr>
+                            <td colspan="11" style="text-align: center; padding: 30px; color: #64748b;">
+                                <em>Chưa có đề xuất cấp nước nào được gửi trong tuần này.</em>
+                            </td>
+                        </tr>
+                    <?php else: ?>
+                        <?php foreach ($weeklyProposals as $index => $row): ?>
+                            <?php 
+                                // Chuẩn hóa trạng thái
+                                $sttRaw = mb_strtolower(trim($row['status'] ?? ''));
+                                $isRejected = (strpos($sttRaw, 'từ chối') !== false || strpos($sttRaw, 'hủy') !== false);
+                                $isPending  = (strpos($sttRaw, 'chờ') !== false);
+
+                                if ($isPending) {
+                                    $sttText = 'Chờ Duyệt';
+                                    $sttClass = 'badge-pending';
+                                } elseif ($isRejected) {
+                                    $sttText = 'Từ Chối';
+                                    $sttClass = 'badge-rejected';
+                                } else {
+                                    $sttText = 'Đã duyệt';
+                                    $sttClass = 'badge-approved';
+                                }
+
+                                // 1. MÃ YÊU CẦU: Truy xuất trực tiếp từ DB
+                                $rawCode = $row['request_code'] ?? ($row['code'] ?? ($row['ma_yeu_cau'] ?? ''));
+                                if (!empty($rawCode)) {
+                                    $displayReqCode = $rawCode;
+                                } else {
+                                    $displayReqCode = date('YmdHis', strtotime($row['created_at']));
+                                }
+
+                                // 2. S.L DUYỆT: Truy xuất chính xác từ DB
+                                $approvedQty = null;
+                                if (isset($row['approved_quantity']) && $row['approved_quantity'] !== null) {
+                                    $approvedQty = $row['approved_quantity'];
+                                } elseif (isset($row['approved_qty']) && $row['approved_qty'] !== null) {
+                                    $approvedQty = $row['approved_qty'];
+                                } elseif (isset($row['actual_quantity']) && $row['actual_quantity'] !== null) {
+                                    $approvedQty = $row['actual_quantity'];
+                                }
+
+                                // Ghi chú duyệt (nếu có)
+                                $approvalNote = trim($row['approval_note'] ?? ($row['note'] ?? ($row['ly_do'] ?? '')));
+                                $unitName = htmlspecialchars($row['unit'] ?? '');
+                            ?>
+                            <tr>
+                                <td style="text-align: center; font-weight: 600;"><?= $index + 1 ?></td>
+                                
+                                <!-- Mã Yêu Cầu lưu sẵn trong DB -->
+                                <td style="text-align: center; font-weight: 700; color: #0284c7; font-family: monospace; font-size: 0.95rem;">
+                                    <?= htmlspecialchars($displayReqCode) ?>
+                                </td>
+                                
+                                <td style="font-size: 0.85rem; color: #475569;"><?= date('H:i d/m/Y', strtotime($row['created_at'])) ?></td>
+                                <td style="font-weight: 700; color: #0f172a;"><?= htmlspecialchars($row['receiver_name']) ?></td>
+                                <td><?= htmlspecialchars($row['department']) ?></td>
+                                <td>
+                                    <strong><?= htmlspecialchars($row['item_name'] ?? 'Nước uống') ?></strong>
+                                    <?php if (!empty($row['specification'])): ?>
+                                        <div style="font-size: 0.8rem; color: #64748b;"><?= htmlspecialchars($row['specification']) ?></div>
+                                    <?php endif; ?>
+                                </td>
+                                
+                                <td style="text-align: center; font-weight: 700; font-size: 0.95rem;">
+                                    <?= htmlspecialchars($row['quantity']) ?> <?= $unitName ?>
+                                </td>
+                                
+                                <!-- Cột S.L Duyệt: Chỉ hiển thị số lượng cụ thể hoặc Từ chối, có nút mũi tên bấm xem ghi chú -->
+                                <td style="text-align: center;">
+                                    <div class="approved-cell">
+                                        <?php if ($isRejected): ?>
+                                            <span style="color: #dc2626; font-weight: 800;">Từ chối</span>
+                                        <?php elseif ($approvedQty !== null): ?>
+                                            <span style="color: #166534; font-weight: 800; font-size: 1rem;"><?= htmlspecialchars($approvedQty) ?> <?= $unitName ?></span>
+                                        <?php else: ?>
+                                            <span style="color: #94a3b8;">--</span>
+                                        <?php endif; ?>
+
+                                        <?php if (!empty($approvalNote)): ?>
+                                            <button type="button" class="btn-toggle-note" onclick="toggleNote(this, 'note_<?= $row['id'] ?>')" title="Bấm xem ghi chú duyệt">▶</button>
+                                        <?php endif; ?>
+                                    </div>
+                                    
+                                    <?php if (!empty($approvalNote)): ?>
+                                        <div class="note-dropdown-box" id="note_<?= $row['id'] ?>">
+                                            📝 <strong>Ghi chú:</strong> <?= nl2br(htmlspecialchars($approvalNote)) ?>
+                                        </div>
+                                    <?php endif; ?>
+                                </td>
+                                
+                                <td style="text-align: center;">
+                                    <?php if ($row['return_bottle_count'] > 0): ?>
+                                        <strong style="color: #c2410c;"><?= htmlspecialchars($row['return_bottle_count']) ?> vỏ</strong>
+                                    <?php else: ?>
+                                        <span style="color: #94a3b8;">0</span>
+                                    <?php endif; ?>
+                                </td>
+                                
+                                <td style="max-width: 220px; font-size: 0.88rem;"><?= nl2br(htmlspecialchars($row['delivery_location'])) ?></td>
+                                
+                                <td style="text-align: center;">
+                                    <span class="badge <?= $sttClass ?>"><?= $sttText ?></span>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 2. NÚT THÊM ĐỀ XUẤT NƯỚC UỐNG DỄ THẤY -->
+        <div class="action-bar">
+            <button type="button" class="btn-create-proposal" id="btnOpenModal">
+                <span>➕</span> THÊM ĐỀ XUẤT NƯỚC UỐNG
+            </button>
+            <div style="font-size: 0.82rem; color: #64748b; margin-top: 8px;">
+                Nhấn vào nút để mở phiếu đăng ký đề xuất cấp nước uống cho bộ phận của bạn
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ================= MODAL PHIẾU ĐỀ XUẤT CẤP NƯỚC UỐNG ================= -->
+<div class="modal-overlay" id="proposalModal">
+    <div class="modal-card">
+        <div class="modal-card-header">
+            <h2>💧 PHIẾU ĐỀ XUẤT CẤP NƯỚC UỐNG</h2>
+            <button type="button" class="modal-close-btn" id="btnCloseModal">&times;</button>
+        </div>
+
+        <div class="proposal-body">
+            <form method="POST" action="de-xuat-nuoc-uong.php" id="formProposal">
+                <input type="hidden" name="action" value="submit_proposal">
+                <input type="hidden" name="employee_id" id="hidden_emp_id">
+
+                <!-- 1. Người nhận / Mã số -->
+                <div class="form-group">
+                    <label>Người đại diện nhận / Họ và tên: *</label>
+                    <input type="text" name="receiver_name" id="inp_receiver" placeholder="Nhập tên hoặc gõ mã ID..." autocomplete="off" required>
+                    <div class="suggest-list" id="suggest_box"></div>
+                    <span class="hint-text">💡 Có thể nhập tự do hoặc gõ mã ID/Tên để hệ thống tự điền phòng ban</span>
+                </div>
+
+                <!-- 2. Phòng ban / Bộ phận -->
+                <div class="form-group">
+                    <label>Phòng ban / Bộ phận: *</label>
+                    <select name="department" id="sel_dept" required>
+                        <option value="">-- Chọn phòng ban --</option>
+                        <?php foreach ($departments as $d): ?>
+                            <option value="<?= htmlspecialchars($d) ?>"><?= htmlspecialchars($d) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
+                <!-- 3. Chọn loại nước -->
+                <div class="form-group">
+                    <label>Chọn loại nước uống: *</label>
+                    <select name="item_id" id="sel_water_item" onchange="checkWaterSpec(this)" required>
+                        <option value="">-- Chọn sản phẩm nước --</option>
+                        <?php foreach ($waterItems as $it): ?>
+                            <option value="<?= $it['id'] ?>" 
+                                    data-spec="<?= htmlspecialchars($it['specification'] ?? '') ?>" 
+                                    data-unit="<?= htmlspecialchars($it['unit'] ?? '') ?>">
+                                <?= htmlspecialchars($it['item_name']) ?> - <?= htmlspecialchars($it['specification'] ?: 'Bình chuẩn') ?> (Tồn kho: <?= $it['stock_qty'] . ' ' . $it['unit'] ?>)
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
+                <!-- 4. Số lượng yêu cầu -->
+                <div class="form-group">
+                    <label>Số lượng cần cấp: *</label>
+                    <input type="number" name="quantity" id="inp_quantity" min="1" max="100" value="1" required oninput="syncReturnBottles()">
+                </div>
+
+                <!-- 5. Trả vỏ bình (Tự động hiển thị và đồng bộ theo số lượng nếu là loại bình cần vỏ) -->
+                <div class="bottle-return-box" id="box_bottle_return">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label style="color: #c2410c;">↩️ Số lượng vỏ bình gửi trả đợt này (Loại 19L / Bình đổi):</label>
+                        <input type="number" name="return_bottle_count" id="inp_return_bottles" min="0" value="1" placeholder="Số vỏ bình trả...">
+                        <span class="hint-text" style="color: #ea580c;">* Đã tự động điền theo số lượng yêu cầu. Bạn có thể sửa lại số lượng này nếu thực tế trả khác.</span>
+                    </div>
+                </div>
+
+                <!-- 6. Ghi chú / Vị trí giao -->
+                <div class="form-group">
+                    <label>Ghi chú / Vị trí giao nhận: *</label>
+                    <textarea name="delivery_location" rows="3" placeholder="Ghi rõ tầng, phòng, vị trí đặt bình hoặc lưu ý nhận..." required></textarea>
+                </div>
+
+                <button type="submit" class="btn-submit">🚀 GỬI ĐỀ XUẤT NƯỚC UỐNG</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ================= MODAL XÁC NHẬN GỬI ĐỀ XUẤT ================= -->
+<div class="confirm-modal-overlay" id="confirmModal">
+    <div class="confirm-modal-box">
+        <div class="confirm-modal-header">Xác nhận gửi đề xuất</div>
+        <div class="confirm-modal-content">
+            Bạn có chắc chắn đồng ý gửi phiếu đề xuất cấp nước uống này không?<br>
+            <span style="font-size: 0.85rem; color: #64748b;">(Vui lòng kiểm tra kỹ người nhận và số lượng trước khi xác nhận).</span>
+        </div>
+        <div class="confirm-modal-actions">
+            <button type="button" class="btn-modal btn-cancel" id="btnCancelSubmit">Hủy</button>
+            <button type="button" class="btn-modal btn-confirm" id="btnConfirmSubmit">Đồng ý</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// 1. Quản lý Modal Phiếu Đề Xuất
+const btnOpenModal   = document.getElementById('btnOpenModal');
+const btnCloseModal  = document.getElementById('btnCloseModal');
+const proposalModal  = document.getElementById('proposalModal');
+
+btnOpenModal.addEventListener('click', () => {
+    proposalModal.style.display = 'flex';
+});
+
+btnCloseModal.addEventListener('click', () => {
+    proposalModal.style.display = 'none';
+});
+
+window.addEventListener('click', (e) => {
+    if (e.target === proposalModal) {
+        proposalModal.style.display = 'none';
+    }
+});
+
+// 2. Gợi ý nhân viên
+const employees   = <?= json_encode($employees) ?>;
+const inpReceiver = document.getElementById('inp_receiver');
+const suggestBox  = document.getElementById('suggest_box');
+const selDept     = document.getElementById('sel_dept');
+const hiddenEmpId = document.getElementById('hidden_emp_id');
+
+inpReceiver.addEventListener('input', function() {
+    const val = this.value.trim().toLowerCase();
+    suggestBox.innerHTML = '';
+    if (!val) {
+        suggestBox.style.display = 'none';
+        return;
+    }
+
+    const matched = employees.filter(e => 
+        (e.fullname && e.fullname.toLowerCase().includes(val)) || 
+        (e.id && e.id.toString() === val) || 
+        ('id:' + e.id).includes(val)
+    );
+
+    if (matched.length > 0) {
+        matched.slice(0, 8).forEach(emp => {
+            const div = document.createElement('div');
+            div.className = 'suggest-item';
+            div.innerHTML = `<strong>#${emp.id} - ${emp.fullname}</strong> (${emp.department || 'Chưa phân bổ'})`;
+            div.onclick = function() {
+                inpReceiver.value = emp.fullname;
+                hiddenEmpId.value = emp.id;
+                if (emp.department) {
+                    selDept.value = emp.department;
+                }
+                suggestBox.style.display = 'none';
+            };
+            suggestBox.appendChild(div);
+        });
+        suggestBox.style.display = 'block';
+    } else {
+        suggestBox.style.display = 'none';
+        hiddenEmpId.value = '';
+    }
+});
+
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('#inp_receiver') && !e.target.closest('#suggest_box')) {
+        suggestBox.style.display = 'none';
+    }
+});
+
+// 3. Kiểm tra loại bình có cần trả vỏ không & Tự động đồng bộ số vỏ theo số lượng yêu cầu
+const selWaterItem     = document.getElementById('sel_water_item');
+const boxBottle        = document.getElementById('box_bottle_return');
+const inpQuantity      = document.getElementById('inp_quantity');
+const inpReturnBottles = document.getElementById('inp_return_bottles');
+
+function isReturnBottleRequired() {
+    if (!selWaterItem.value) return false;
+    const selectedOpt = selWaterItem.options[selWaterItem.selectedIndex];
+    const spec = (selectedOpt.getAttribute('data-spec') || '').toLowerCase();
+    const name = (selectedOpt.text || '').toLowerCase();
+    return (spec.includes('19') || spec.includes('20') || name.includes('19l') || name.includes('19 lít') || name.includes('bình'));
+}
+
+function checkWaterSpec(selectElem) {
+    if (isReturnBottleRequired()) {
+        boxBottle.style.display = 'block';
+        syncReturnBottles();
+    } else {
+        boxBottle.style.display = 'none';
+        inpReturnBottles.value = 0;
+    }
+}
+
+function syncReturnBottles() {
+    if (isReturnBottleRequired()) {
+        const qty = parseInt(inpQuantity.value) || 0;
+        inpReturnBottles.value = qty;
+    }
+}
+
+// 4. Bấm nút mũi tên xem / ẩn ghi chú duyệt
+function toggleNote(btn, noteBoxId) {
+    const box = document.getElementById(noteBoxId);
+    if (!box) return;
+    if (box.style.display === 'block') {
+        box.style.display = 'none';
+        btn.classList.remove('active');
+    } else {
+        box.style.display = 'block';
+        btn.classList.add('active');
+    }
+}
+
+// 5. Modal xác nhận trước khi gửi Form
+const formProposal     = document.getElementById('formProposal');
+const confirmModal     = document.getElementById('confirmModal');
+const btnCancelSubmit  = document.getElementById('btnCancelSubmit');
+const btnConfirmSubmit = document.getElementById('btnConfirmSubmit');
+let isConfirmed        = false;
+
+formProposal.addEventListener('submit', function(e) {
+    if (!isConfirmed) {
+        e.preventDefault();
+        if (formProposal.checkValidity()) {
+            confirmModal.style.display = 'flex';
+        } else {
+            formProposal.reportValidity();
+        }
+    }
+});
+
+btnCancelSubmit.addEventListener('click', function() {
+    confirmModal.style.display = 'none';
+});
+
+btnConfirmSubmit.addEventListener('click', function() {
+    isConfirmed = true;
+    confirmModal.style.display = 'none';
+    formProposal.submit();
+});
+
+// 6. Tự động reload sau 5 giây nếu gửi thành công
+<?php if ($message): ?>
+let timeLeft = 5;
+const timerEl = document.getElementById('timer');
+const timerInterval = setInterval(function() {
+    timeLeft--;
+    if (timerEl) timerEl.textContent = timeLeft;
+    if (timeLeft <= 0) {
+        clearInterval(timerInterval);
+        window.location.href = 'de-xuat-nuoc-uong.php';
+    }
+}, 1000);
+<?php endif; ?>
+</script>
+
+</body>
+</html>

@@ -753,7 +753,7 @@ window.addEventListener('click', function(e) {
 <?php if ($message): ?>
 document.addEventListener('DOMContentLoaded', function() {
     openProposalModal(); // Mở modal để người dùng xem thông báo thành công
-    let timeLeft = 10;
+    let timeLeft = 15;
     const secondsEl = document.getElementById('secondsLeft');
     const timerInterval = setInterval(function() {
         timeLeft--;

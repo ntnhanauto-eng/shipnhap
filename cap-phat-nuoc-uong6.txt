@@ -1,8 +1,5 @@
 <?php
 // cap-phat-nuoc-uong.php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
 require_once 'db_connect.php';
 
 if (!isset($_SESSION['user_id'])) {
@@ -184,7 +181,6 @@ function is19LBottle($name, $spec = '') {
     return (strpos($str, '19l') !== false || strpos($str, '19 l') !== false || strpos($str, '19 lít') !== false || strpos($str, '19 lit') !== false || strpos($str, '20l') !== false);
 }
 
-// Chuẩn hóa chuỗi phục vụ Fuzzy Matching siêu tốc (Loại bỏ cả khoảng trắng ẩn UTF-8)
 function normalizeFastText($str) {
     $str = str_replace("\xC2\xA0", ' ', (string)$str);
     $str = mb_strtolower(trim($str), 'UTF-8');
@@ -198,7 +194,6 @@ function normalizeFastText($str) {
     return preg_replace('/[^a-z0-9]/', '', $str);
 }
 
-// Chuyển đổi ngày từ số Serial Excel hoặc chuỗi ngày thông thường
 function parseExcelDate($rawDate, $defaultToday) {
     $rawDate = trim(str_replace("\xC2\xA0", ' ', (string)$rawDate));
     if (empty($rawDate)) return $defaultToday;
@@ -216,7 +211,6 @@ function parseExcelDate($rawDate, $defaultToday) {
     return $defaultToday;
 }
 
-// Bộ giải mã file XLSX tối ưu hóa tốc độ và bộ nhớ bằng streaming
 function parseXlsxFastStream($filepath) {
     if (!class_exists('ZipArchive')) return null;
     $zip = new ZipArchive();
@@ -289,7 +283,6 @@ function parseXlsxFastStream($filepath) {
     return $rows;
 }
 
-// Danh sách phòng ban mặc định
 if (!isset($DEFAULT_DEPARTMENTS) || !is_array($DEFAULT_DEPARTMENTS)) {
     $DEFAULT_DEPARTMENTS = [
         'Ban Giám Đốc', 'Phòng Hành Chính - Nhân Sự', 'Phòng Kế Toán - Tài Chính',
@@ -532,11 +525,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $ret_bottles = $is19L ? max(0, intval($_POST['return_bottle_count'] ?? 0)) : 0;
         $code = !empty($prop['request_code']) ? $prop['request_code'] : generateUniqueWaterCode($pdo, 'water_requests', $prop['created_at']);
 
-        // Trừ tồn kho
         $stmtSub = $pdo->prepare("UPDATE water_items SET stock_qty = stock_qty - :qty WHERE id = :id");
         $stmtSub->execute([':qty' => $quantity, ':id' => $item_id]);
 
-        // Ghi vào lịch sử cấp phát
         $stmtReq = $pdo->prepare("
             INSERT INTO water_requests (request_code, request_date, department, receiver_name, item_id, quantity, has_bottle_return, delivery_location, notes)
             VALUES (:code, :r_date, :dept, :rec, :item_id, :qty, :has_ret, :loc, :notes)
@@ -553,7 +544,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             ':notes'   => $custom_notes
         ]);
 
-        // Đánh dấu đề xuất là đã cấp phát
         $stmtUp = $pdo->prepare("UPDATE water_proposals SET status = 'Đã cấp phát', approved_quantity = :appr_q, request_code = :code WHERE id = :id");
         $stmtUp->execute([':appr_q' => $quantity, ':code' => $code, ':id' => $prop_id]);
 
@@ -1289,7 +1279,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         ]);
                         $upCount++;
                     } else {
-                        // Kiểm tra lại lần nữa trong database tránh trùng lặp
                         $existingId = null;
                         if (!empty($pItem['item_code'])) {
                             $stmtFindByCode->execute([':c' => $pItem['item_code']]);

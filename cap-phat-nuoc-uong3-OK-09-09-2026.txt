@@ -78,6 +78,8 @@ if (isset($_GET['download_import_template'])) {
             <th>Nhà cung cấp</th>
             <th>Mã sản phẩm</th>
             <th>Tên loại nước</th>
+            <th>Quy cách</th>
+            <th>Đơn vị tính</th>
             <th>Số lượng</th>
             <th>Số hóa đơn / Chứng từ</th>
             <th>Ghi chú</th>
@@ -86,7 +88,9 @@ if (isset($_GET['download_import_template'])) {
             <td><?= date('Y-m-d') ?></td>
             <td>Công ty Nước Khoáng Lavie</td>
             <td>LAVIE19L</td>
-            <td>Nước Lavie bình 19L</td>
+            <td>Nước khoáng Lavie</td>
+            <td>Bình 19L có vòi</td>
+            <td>Bình</td>
             <td>50</td>
             <td>HD-00124</td>
             <td>Nhập đợt đầu tháng</td>
@@ -95,7 +99,9 @@ if (isset($_GET['download_import_template'])) {
             <td><?= date('Y-m-d') ?></td>
             <td>Đại lý Vĩnh Hảo Sài Gòn</td>
             <td>VH19L</td>
-            <td>Nước tinh khiết Vihawa 19L</td>
+            <td>Nước tinh khiết Vihawa</td>
+            <td>Bình 19L úp</td>
+            <td>Bình</td>
             <td>30</td>
             <td>HD-00125</td>
             <td>Nhập dự phòng</td>
@@ -107,7 +113,7 @@ if (isset($_GET['download_import_template'])) {
     exit;
 }
 
-// ==================== CÁC HÀM HỖ TRỢ (ĐẶT ĐẦU FILE) ====================
+// ==================== CÁC HÀM HỖ TRỢ ====================
 function renderPaginationBar($currentPage, $totalPages, $paramName) {
     if ($totalPages <= 1) return;
     $queryParams = $_GET;
@@ -175,8 +181,21 @@ function is19LBottle($name, $spec = '') {
     return (strpos($str, '19l') !== false || strpos($str, '19 l') !== false || strpos($str, '19 lít') !== false || strpos($str, '20l') !== false);
 }
 
-// Hàm hỗ trợ đọc file Excel (.xlsx) thuần PHP không cần thư viện ngoài
-function parseXlsxToArray($filepath) {
+// Chuẩn hóa chuỗi phục vụ Fuzzy Matching siêu tốc
+function normalizeFastText($str) {
+    $str = mb_strtolower(trim((string)$str), 'UTF-8');
+    $str = preg_replace('/[áàảãạăắằẳẵặâấầẩẫậ]/u', 'a', $str);
+    $str = preg_replace('/[éèẻẽẹêếềểễệ]/u', 'e', $str);
+    $str = preg_replace('/[íìỉĩị]/u', 'i', $str);
+    $str = preg_replace('/[óòỏõọôốồổỗộơớờởỡợ]/u', 'o', $str);
+    $str = preg_replace('/[úùủũụưứừửữự]/u', 'u', $str);
+    $str = preg_replace('/[ýỳỷỹỵ]/u', 'y', $str);
+    $str = preg_replace('/đ/u', 'd', $str);
+    return preg_replace('/[^a-z0-9]/', '', $str);
+}
+
+// Bộ giải mã file XLSX tối ưu hóa tốc độ và bộ nhớ bằng streaming
+function parseXlsxFastStream($filepath) {
     if (!class_exists('ZipArchive')) return null;
     $zip = new ZipArchive();
     if ($zip->open($filepath) !== true) return null;
@@ -184,20 +203,24 @@ function parseXlsxToArray($filepath) {
     $strings = [];
     $sharedStrXml = $zip->getFromName('xl/sharedStrings.xml');
     if ($sharedStrXml) {
-        $xml = simplexml_load_string($sharedStrXml);
-        if ($xml) {
-            foreach ($xml->si as $si) {
-                if (isset($si->t)) {
-                    $strings[] = (string)$si->t;
-                } elseif (isset($si->r)) {
-                    $t = '';
-                    foreach ($si->r as $r) { $t .= (string)$r->t; }
-                    $strings[] = $t;
-                } else {
-                    $strings[] = '';
-                }
+        $reader = new XMLReader();
+        $reader->XML($sharedStrXml);
+        $currText = '';
+        $inT = false;
+        while ($reader->read()) {
+            if ($reader->nodeType === XMLReader::ELEMENT && $reader->name === 'si') {
+                $currText = '';
+            } elseif ($reader->nodeType === XMLReader::ELEMENT && $reader->name === 't') {
+                $inT = true;
+            } elseif ($reader->nodeType === XMLReader::END_ELEMENT && $reader->name === 't') {
+                $inT = false;
+            } elseif ($inT && ($reader->nodeType === XMLReader::TEXT || $reader->nodeType === XMLReader::CDATA)) {
+                $currText .= $reader->value;
+            } elseif ($reader->nodeType === XMLReader::END_ELEMENT && $reader->name === 'si') {
+                $strings[] = $currText;
             }
         }
+        $reader->close();
     }
 
     $sheetXml = $zip->getFromName('xl/worksheets/sheet1.xml');
@@ -206,24 +229,40 @@ function parseXlsxToArray($filepath) {
         return null;
     }
 
-    $xmlSheet = simplexml_load_string($sheetXml);
     $rows = [];
-    if ($xmlSheet && isset($xmlSheet->sheetData->row)) {
-        foreach ($xmlSheet->sheetData->row as $r) {
-            $rowValues = [];
-            foreach ($r->c as $c) {
-                $val = (string)$c->v;
-                $type = (string)$c['t'];
-                if ($type === 's' && isset($strings[intval($val)])) {
-                    $val = $strings[intval($val)];
-                }
-                $rowValues[] = trim($val);
+    $reader = new XMLReader();
+    $reader->XML($sheetXml);
+
+    $currentRow = [];
+    $currentVal = '';
+    $cellType = '';
+    $inVal = false;
+
+    while ($reader->read()) {
+        if ($reader->nodeType === XMLReader::ELEMENT && $reader->name === 'row') {
+            $currentRow = [];
+        } elseif ($reader->nodeType === XMLReader::ELEMENT && $reader->name === 'c') {
+            $cellType = $reader->getAttribute('t') ?? '';
+            $currentVal = '';
+        } elseif ($reader->nodeType === XMLReader::ELEMENT && $reader->name === 'v') {
+            $inVal = true;
+        } elseif ($reader->nodeType === XMLReader::END_ELEMENT && $reader->name === 'v') {
+            $inVal = false;
+        } elseif ($inVal && ($reader->nodeType === XMLReader::TEXT || $reader->nodeType === XMLReader::CDATA)) {
+            $currentVal .= $reader->value;
+        } elseif ($reader->nodeType === XMLReader::END_ELEMENT && $reader->name === 'c') {
+            $val = trim($currentVal);
+            if ($cellType === 's' && isset($strings[intval($val)])) {
+                $val = trim($strings[intval($val)]);
             }
-            if (!empty(array_filter($rowValues, fn($v) => $v !== ''))) {
-                $rows[] = $rowValues;
+            $currentRow[] = $val;
+        } elseif ($reader->nodeType === XMLReader::END_ELEMENT && $reader->name === 'row') {
+            if (!empty(array_filter($currentRow, fn($v) => $v !== ''))) {
+                $rows[] = $currentRow;
             }
         }
     }
+    $reader->close();
     $zip->close();
     return $rows;
 }
@@ -471,11 +510,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $ret_bottles = $is19L ? max(0, intval($_POST['return_bottle_count'] ?? 0)) : 0;
         $code = !empty($prop['request_code']) ? $prop['request_code'] : generateUniqueWaterCode($pdo, 'water_requests', $prop['created_at']);
 
-        // 1. Trừ tồn kho
+        // Trừ tồn kho
         $stmtSub = $pdo->prepare("UPDATE water_items SET stock_qty = stock_qty - :qty WHERE id = :id");
         $stmtSub->execute([':qty' => $quantity, ':id' => $item_id]);
 
-        // 2. Ghi vào lịch sử cấp phát
+        // Ghi vào lịch sử cấp phát
         $stmtReq = $pdo->prepare("
             INSERT INTO water_requests (request_code, request_date, department, receiver_name, item_id, quantity, has_bottle_return, delivery_location, notes)
             VALUES (:code, :r_date, :dept, :rec, :item_id, :qty, :has_ret, :loc, :notes)
@@ -492,7 +531,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             ':notes'   => $custom_notes
         ]);
 
-        // 3. Đánh dấu đề xuất là đã cấp phát
+        // Đánh dấu đề xuất là đã cấp phát
         $stmtUp = $pdo->prepare("UPDATE water_proposals SET status = 'Đã cấp phát', approved_quantity = :appr_q, request_code = :code WHERE id = :id");
         $stmtUp->execute([':appr_q' => $quantity, ':code' => $code, ':id' => $prop_id]);
 
@@ -529,7 +568,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 }
 
-// ==================== 2. XỬ LÝ NHẬP KHO & NHÀ CUNG CẤP ====================
+// ==================== 2. XỬ LÝ NHẬP KHO & NHÀ CUNG CẤP TỐI ƯU ====================
 
 // 2A. Nhập kho thủ công
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'import_stock') {
@@ -571,25 +610,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 }
 
-// 2B. Nhập kho từ file Excel (.xlsx, .xls, .csv)
+// 2B. Nhập kho từ file Excel (Kiến trúc Streaming, In-memory O(1) matching & Báo cáo trực quan)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'import_stock_excel') {
     if (isset($_FILES['excel_file']) && $_FILES['excel_file']['error'] === UPLOAD_ERR_OK) {
-        $tmpName = $_FILES['excel_file']['tmp_name'];
+        $tmpName  = $_FILES['excel_file']['tmp_name'];
         $fileName = $_FILES['excel_file']['name'];
-        $ext = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+        $ext      = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
 
         $rows = [];
+
         if ($ext === 'csv') {
             if (($handle = fopen($tmpName, 'r')) !== false) {
-                while (($data = fgetcsv($handle, 2000, ',')) !== false) {
+                while (($data = fgetcsv($handle, 4000, ',')) !== false) {
                     $rows[] = array_map('trim', $data);
                 }
                 fclose($handle);
             }
         } elseif ($ext === 'xlsx') {
-            $rows = parseXlsxToArray($tmpName);
+            $rows = parseXlsxFastStream($tmpName);
             if ($rows === null) {
-                $error = "Máy chủ PHP cần hỗ trợ ZipArchive để đọc file .xlsx hoặc hãy lưu file dạng CSV/XLS!";
+                $error = "Máy chủ PHP cần bật tiện ích ZipArchive để đọc file .xlsx nhanh hoặc hãy lưu file dưới dạng CSV / XLS!";
             }
         } elseif ($ext === 'xls') {
             $content = file_get_contents($tmpName);
@@ -604,110 +644,212 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     foreach ($tds as $td) {
                         $rowValues[] = trim($td->textContent);
                     }
-                    if (!empty(array_filter($rowValues))) $rows[] = $rowValues;
+                    if (!empty(array_filter($rowValues, fn($v) => $v !== ''))) {
+                        $rows[] = $rowValues;
+                    }
                 }
+            } else {
+                $rows = parseXlsxFastStream($tmpName);
             }
         }
 
         if (!empty($rows)) {
-            $allItems = $pdo->query("SELECT id, item_code, item_name FROM water_items")->fetchAll();
-            $itemMapCode = [];
-            $itemMapName = [];
-            foreach ($allItems as $it) {
-                if (!empty($it['item_code'])) $itemMapCode[mb_strtolower(trim($it['item_code']), 'UTF-8')] = $it['id'];
-                $itemMapName[mb_strtolower(trim($it['item_name']), 'UTF-8')] = $it['id'];
-            }
-
+            // Nhận diện cột linh hoạt (Fuzzy column header matching)
             $header = array_shift($rows);
-            $idxDate = -1; $idxSup = -1; $idxCode = -1; $idxName = -1; $idxQty = -1; $idxInv = -1; $idxNote = -1;
+            $idxDate = -1; $idxSup = -1; $idxCode = -1; $idxName = -1; 
+            $idxSpec = -1; $idxUnit = -1; $idxQty = -1; $idxInv = -1; $idxNote = -1;
 
             foreach ($header as $colIdx => $colName) {
-                $c = mb_strtolower(trim($colName), 'UTF-8');
-                if (strpos($c, 'ngày') !== false || strpos($c, 'date') !== false) $idxDate = $colIdx;
-                elseif (strpos($c, 'nhà cung cấp') !== false || strpos($c, 'ncc') !== false || strpos($c, 'supplier') !== false) $idxSup = $colIdx;
-                elseif (strpos($c, 'mã sp') !== false || strpos($c, 'mã') !== false || strpos($c, 'code') !== false) $idxCode = $colIdx;
-                elseif (strpos($c, 'tên') !== false || strpos($c, 'loại nước') !== false || strpos($c, 'item') !== false) $idxName = $colIdx;
-                elseif (strpos($c, 'số lượng') !== false || strpos($c, 'qty') !== false || strpos($c, 'sl') !== false) $idxQty = $colIdx;
-                elseif (strpos($c, 'hóa đơn') !== false || strpos($c, 'chứng từ') !== false || strpos($c, 'invoice') !== false) $idxInv = $colIdx;
-                elseif (strpos($c, 'ghi chú') !== false || strpos($c, 'note') !== false) $idxNote = $colIdx;
+                $cNorm = normalizeFastText($colName);
+
+                if ($idxDate === -1 && (strpos($cNorm, 'ngay') !== false || strpos($cNorm, 'date') !== false)) {
+                    $idxDate = $colIdx;
+                } elseif ($idxSup === -1 && (strpos($cNorm, 'ncc') !== false || strpos($cNorm, 'nhacungcap') !== false || strpos($cNorm, 'supplier') !== false)) {
+                    $idxSup = $colIdx;
+                } elseif ($idxCode === -1 && (strpos($cNorm, 'masp') !== false || strpos($cNorm, 'mavpp') !== false || strpos($cNorm, 'code') !== false || $cNorm === 'ma')) {
+                    $idxCode = $colIdx;
+                } elseif ($idxName === -1 && (strpos($cNorm, 'ten') !== false || strpos($cNorm, 'loainuoc') !== false || strpos($cNorm, 'item') !== false)) {
+                    $idxName = $colIdx;
+                } elseif ($idxSpec === -1 && (strpos($cNorm, 'quycach') !== false || strpos($cNorm, 'donggoi') !== false || strpos($cNorm, 'spec') !== false)) {
+                    $idxSpec = $colIdx;
+                } elseif ($idxUnit === -1 && (strpos($cNorm, 'dvt') !== false || strpos($cNorm, 'donvi') !== false || strpos($cNorm, 'unit') !== false)) {
+                    $idxUnit = $colIdx;
+                } elseif ($idxQty === -1 && (strpos($cNorm, 'soluong') !== false || strpos($cNorm, 'sl') !== false || strpos($cNorm, 'qty') !== false || strpos($cNorm, 'quantity') !== false)) {
+                    $idxQty = $colIdx;
+                } elseif ($idxInv === -1 && (strpos($cNorm, 'hoadon') !== false || strpos($cNorm, 'chungtu') !== false || strpos($cNorm, 'invoice') !== false || strpos($cNorm, 'sohd') !== false)) {
+                    $idxInv = $colIdx;
+                } elseif ($idxNote === -1 && (strpos($cNorm, 'ghichu') !== false || strpos($cNorm, 'note') !== false)) {
+                    $idxNote = $colIdx;
+                }
             }
 
-            if ($idxSup === -1) $idxSup = 1;
+            // Fallback vị trí mặc định
             if ($idxDate === -1) $idxDate = 0;
+            if ($idxSup  === -1) $idxSup  = 1;
             if ($idxCode === -1) $idxCode = 2;
             if ($idxName === -1) $idxName = 3;
-            if ($idxQty === -1) $idxQty = 4;
-            if ($idxInv === -1) $idxInv = 5;
-            if ($idxNote === -1) $idxNote = 6;
+            if ($idxSpec === -1) $idxSpec = 4;
+            if ($idxUnit === -1) $idxUnit = 5;
+            if ($idxQty  === -1) $idxQty  = 6;
+            if ($idxInv  === -1) $idxInv  = 7;
+            if ($idxNote === -1) $idxNote = 8;
 
-            $successCount = 0;
-            $failRows = [];
+            // Nạp toàn bộ danh mục sản phẩm vào bộ nhớ O(1) Lookup
+            $allItems = $pdo->query("SELECT id, item_code, item_name, specification, unit, stock_qty FROM water_items")->fetchAll();
+            $itemMapByCode = [];
+            $itemMapByName = [];
+
+            foreach ($allItems as $it) {
+                if (!empty($it['item_code'])) {
+                    $itemMapByCode[normalizeFastText($it['item_code'])] = $it;
+                }
+                if (!empty($it['item_name'])) {
+                    $itemMapByName[normalizeFastText($it['item_name'])] = $it;
+                }
+            }
+
+            $successImports = [];
+            $autoCreated    = [];
+            $failedRows     = [];
 
             try {
                 $pdo->beginTransaction();
-                $stmtIns = $pdo->prepare("
-                    INSERT INTO water_imports (invoice_no, supplier_name, import_date, item_id, quantity, notes) 
-                    VALUES (:inv, :sup, :idate, :it, :qty, :n)
+
+                $stmtInsertItem = $pdo->prepare("
+                    INSERT INTO water_items (item_code, item_name, specification, unit, initial_stock, total_imported, stock_qty)
+                    VALUES (:code, :name, :spec, :unit, 0, 0, 0)
                 ");
-                $stmtStock = $pdo->prepare("
+
+                $stmtImport = $pdo->prepare("
+                    INSERT INTO water_imports (invoice_no, supplier_name, import_date, item_id, quantity, notes)
+                    VALUES (:inv, :sup, :idate, :it_id, :qty, :n)
+                ");
+
+                $stmtUpStock = $pdo->prepare("
                     UPDATE water_items 
                     SET stock_qty = stock_qty + :q1, total_imported = total_imported + :q2 
                     WHERE id = :id
                 ");
 
-                foreach ($rows as $lineIndex => $row) {
-                    $rowNum = $lineIndex + 2;
-                    $supplier = trim($row[$idxSup] ?? '');
-                    $qty = intval(preg_replace('/[^0-9]/', '', $row[$idxQty] ?? 0));
-                    $rawDate = trim($row[$idxDate] ?? '');
-                    $invoice = trim($row[$idxInv] ?? '');
-                    $note = trim($row[$idxNote] ?? '');
+                foreach ($rows as $index => $row) {
+                    $rowNum   = $index + 2;
+                    $rawDate  = trim($row[$idxDate] ?? '');
+                    $supplier = trim($row[$idxSup]  ?? '');
+                    $code     = trim($row[$idxCode] ?? '');
+                    $name     = trim($row[$idxName] ?? '');
+                    $spec     = ($idxSpec !== -1) ? trim($row[$idxSpec] ?? '') : '';
+                    $unit     = ($idxUnit !== -1) ? trim($row[$idxUnit] ?? '') : '';
+                    $rawQty   = $row[$idxQty] ?? '';
+                    $invoice  = ($idxInv !== -1)  ? trim($row[$idxInv]  ?? '') : '';
+                    $note     = ($idxNote !== -1) ? trim($row[$idxNote] ?? '') : '';
 
-                    $parsedDate = date('Y-m-d', strtotime($rawDate));
-                    if (!$parsedDate || $parsedDate === '1970-01-01') $parsedDate = $today;
-
-                    $pCode = mb_strtolower(trim($row[$idxCode] ?? ''), 'UTF-8');
-                    $pName = mb_strtolower(trim($row[$idxName] ?? ''), 'UTF-8');
-
-                    $matchedItemId = null;
-                    if ($pCode !== '' && isset($itemMapCode[$pCode])) {
-                        $matchedItemId = $itemMapCode[$pCode];
-                    } elseif ($pName !== '' && isset($itemMapName[$pName])) {
-                        $matchedItemId = $itemMapName[$pName];
-                    }
-
-                    if (empty($supplier) || $qty <= 0 || !$matchedItemId) {
-                        $failRows[] = "Dòng $rowNum: Không tìm thấy sản phẩm hợp lệ hoặc thiếu tên NCC / số lượng.";
+                    // Kiểm tra dữ liệu bắt buộc
+                    if (empty($code) && empty($name)) {
+                        $failedRows[] = "Dòng {$rowNum}: Bỏ qua vì thiếu cả Mã sản phẩm và Tên loại nước.";
                         continue;
                     }
 
-                    $stmtIns->execute([
+                    $cleanQtyStr = preg_replace('/[^0-9]/', '', (string)$rawQty);
+                    $qty = intval($cleanQtyStr);
+                    if ($qty <= 0) {
+                        $failedRows[] = "Dòng {$rowNum} [{$code} - {$name}]: Số lượng nhập '{$rawQty}' không hợp lệ (phải là số > 0).";
+                        continue;
+                    }
+
+                    if (empty($supplier)) {
+                        $supplier = 'Nhà cung cấp tổng hợp';
+                    }
+
+                    // Chuẩn hóa ngày nhập
+                    $parsedDate = date('Y-m-d', strtotime(str_replace('/', '-', $rawDate)));
+                    if (!$parsedDate || $parsedDate === '1970-01-01') {
+                        $parsedDate = $today;
+                    }
+
+                    // Khớp danh mục
+                    $matched = null;
+                    $cKey = !empty($code) ? normalizeFastText($code) : '';
+                    $nKey = !empty($name) ? normalizeFastText($name) : '';
+
+                    if (!empty($cKey) && isset($itemMapByCode[$cKey])) {
+                        $matched = $itemMapByCode[$cKey];
+                    } elseif (!empty($nKey) && isset($itemMapByName[$nKey])) {
+                        $matched = $itemMapByName[$nKey];
+                    }
+
+                    // Nếu chưa có trong hệ thống, tự động thêm mới vào water_items
+                    if (!$matched) {
+                        $newCode = $code ?: ('SP_' . strtoupper(substr(md5(uniqid()), 0, 6)));
+                        $newName = $name ?: ('Mặt hàng mã ' . $newCode);
+                        $newUnit = $unit ?: 'Bình';
+
+                        $stmtInsertItem->execute([
+                            ':code' => $newCode,
+                            ':name' => $newName,
+                            ':spec' => $spec,
+                            ':unit' => $newUnit
+                        ]);
+
+                        $newId = $pdo->lastInsertId();
+                        $matched = [
+                            'id'            => $newId,
+                            'item_code'     => $newCode,
+                            'item_name'     => $newName,
+                            'specification' => $spec,
+                            'unit'          => $newUnit,
+                            'stock_qty'     => 0
+                        ];
+
+                        $itemMapByCode[normalizeFastText($newCode)] = $matched;
+                        $itemMapByName[normalizeFastText($newName)] = $matched;
+                        $autoCreated[] = "[{$newCode}] {$newName}";
+                    }
+
+                    // Ghi nhận chứng từ nhập kho & Cập nhật tồn
+                    $stmtImport->execute([
                         ':inv'   => $invoice,
                         ':sup'   => $supplier,
                         ':idate' => $parsedDate,
-                        ':it'    => $matchedItemId,
+                        ':it_id' => $matched['id'],
                         ':qty'   => $qty,
                         ':n'     => $note
                     ]);
-                    $stmtStock->execute([':q1' => $qty, ':q2' => $qty, ':id' => $matchedItemId]);
-                    $successCount++;
+
+                    $stmtUpStock->execute([
+                        ':q1' => $qty,
+                        ':q2' => $qty,
+                        ':id' => $matched['id']
+                    ]);
+
+                    $successImports[] = "[{$matched['item_code']}] {$matched['item_name']} (+{$qty} {$matched['unit']} - NCC: {$supplier})";
                 }
 
                 $pdo->commit();
 
-                if ($successCount > 0) {
-                    $message = "Đã nhập thành công {$successCount} phiếu nhập kho từ file Excel!";
+                // Tổng hợp thông báo sau khi import
+                $reportOutput = [];
+                if (!empty($successImports)) {
+                    $reportOutput[] = "🎉 <strong>Đã nhập kho thành công:</strong> " . count($successImports) . " dòng chứng từ.";
                 }
-                if (!empty($failRows)) {
-                    $error = "Bỏ qua " . count($failRows) . " dòng do dữ liệu không khớp: " . implode('<br>', array_slice($failRows, 0, 5));
-                    if (count($failRows) > 5) $error .= "<br>...và " . (count($failRows) - 5) . " dòng lỗi khác.";
+                if (!empty($autoCreated)) {
+                    $reportOutput[] = "✨ <strong>Tự động khởi tạo " . count($autoCreated) . " mặt hàng mới vào kho:</strong> " . implode(', ', array_slice($autoCreated, 0, 5)) . (count($autoCreated) > 5 ? "... và " . (count($autoCreated) - 5) . " loại khác." : "");
+                }
+                if (!empty($reportOutput)) {
+                    $message = implode('<br><br>', $reportOutput);
+                }
+
+                if (!empty($failedRows)) {
+                    $error = "<strong>Chi tiết các dòng bị lỗi / bỏ qua (" . count($failedRows) . " dòng):</strong><br>&bull; " . implode('<br>&bull; ', array_slice($failedRows, 0, 6));
+                    if (count($failedRows) > 6) {
+                        $error .= "<br>... và " . (count($failedRows) - 6) . " dòng khác.";
+                    }
                 }
             } catch (Exception $e) {
                 if ($pdo->inTransaction()) $pdo->rollBack();
-                $error = "Lỗi khi nhập dữ liệu: " . $e->getMessage();
+                $error = "Lỗi xử lý Transaction cơ sở dữ liệu: " . $e->getMessage();
             }
         } elseif (empty($error)) {
-            $error = "File không có dữ liệu hoặc định dạng file không đúng!";
+            $error = "Tệp tải lên rỗng hoặc cấu trúc dữ liệu không hợp lệ!";
         }
     } else {
         $error = "Vui lòng chọn file Excel hợp lệ để tải lên!";
@@ -890,7 +1032,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
     }
 
-    // 4B. Nhập danh mục loại nước từ file Excel (Fuzzy matching + Upsert thông minh)
+    // 4B. Nhập danh mục loại nước từ file Excel
     if ($act === 'import_item_excel') {
         if (isset($_FILES['item_excel_file']) && $_FILES['item_excel_file']['error'] === UPLOAD_ERR_OK) {
             $tmpName  = $_FILES['item_excel_file']['tmp_name'];
@@ -906,7 +1048,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     fclose($handle);
                 }
             } elseif ($ext === 'xlsx') {
-                $rows = parseXlsxToArray($tmpName);
+                $rows = parseXlsxFastStream($tmpName);
                 if ($rows === null) {
                     $error = "Máy chủ PHP cần bật ZipArchive để đọc file .xlsx hoặc bạn có thể lưu file dạng .XLS / .CSV để tải lên!";
                 }
@@ -932,60 +1074,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $header = array_shift($rows);
                 $idxCode = -1; $idxName = -1; $idxSpec = -1; $idxUnit = -1;
 
-                // Thuật toán Fuzzy Matching: Dò tìm vị trí cột linh hoạt không phụ thuộc thứ tự
                 foreach ($header as $colIdx => $colName) {
-                    $cleanName = mb_strtolower(preg_replace('/\s+/', ' ', trim($colName)), 'UTF-8');
+                    $cNorm = normalizeFastText($colName);
 
-                    // 1. Nhận diện cột Mã SP
-                    if ($idxCode === -1 && (
-                        strpos($cleanName, 'mã sp') !== false ||
-                        strpos($cleanName, 'mã') !== false ||
-                        strpos($cleanName, 'code') !== false ||
-                        strpos($cleanName, 'item_code') !== false
-                    )) {
+                    if ($idxCode === -1 && (strpos($cNorm, 'masp') !== false || strpos($cNorm, 'code') !== false || $cNorm === 'ma')) {
                         $idxCode = $colIdx;
-                        continue;
-                    }
-
-                    // 2. Nhận diện cột Tên Loại Nước
-                    if ($idxName === -1 && (
-                        strpos($cleanName, 'tên loại nước') !== false ||
-                        strpos($cleanName, 'tên loại') !== false ||
-                        strpos($cleanName, 'loại nước') !== false ||
-                        strpos($cleanName, 'tên sp') !== false ||
-                        strpos($cleanName, 'tên nước') !== false ||
-                        strpos($cleanName, 'tên') !== false ||
-                        strpos($cleanName, 'name') !== false
-                    )) {
+                    } elseif ($idxName === -1 && (strpos($cNorm, 'ten') !== false || strpos($cNorm, 'loainuoc') !== false || strpos($cNorm, 'name') !== false)) {
                         $idxName = $colIdx;
-                        continue;
-                    }
-
-                    // 3. Nhận diện cột Quy Cách
-                    if ($idxSpec === -1 && (
-                        strpos($cleanName, 'quy cách') !== false ||
-                        strpos($cleanName, 'đóng gói') !== false ||
-                        strpos($cleanName, 'quy cach') !== false ||
-                        strpos($cleanName, 'spec') !== false
-                    )) {
+                    } elseif ($idxSpec === -1 && (strpos($cNorm, 'quycach') !== false || strpos($cNorm, 'donggoi') !== false || strpos($cNorm, 'spec') !== false)) {
                         $idxSpec = $colIdx;
-                        continue;
-                    }
-
-                    // 4. Nhận diện cột ĐVT
-                    if ($idxUnit === -1 && (
-                        strpos($cleanName, 'đơn vị tính') !== false ||
-                        strpos($cleanName, 'đơn vị') !== false ||
-                        strpos($cleanName, 'đvt') !== false ||
-                        strpos($cleanName, 'dvt') !== false ||
-                        strpos($cleanName, 'unit') !== false
-                    )) {
+                    } elseif ($idxUnit === -1 && (strpos($cNorm, 'dvt') !== false || strpos($cNorm, 'donvi') !== false || strpos($cNorm, 'unit') !== false)) {
                         $idxUnit = $colIdx;
-                        continue;
                     }
                 }
 
-                // Gán thứ tự mặc định nếu không nhận diện được tiêu đề
                 if ($idxCode === -1) $idxCode = 0;
                 if ($idxName === -1) $idxName = 1;
                 if ($idxSpec === -1) $idxSpec = 2;
@@ -995,9 +1097,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $mapExisting = [];
                 foreach ($existingItems as $ex) {
                     if (!empty($ex['item_code'])) {
-                        $mapExisting['c_' . mb_strtolower(trim($ex['item_code']), 'UTF-8')] = $ex;
+                        $mapExisting['c_' . normalizeFastText($ex['item_code'])] = $ex;
                     }
-                    $mapExisting['n_' . mb_strtolower(trim($ex['item_name']), 'UTF-8')] = $ex;
+                    $mapExisting['n_' . normalizeFastText($ex['item_name'])] = $ex;
                 }
 
                 $successCount = 0;
@@ -1030,8 +1132,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                             continue;
                         }
 
-                        $codeKey = mb_strtolower($code, 'UTF-8');
-                        $nameKey = mb_strtolower($name, 'UTF-8');
+                        $codeKey = normalizeFastText($code);
+                        $nameKey = normalizeFastText($name);
 
                         $match = null;
                         if (!empty($code) && isset($mapExisting['c_' . $codeKey])) {
@@ -1041,7 +1143,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         }
 
                         if ($match) {
-                            // Đã tồn tại -> Cập nhật thông tin quy cách & ĐVT (giữ nguyên tồn kho)
                             $stmtUpdate->execute([
                                 ':code' => $code ?: $match['item_code'],
                                 ':spec' => $spec,
@@ -1050,7 +1151,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                             ]);
                             $updateCount++;
                         } else {
-                            // Chưa có -> Thêm mới
                             $stmtInsert->execute([
                                 ':code' => $code,
                                 ':name' => $name,
@@ -1440,9 +1540,9 @@ if (isset($_GET['export_report'])) {
 
     if (!empty($f_hist_search)) {
         $whereExp[] = "(r.request_code LIKE :hs1 
-                     OR DATE_FORMAT(r.created_at, '%d%m%Y%H%i%s') LIKE :hs2 
-                     OR r.receiver_name LIKE :hs3 
-                     OR i.item_name LIKE :hs4)";
+                       OR DATE_FORMAT(r.created_at, '%d%m%Y%H%i%s') LIKE :hs2 
+                       OR r.receiver_name LIKE :hs3 
+                       OR i.item_name LIKE :hs4)";
         $paramsExp[':hs1'] = "%$f_hist_search%";
         $paramsExp[':hs2'] = "%$f_hist_search%";
         $paramsExp[':hs3'] = "%$f_hist_search%";
@@ -1860,7 +1960,6 @@ include 'header.php';
     .table-proposal th, .table-proposal td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
     .table-proposal th { background: #f0f9ff; color: #0369a1; font-weight: 700; }
     
-    /* Giao diện nút thao tác nhận diện trực quan */
     .prop-action-group { display: flex; align-items: center; justify-content: center; gap: 6px; }
     .prop-dropdown { position: relative; display: inline-block; }
     
@@ -1878,7 +1977,6 @@ include 'header.php';
     .prop-item-give { color: #15803d; }
     .prop-item-reject { color: #dc2626; }
 
-    /* Dropdown Cây Viết Thao Tác (Sửa / Xóa) */
     .prop-pencil-dropdown { position: relative; display: inline-block; }
     .btn-prop-pencil { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; width: 30px; height: 30px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; font-size: 0.88rem; text-decoration: none; padding: 0; }
     .btn-prop-pencil:hover { background: #dbeafe; }
@@ -1947,9 +2045,9 @@ include 'header.php';
     .modal-body label { font-size: 0.85rem; font-weight: 600; color: #334155; display: block; margin-bottom: 4px; }
     .modal-body input, .modal-body select, .modal-body textarea { width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; outline: none; }
     
-    .alert-box { padding: 12px 16px; border-radius: 6px; font-size: 0.9rem; margin-bottom: 16px; }
-    .alert-success { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
-    .alert-danger { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+    .alert-box { padding: 14px 18px; border-radius: 8px; font-size: 0.9rem; margin-bottom: 18px; line-height: 1.5; }
+    .alert-success { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; box-shadow: 0 2px 4px rgba(22,101,52,0.04); }
+    .alert-danger { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; box-shadow: 0 2px 4px rgba(153,27,27,0.04); }
 
     .prop-grid-user-dept { display: flex; gap: 10px; }
     .prop-grid-user-dept > div { flex: 1; }
@@ -1957,7 +2055,6 @@ include 'header.php';
         .prop-grid-user-dept { flex-direction: column; gap: 12px; }
     }
 
-    /* Thiết kế ô S.L Duyệt: Canh trái nội dung, nút mũi tên canh phải ngang hàng */
     .appr-cell-box {
         display: flex;
         align-items: center;
@@ -1995,14 +2092,12 @@ include 'header.php';
     .note-popover::after { content: ''; position: absolute; top: 100%; right: 10px; border-width: 5px; border-style: solid; border-color: #ffffff transparent transparent transparent; }
     .note-popover.show { display: block; }
 
-    /* Dropdown cho nút Nhập kho */
     .import-btn-group { position: relative; display: inline-block; }
     .import-menu { display: none; position: absolute; right: 0; top: 108%; background: #fff; min-width: 190px; box-shadow: 0 8px 22px rgba(0,0,0,0.15); border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px 0; z-index: 100; }
     .import-menu.show { display: block; }
     .import-menu-btn { width: 100%; background: none; border: none; text-align: left; padding: 9px 14px; font-size: 0.86rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; color: #334155; }
     .import-menu-btn:hover { background: #f1f5f9; color: #0284c7; }
 
-    /* Dropdown cho nút Thêm Loại Nước */
     .add-item-btn-group { position: relative; display: inline-block; }
     .add-item-menu { display: none; position: absolute; right: 0; top: 108%; background: #fff; min-width: 200px; box-shadow: 0 8px 22px rgba(0,0,0,0.15); border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px 0; z-index: 100; }
     .add-item-menu.show { display: block; }
@@ -2021,7 +2116,6 @@ include 'header.php';
         <div style="display:flex; gap:8px; align-items:center;">
             <a href="de-xuat-nuoc-uong.php" target="_blank" class="btn-action" style="background:#8b5cf6;">🔗 Mở Form Đề Xuất Nước</a>
             
-            <!-- Nút Nhập Kho với Dropdown 2 lựa chọn: Thủ công hoặc Excel -->
             <div class="import-btn-group">
                 <button type="button" class="btn-action" style="background:#10b981;" onclick="toggleImportMenu(event)">
                     📦 Nhập Kho ▾
@@ -2058,7 +2152,7 @@ include 'header.php';
     <?php if ($message): ?><div class="alert-box alert-success"><?= $message ?></div><?php endif; ?>
     <?php if ($error): ?><div class="alert-box alert-danger"><?= $error ?></div><?php endif; ?>
 
-    <!-- ==================== KHỐI 1: DANH SÁCH ĐỀ XUẤT NƯỚC UỐNG ==================== -->
+    <!-- KHỐI 1: DANH SÁCH ĐỀ XUẤT NƯỚC UỐNG -->
     <div class="proposal-notice-box">
         <div class="notice-title">
             <span>
@@ -2144,7 +2238,6 @@ include 'header.php';
                             $pageSumQtyP += intval($p['quantity']);
                             $pageSumBotP += intval($p['return_bottle_count']);
 
-                            // Cột S.L Duyệt canh trái, nút mũi tên canh phải
                             $approvedDisplay = '--';
                             $approvedStyle = 'color:#94a3b8; font-size:1.05rem;';
                             $arrowBtn = '';
@@ -2244,7 +2337,6 @@ include 'header.php';
                                             <?php endif; ?>
                                         </div>
 
-                                        <!-- Dropdown biểu tượng Cây Viết chứa Sửa và Xóa -->
                                         <div class="prop-pencil-dropdown">
                                             <button type="button" class="btn-prop-pencil" title="Tùy chọn thao tác" onclick="togglePropPencilDropdown(event, <?= $p['id'] ?>)">
                                                 ✏️
@@ -2286,7 +2378,7 @@ include 'header.php';
         <?php renderPaginationBar($p_prop, $pages_prop, 'p_prop'); ?>
     </div>
 
-    <!-- ==================== KHỐI 2: DANH MỤC & TỒN KHO NƯỚC UỐNG ==================== -->
+    <!-- KHỐI 2: DANH MỤC & TỒN KHO NƯỚC UỐNG -->
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
         <h3 style="font-size:1.1rem; color:#334155; margin:0;">💧 Danh Mục & Tồn Kho Nước Uống (Tổng: <?= $total_water ?> loại)</h3>
         
@@ -2302,7 +2394,6 @@ include 'header.php';
                 <?php endif; ?>
             </form>
 
-            <!-- Dropdown Thêm Loại Nước: 2 tùy chọn Thủ công & Excel -->
             <div class="add-item-btn-group">
                 <button type="button" class="btn-action" style="background:#8b5cf6; padding:6px 12px; font-size:0.85rem;" onclick="toggleAddItemMenu(event)">
                     + Thêm Loại Nước ▾
@@ -2368,8 +2459,8 @@ include 'header.php';
     </div>
     <?php renderPaginationBar($p_water, $pages_water, 'p_water'); ?>
 
-    <!-- ==================== KHỐI 3: QUẢN LÝ NHẬP KHO & NHÀ CUNG CẤP ==================== -->
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; margin-top:20px; flex-wrap:gap; gap:10px;">
+    <!-- KHỐI 3: QUẢN LÝ NHẬP KHO & NHÀ CUNG CẤP -->
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; margin-top:20px; flex-wrap:wrap; gap:10px;">
         <h3 style="font-size:1.1rem; color:#334155; margin:0;">🚚 Lịch Sử Nhập Kho & Nhà Cung Cấp (Tổng: <?= $total_imports ?> lần nhập)</h3>
         <div style="display:flex; gap:8px;">
             <a href="cap-phat-nuoc-uong.php?export_imports_report=1&f_imp_search=<?= urlencode($f_imp_search) ?>&f_imp_mode=<?= urlencode($f_imp_mode) ?>&f_imp_date=<?= urlencode($f_imp_date) ?>&f_imp_week=<?= urlencode($f_imp_week) ?>&f_imp_month=<?= urlencode($f_imp_month) ?>&f_imp_year=<?= urlencode($f_imp_year) ?>" class="btn-export" title="Xuất báo cáo lịch sử nhập kho theo bộ lọc hiện tại">
@@ -2475,7 +2566,7 @@ include 'header.php';
     </div>
     <?php renderPaginationBar($p_imp, $pages_imp, 'p_imp'); ?>
 
-    <!-- ==================== KHỐI 4: LỊCH SỬ CẤP PHÁT NƯỚC ==================== -->
+    <!-- KHỐI 4: LỊCH SỬ CẤP PHÁT NƯỚC -->
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; margin-top:20px; flex-wrap:wrap; gap:10px;">
         <h3 style="font-size:1.1rem; color:#334155; margin:0;">📜 Lịch Sử Cấp Phát Nước (Tổng: <?= $total_history ?> lượt)</h3>
         <div style="display:flex; gap:8px;">
@@ -2605,7 +2696,7 @@ include 'header.php';
     <?php renderPaginationBar($p_hist, $pages_hist, 'p_hist'); ?>
 </div>
 
-<!-- ==================== CÁC BẢNG MODAL ==================== -->
+<!-- ==================== CÁC MODAL HỆ THỐNG ==================== -->
 
 <!-- MODAL NHẬP KHO TỪ FILE EXCEL -->
 <div id="modal-import-excel" class="modal-overlay">
@@ -2618,9 +2709,9 @@ include 'header.php';
             </div>
             <div class="modal-body">
                 <div style="background:#f0fdf4; border:1px solid #bbf7d0; padding:12px; border-radius:6px; font-size:0.85rem; color:#166534; line-height:1.5;">
-                    💡 <strong>Hướng dẫn:</strong> Hệ thống tự động nhận diện cột theo tên (Ngày nhập, Nhà cung cấp, Mã SP / Tên nước, Số lượng, Số HĐ, Ghi chú). Bạn có thể tải file Excel mẫu chuẩn tại đây:
+                    💡 <strong>Xử lý siêu tốc:</strong> Tự động nhận diện cột: <i>Mã SP, Tên loại nước, Nhà cung cấp, Số lượng, Ngày nhập, Số HĐ...</i>. Tự động cộng tồn kho và sinh mã mới nếu chưa có.
                     <div style="margin-top:6px;">
-                        <a href="cap-phat-nuoc-uong.php?download_import_template=1" style="color:#0284c7; font-weight:bold; text-decoration:none;">📥 Tải File Excel Mẫu (.XLS)</a>
+                        <a href="cap-phat-nuoc-uong.php?download_import_template=1" style="color:#0284c7; font-weight:bold; text-decoration:none;">📥 Tải File Excel Mẫu Nhập Kho (.XLS)</a>
                     </div>
                 </div>
 
@@ -2632,7 +2723,7 @@ include 'header.php';
             </div>
             <div class="modal-footer" style="padding:12px 20px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end; gap:8px;">
                 <button type="button" class="btn-action" style="background:#e2e8f0; color:#475569;" onclick="closeModal('modal-import-excel')">Hủy</button>
-                <button type="submit" class="btn-action" style="background:#10b981; padding:8px 22px;">Tiến Hành Nhập Dữ Liệu</button>
+                <button type="submit" class="btn-action" style="background:#10b981; padding:8px 22px;">Tiến Hành Nhập Kho</button>
             </div>
         </form>
     </div>
@@ -2649,7 +2740,7 @@ include 'header.php';
             </div>
             <div class="modal-body">
                 <div style="background:#f5f3ff; border:1px solid #ddd6fe; padding:12px; border-radius:6px; font-size:0.85rem; color:#5b21b6; line-height:1.5;">
-                    💡 <strong>Thuật toán thông minh (Fuzzy Matching):</strong> Tự động dò tìm các cột: <b>Mã SP</b>, <b>Tên loại nước</b>, <b>Quy cách</b>, <b>ĐVT</b> bất kể vị trí cột trước sau. Nếu đã tồn tại sẽ tự động cập nhật thông tin tương ứng.
+                    💡 <strong>Thuật toán thông minh:</strong> Tự động dò tìm các cột: <b>Mã SP</b>, <b>Tên loại nước</b>, <b>Quy cách</b>, <b>ĐVT</b> bất kể vị trí cột trước sau.
                     <div style="margin-top:8px;">
                         <a href="cap-phat-nuoc-uong.php?download_item_template=1" style="color:#7c3aed; font-weight:bold; text-decoration:none;">📥 Tải File Excel Mẫu Danh Mục (.XLS)</a>
                     </div>
@@ -2669,7 +2760,7 @@ include 'header.php';
     </div>
 </div>
 
-<!-- MODAL DUYỆT ĐỀ XUẤT NƯỚC UỐNG (PC: 1 HÀNG NGANG, MOBILE: 2 DÒNG TRÁNH CO ÉP) -->
+<!-- MODAL DUYỆT ĐỀ XUẤT NƯỚC UỐNG -->
 <div id="modal-approve-proposal" class="modal-overlay">
     <div class="modal-box" style="max-width: 480px;">
         <form method="POST" action="cap-phat-nuoc-uong.php">
@@ -2682,18 +2773,15 @@ include 'header.php';
             </div>
 
             <div class="modal-body">
-                <!-- 1. Thời gian gửi đề xuất trên cùng -->
                 <div style="background:#f0f9ff; border:1px solid #bae6fd; padding:10px 14px; border-radius:6px; font-size:0.85rem; color:#0369a1;">
                     🕒 Thời gian gửi đề xuất: <strong id="ap_time"></strong>
                 </div>
 
-                <!-- 2. Hàng tiếp theo là Mã yêu cầu -->
                 <div>
                     <label>Mã yêu cầu đề xuất:</label>
                     <input type="text" id="ap_request_code" style="background:#f8fafc; font-weight:bold; color:#0284c7;" readonly>
                 </div>
 
-                <!-- 3. Khối Người yêu cầu & Phòng ban: PC hiển thị 1 hàng ngang, Mobile xếp 2 dòng -->
                 <div class="prop-grid-user-dept">
                     <div>
                         <label>Người yêu cầu:</label>
@@ -2718,7 +2806,6 @@ include 'header.php';
                     <input type="number" name="approved_quantity" id="ap_appr_quantity" min="1" required style="border:2px solid #0284c7; font-weight:bold; font-size:1.05rem; color:#15803d;">
                 </div>
 
-                <!-- Ô nhập số lượng vỏ đổi khi duyệt (bình 19L) -->
                 <div id="ap_bottle_wrapper" style="background:#fff7ed; border:1px solid #fed7aa; padding:12px; border-radius:6px; display:none;">
                     <label style="color:#c2410c; margin-bottom:4px;">Số lượng vỏ bình đổi/trả lại (19L):</label>
                     <input type="number" name="return_bottle_count" id="ap_return_bottle_count" min="0" value="0">
@@ -2738,7 +2825,7 @@ include 'header.php';
     </div>
 </div>
 
-<!-- MODAL SỬA NỘI DUNG ĐỀ XUẤT (HIỂN THỊ ĐỦ THÔNG TIN TRƯỚC/SAU DUYỆT) -->
+<!-- MODAL SỬA NỘI DUNG ĐỀ XUẤT -->
 <div id="modal-edit-proposal" class="modal-overlay">
     <div class="modal-box">
         <form method="POST" action="cap-phat-nuoc-uong.php">
@@ -2780,7 +2867,6 @@ include 'header.php';
                     <input type="number" name="quantity" id="ep_quantity" min="1" required>
                 </div>
 
-                <!-- Khối hiển thị thông tin sau duyệt: Chỉ xuất hiện khi đề xuất đã được duyệt hoặc cấp phát -->
                 <div id="ep_approved_group" style="display:none; background:#f0fdf4; border:1px solid #bbf7d0; padding:12px; border-radius:6px; flex-direction:column; gap:10px;">
                     <div>
                         <label style="color:#15803d; margin-bottom:4px;">Số lượng sau duyệt:</label>
@@ -2914,7 +3000,7 @@ include 'header.php';
     </div>
 </div>
 
-<!-- MODAL XÁC NHẬN CẤP PHÁT ĐỀ XUẤT (KHI ĐÃ ĐƯỢC DUYỆT - ĐIỀN ĐỦ DỮ LIỆU ĐÃ DUYỆT) -->
+<!-- MODAL XÁC NHẬN CẤP PHÁT ĐỀ XUẤT -->
 <div id="modal-confirm-proposal" class="modal-overlay">
     <div class="modal-box">
         <form method="POST" action="cap-phat-nuoc-uong.php" id="formConfirmProposal" onsubmit="return handleConfirmDelivery();">
@@ -3219,7 +3305,6 @@ function openModal(id) { document.getElementById(id).style.display = 'flex'; }
 function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 function toggleMoreMenu(e) { if(e) e.stopPropagation(); closeAllMenus(); document.getElementById('more_dropdown_menu').classList.toggle('show'); }
 
-// Bật/tắt menu dropdown cho nút Nhập kho
 function toggleImportMenu(e) {
     if (e) e.stopPropagation();
     const btn = e.currentTarget;
@@ -3232,7 +3317,6 @@ function toggleImportMenu(e) {
     }
 }
 
-// Bật/tắt menu dropdown cho nút Thêm Loại Nước
 function toggleAddItemMenu(e) {
     if (e) e.stopPropagation();
     const btn = e.currentTarget;
@@ -3252,7 +3336,6 @@ function closeAllMenus() {
     if (moreMenu) moreMenu.classList.remove('show');
 }
 
-// Bật/tắt menu Thao tác trong bảng Đề Xuất
 function togglePropDropdown(e, id) {
     if (e) e.stopPropagation();
     const currentMenu = document.getElementById('prop_dropdown_' + id);
@@ -3269,7 +3352,6 @@ function closeAllPropDropdowns() {
     document.querySelectorAll('.prop-dropdown-menu').forEach(el => el.classList.remove('show'));
 }
 
-// Bật/tắt dropdown cho nút Cây Viết (Sửa / Xóa)
 function togglePropPencilDropdown(e, id) {
     if (e) e.stopPropagation();
     const currentMenu = document.getElementById('prop_pencil_menu_' + id);
@@ -3286,7 +3368,6 @@ function closeAllPencilDropdowns() {
     document.querySelectorAll('.prop-pencil-menu').forEach(el => el.classList.remove('show'));
 }
 
-// Bật/tắt Popover hiển thị trọn vẹn ghi chú khi bấm vào nút mũi tên
 function toggleNotePopover(e, btn) {
     if (e) e.stopPropagation();
     const container = btn.closest('.note-interactive-container');
@@ -3321,7 +3402,6 @@ window.onclick = function(e) {
     if (!e.target.closest('.note-interactive-container')) closeAllNotePopovers();
 }
 
-// Chuyển đổi input Ngày / Tuần / Tháng / Năm cho bảng Đề Xuất
 function togglePropInputs(mode) {
     document.getElementById('prop_input_day').style.display   = (mode === 'day') ? 'inline-block' : 'none';
     document.getElementById('prop_input_week').style.display  = (mode === 'week') ? 'inline-block' : 'none';
@@ -3329,7 +3409,6 @@ function togglePropInputs(mode) {
     document.getElementById('prop_input_year').style.display  = (mode === 'year') ? 'inline-block' : 'none';
 }
 
-// Chuyển đổi input Ngày / Tuần / Tháng / Năm cho bảng Nhập Kho
 function toggleImpInputs(mode) {
     document.getElementById('imp_input_day').style.display   = (mode === 'day') ? 'inline-block' : 'none';
     document.getElementById('imp_input_week').style.display  = (mode === 'week') ? 'inline-block' : 'none';
@@ -3337,7 +3416,6 @@ function toggleImpInputs(mode) {
     document.getElementById('imp_input_year').style.display  = (mode === 'year') ? 'inline-block' : 'none';
 }
 
-// Chuyển đổi input Ngày / Tuần / Tháng / Năm cho bảng Lịch Sử Cấp Phát
 function toggleHistInputs(mode) {
     document.getElementById('hist_input_day').style.display   = (mode === 'day') ? 'inline-block' : 'none';
     document.getElementById('hist_input_week').style.display  = (mode === 'week') ? 'inline-block' : 'none';
@@ -3345,7 +3423,6 @@ function toggleHistInputs(mode) {
     document.getElementById('hist_input_year').style.display  = (mode === 'year') ? 'inline-block' : 'none';
 }
 
-// Kiểm tra hiển thị ô trả vỏ trong Modal xác nhận đề xuất
 function toggleCfpBottleBox(selectElem) {
     const selectedOpt = selectElem.options[selectElem.selectedIndex];
     const is19L = selectedOpt ? selectedOpt.getAttribute('data-is19l') : '0';
@@ -3358,7 +3435,6 @@ function toggleCfpBottleBox(selectElem) {
     }
 }
 
-// Kiểm tra hiển thị ô trả vỏ trong Modal cấp phát thủ công
 function toggleMgBottle(selectElem) {
     const selectedOpt = selectElem.options[selectElem.selectedIndex];
     const is19L = selectedOpt ? selectedOpt.getAttribute('data-is19l') : '0';
@@ -3371,7 +3447,6 @@ function toggleMgBottle(selectElem) {
     }
 }
 
-// Kiểm tra hiển thị ô trả vỏ trong Modal chỉnh sửa đề xuất
 function toggleEpBottle(selectElem) {
     const selectedOpt = selectElem.options[selectElem.selectedIndex];
     const is19L = selectedOpt ? selectedOpt.getAttribute('data-is19l') : '0';
@@ -3384,7 +3459,6 @@ function toggleEpBottle(selectElem) {
     }
 }
 
-// Kiểm tra hiển thị ô trả vỏ trong Modal chỉnh sửa lịch sử
 function toggleEhBottle(selectElem) {
     const selectedOpt = selectElem.options[selectElem.selectedIndex];
     const is19L = selectedOpt ? selectedOpt.getAttribute('data-is19l') : '0';
@@ -3397,7 +3471,6 @@ function toggleEhBottle(selectElem) {
     }
 }
 
-// Mở modal Phê Duyệt đề xuất (Có thời gian gửi trên cùng, mã yêu cầu, Người yêu cầu & Phòng ban)
 function openApproveModal(p, code) {
     document.getElementById('ap_proposal_id').value = p.id;
     document.getElementById('ap_time').innerText = p.created_at || '';
@@ -3425,7 +3498,6 @@ function openApproveModal(p, code) {
     openModal('modal-approve-proposal');
 }
 
-// Mở modal Chỉnh sửa nội dung đề xuất (Hiển thị đầy đủ thông tin trước/sau duyệt)
 function openEditProposalModal(p) {
     document.getElementById('ep_proposal_id').value = p.id;
     document.getElementById('ep_receiver_name').value = p.receiver_name;
@@ -3434,7 +3506,6 @@ function openEditProposalModal(p) {
     document.getElementById('ep_quantity').value = p.quantity;
     document.getElementById('ep_delivery_location').value = p.delivery_location || '';
 
-    // Xử lý thông tin sau duyệt: Chỉ hiển thị khi trạng thái là Đã duyệt hoặc Đã cấp phát
     const approvedGroup = document.getElementById('ep_approved_group');
     const inpApprQty = document.getElementById('ep_approved_quantity');
     const inpApprNote = document.getElementById('ep_approval_note');
@@ -3465,7 +3536,6 @@ function openEditProposalModal(p) {
     openModal('modal-edit-proposal');
 }
 
-// Mở modal xác nhận đề xuất trước khi cấp (Điền sẵn toàn bộ thông tin đã được duyệt để thao tác nhanh)
 function openConfirmProposalModal(p, code) {
     closeAllPropDropdowns();
     document.getElementById('cfp_proposal_id').value = p.id;
@@ -3475,7 +3545,6 @@ function openConfirmProposalModal(p, code) {
     document.getElementById('cfp_department').value = p.department;
     document.getElementById('cfp_item_id').value = p.item_id;
     
-    // Ưu tiên số lượng đã duyệt
     const grantQty = (p.approved_quantity !== null && parseInt(p.approved_quantity) > 0) ? p.approved_quantity : p.quantity;
     document.getElementById('cfp_quantity').value = grantQty;
     document.getElementById('cfp_delivery_location').value = p.delivery_location || '';
@@ -3498,14 +3567,12 @@ function openConfirmProposalModal(p, code) {
     openModal('modal-confirm-proposal');
 }
 
-// Mở modal từ chối đề xuất
 function openRejectModal(proposalId) {
     closeAllPropDropdowns();
     document.getElementById('rej_proposal_id').value = proposalId;
     openModal('modal-reject-proposal');
 }
 
-// Mở modal chỉnh sửa loại nước trong danh mục kho
 function openEditItemModal(it) {
     document.getElementById('edit_item_id').value = it.id;
     document.getElementById('edit_item_code').value = it.item_code || '';
@@ -3516,7 +3583,6 @@ function openEditItemModal(it) {
     openModal('modal-edit-item');
 }
 
-// Mở modal chỉnh sửa phiếu nhập kho
 function openEditImportModal(imp) {
     document.getElementById('ei_import_id').value = imp.id;
     document.getElementById('ei_import_date').value = imp.import_date;
@@ -3528,7 +3594,6 @@ function openEditImportModal(imp) {
     openModal('modal-edit-import');
 }
 
-// Mở modal chỉnh sửa lịch sử cấp phát
 function openEditHistoryModal(h) {
     document.getElementById('eh_request_id').value = h.id;
     document.getElementById('eh_request_date').value = h.request_date;

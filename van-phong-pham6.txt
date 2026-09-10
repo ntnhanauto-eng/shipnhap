@@ -1,0 +1,2468 @@
+<?php
+// van-phong-pham.php
+require_once 'db_connect.php';
+
+if (!isset($_SESSION['user_id'])) {
+    header('Location: login.php');
+    exit;
+}
+
+$currentUserFullName = $_SESSION['fullname'] ?? $_SESSION['name'] ?? $_SESSION['username'] ?? 'Bộ phận Hành chính';
+
+$message = '';
+$error = '';
+$today = date('Y-m-d');
+$limit = 15; // Số dòng trên mỗi trang
+
+// Khai báo an toàn các biến phân trang
+$p_vpp  = max(1, intval($_GET['p_vpp'] ?? 1));
+$p_prop = max(1, intval($_GET['p_prop'] ?? 1));
+$p_hist = max(1, intval($_GET['p_hist'] ?? 1));
+$p_imp  = max(1, intval($_GET['p_imp'] ?? 1));
+
+// ==================== TẢI FILE EXCEL MẪU DANH MỤC VPP ====================
+if (isset($_GET['download_item_template'])) {
+    header("Content-Type: application/vnd.ms-excel; charset=UTF-8");
+    header("Content-Disposition: attachment; filename=Mau_Danh_Muc_Van_Phong_Pham.xls");
+    header("Pragma: no-cache");
+    header("Expires: 0");
+    echo "\xEF\xBB\xBF";
+    ?>
+    <html xmlns:x="urn:schemas-microsoft-com:office:excel">
+    <head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"></head>
+    <body>
+    <table border="1">
+        <tr style="background:#8b5cf6; color:#fff; font-weight:bold; text-align:center;">
+            <th>Mã VPP</th>
+            <th>Tên Mặt Hàng</th>
+            <th>Quy Cách / Mô Tả</th>
+            <th>Đơn Vị Tính</th>
+        </tr>
+        <tr>
+            <td>VPP-GAY4</td>
+            <td>Giấy in Double A A4 70gsm</td>
+            <td>Ram 500 tờ</td>
+            <td>Ram</td>
+        </tr>
+        <tr>
+            <td>VPP-BTL01</td>
+            <td>Bút bi Thiên Long 0.5mm xanh</td>
+            <td>Hộp 20 cây</td>
+            <td>Cây</td>
+        </tr>
+    </table>
+    </body>
+    </html>
+    <?php
+    exit;
+}
+
+// ==================== TẢI FILE EXCEL MẪU NHẬP KHO VPP ====================
+if (isset($_GET['download_import_template'])) {
+    header("Content-Type: application/vnd.ms-excel; charset=UTF-8");
+    header("Content-Disposition: attachment; filename=Mau_Nhap_Kho_Van_Phong_Pham.xls");
+    header("Pragma: no-cache");
+    header("Expires: 0");
+    echo "\xEF\xBB\xBF";
+    ?>
+    <html xmlns:x="urn:schemas-microsoft-com:office:excel">
+    <head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"></head>
+    <body>
+    <table border="1">
+        <tr style="background:#10b981; color:#fff; font-weight:bold; text-align:center;">
+            <th>Ngày nhập (YYYY-MM-DD)</th>
+            <th>Nhà cung cấp</th>
+            <th>Mã VPP</th>
+            <th>Tên Mặt Hàng</th>
+            <th>Quy Cách</th>
+            <th>Đơn vị tính</th>
+            <th>Số lượng</th>
+            <th>Số hóa đơn / Chứng từ</th>
+            <th>Ghi chú</th>
+        </tr>
+        <tr>
+            <td><?= date('Y-m-d') ?></td>
+            <td>Công ty Văn Phòng Phẩm Tiến Phát</td>
+            <td>VPP-GAY4</td>
+            <td>Giấy in Double A A4 70gsm</td>
+            <td>Ram 500 tờ</td>
+            <td>Ram</td>
+            <td>50</td>
+            <td>HD-VPP-001</td>
+            <td>Nhập định kỳ đầu tháng</td>
+        </tr>
+    </table>
+    </body>
+    </html>
+    <?php
+    exit;
+}
+
+// ==================== CÁC HÀM HỖ TRỢ ====================
+function renderPaginationBar($currentPage, $totalPages, $paramName) {
+    if ($totalPages <= 1) return;
+    $queryParams = $_GET;
+
+    echo '<div class="pagination-wrapper">';
+    if ($currentPage > 1) {
+        $queryParams[$paramName] = $currentPage - 1;
+        echo '<a href="?' . http_build_query($queryParams) . '" class="page-link">&laquo;</a>';
+    } else {
+        echo '<span class="page-link disabled">&laquo;</span>';
+    }
+
+    $start = max(1, $currentPage - 1);
+    $end = min($totalPages, $currentPage + 1);
+    if ($currentPage == 1) $end = min($totalPages, $start + 2);
+    elseif ($currentPage == $totalPages) $start = max(1, $end - 2);
+
+    for ($i = $start; $i <= $end; $i++) {
+        $queryParams[$paramName] = $i;
+        $activeClass = ($i == $currentPage) ? 'active' : '';
+        echo '<a href="?' . http_build_query($queryParams) . '" class="page-link ' . $activeClass . '">' . $i . '</a>';
+    }
+
+    if ($currentPage < $totalPages) {
+        $queryParams[$paramName] = $currentPage + 1;
+        echo '<a href="?' . http_build_query($queryParams) . '" class="page-link">&raquo;</a>';
+    } else {
+        echo '<span class="page-link disabled">&raquo;</span>';
+    }
+    echo '</div>';
+}
+
+function generateUniqueVppCode($pdo, $table, $timeStr, $excludeId = 0) {
+    $ts = strtotime($timeStr) ?: time();
+    $baseCode = date('dmYHis', $ts);
+
+    $sql = "SELECT request_code FROM `{$table}` WHERE request_code LIKE :b AND id != :exId";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([':b' => $baseCode . '%', ':exId' => $excludeId]);
+    $existing = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+    if (empty($existing) || !in_array($baseCode, $existing)) {
+        return $baseCode;
+    }
+
+    $suffixes = range('A', 'Z');
+    foreach ($suffixes as $char) {
+        $candidate = $baseCode . $char;
+        if (!in_array($candidate, $existing)) {
+            return $candidate;
+        }
+    }
+    return $baseCode . '_' . rand(10, 99);
+}
+
+function getDisplayCode($row) {
+    if (!empty($row['request_code'])) {
+        return $row['request_code'];
+    }
+    return date('dmYHis', strtotime($row['created_at']));
+}
+
+function normalizeFastText($str) {
+    $str = str_replace("\xC2\xA0", ' ', (string)$str);
+    $str = mb_strtolower(trim($str), 'UTF-8');
+    $str = preg_replace('/[áàảãạăắằẳẵặâấầẩẫậ]/u', 'a', $str);
+    $str = preg_replace('/[éèẻẽẹêếềểễệ]/u', 'e', $str);
+    $str = preg_replace('/[íìỉĩị]/u', 'i', $str);
+    $str = preg_replace('/[óòỏõọôốồổỗộơớờởỡợ]/u', 'o', $str);
+    $str = preg_replace('/[úùủũụưứừửữự]/u', 'u', $str);
+    $str = preg_replace('/[ýỳỷỹỵ]/u', 'y', $str);
+    $str = preg_replace('/đ/u', 'd', $str);
+    return preg_replace('/[^a-z0-9]/', '', $str);
+}
+
+if (!isset($DEFAULT_DEPARTMENTS) || !is_array($DEFAULT_DEPARTMENTS)) {
+    $DEFAULT_DEPARTMENTS = [
+        'Ban Giám Đốc', 'Phòng Hành Chính - Nhân Sự', 'Phòng Kế Toán - Tài Chính',
+        'Phòng Kỹ Thuật - IT', 'Phòng Kinh Doanh - Marketing', 'Phòng Quản Lý Chất Lượng (QA/QC)',
+        'Bộ Phận Sản Xuất / Kho Vận', 'Bộ Phận Bếp & Dịch Vụ'
+    ];
+}
+
+// ==================== TẠO BẢNG & TỰ ĐỘNG CẬP NHẬT CỘT ====================
+try {
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS `vpp_items` (
+            `id` INT AUTO_INCREMENT PRIMARY KEY,
+            `item_code` VARCHAR(50) DEFAULT '',
+            `item_name` VARCHAR(150) NOT NULL,
+            `specification` VARCHAR(100) DEFAULT '',
+            `unit` VARCHAR(50) DEFAULT 'Cái',
+            `initial_stock` INT DEFAULT 0,
+            `total_imported` INT DEFAULT 0,
+            `stock_qty` INT DEFAULT 0,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX (`item_code`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    ");
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS `vpp_requests` (
+            `id` INT AUTO_INCREMENT PRIMARY KEY,
+            `request_code` VARCHAR(60) DEFAULT '',
+            `request_date` DATE NOT NULL,
+            `department` VARCHAR(100) NOT NULL,
+            `receiver_name` VARCHAR(150) DEFAULT '',
+            `item_id` INT NOT NULL,
+            `quantity` INT NOT NULL DEFAULT 1,
+            `delivery_location` VARCHAR(255) DEFAULT '',
+            `notes` VARCHAR(255) DEFAULT '',
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX (`item_id`),
+            INDEX (`request_date`),
+            INDEX (`request_code`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    ");
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS `vpp_proposals` (
+            `id` INT AUTO_INCREMENT PRIMARY KEY,
+            `request_code` VARCHAR(60) DEFAULT '',
+            `employee_id` INT DEFAULT NULL,
+            `receiver_name` VARCHAR(150) NOT NULL,
+            `department` VARCHAR(100) NOT NULL,
+            `item_id` INT NOT NULL,
+            `quantity` INT NOT NULL DEFAULT 1,
+            `pre_approved_quantity` INT DEFAULT NULL,
+            `approved_quantity` INT DEFAULT NULL,
+            `approval_note` VARCHAR(255) DEFAULT '',
+            `delivery_location` TEXT DEFAULT NULL,
+            `status` VARCHAR(50) DEFAULT 'Chờ duyệt',
+            `reject_reason` VARCHAR(255) DEFAULT '',
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX (`item_id`),
+            INDEX (`status`),
+            INDEX (`request_code`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    ");
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS `vpp_imports` (
+            `id` INT AUTO_INCREMENT PRIMARY KEY,
+            `invoice_no` VARCHAR(100) DEFAULT '',
+            `supplier_name` VARCHAR(150) NOT NULL,
+            `import_date` DATE NOT NULL,
+            `item_id` INT NOT NULL,
+            `quantity` INT NOT NULL DEFAULT 1,
+            `notes` VARCHAR(255) DEFAULT '',
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX (`item_id`),
+            INDEX (`import_date`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    ");
+
+    $colsVppProp = $pdo->query("SHOW COLUMNS FROM `vpp_proposals`")->fetchAll(PDO::FETCH_COLUMN);
+    if (!in_array('pre_approved_quantity', $colsVppProp)) {
+        $pdo->exec("ALTER TABLE `vpp_proposals` ADD COLUMN `pre_approved_quantity` INT DEFAULT NULL AFTER `quantity`");
+    }
+} catch (PDOException $e) {}
+
+$selected_month = $_GET['month'] ?? date('Y-m');
+$f_dept = trim($_GET['f_dept'] ?? '');
+$search_vpp = trim($_GET['search_vpp'] ?? '');
+
+// ==================== 1. XỬ LÝ ĐỀ XUẤT (SƠ DUYỆT, DUYỆT, CẤP PHÁT, TỪ CHỐI, SỬA, XÓA) ====================
+
+// 1.1 Sơ duyệt đề xuất
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'pre_approve_group_proposals') {
+    $req_code       = trim($_POST['request_code'] ?? '');
+    $pre_items_qty  = $_POST['pre_approved_quantities'] ?? [];
+    $pre_item_notes = $_POST['pre_item_notes'] ?? [];
+
+    try {
+        if (empty($req_code)) throw new Exception("Không xác định được mã yêu cầu đề xuất!");
+        if (empty($pre_items_qty)) throw new Exception("Không có danh sách mặt hàng để sơ duyệt!");
+
+        $pdo->beginTransaction();
+        $upCount = 0;
+        foreach ($pre_items_qty as $propId => $qty) {
+            $q = max(0, intval($qty));
+            $note = trim($pre_item_notes[$propId] ?? '');
+            $stmtUp = $pdo->prepare("
+                UPDATE vpp_proposals 
+                SET status = 'Đã sơ duyệt', pre_approved_quantity = :pre_qty, approval_note = :note 
+                WHERE id = :id AND request_code = :code
+            ");
+            $stmtUp->execute([
+                ':pre_qty' => $q,
+                ':note'    => $note,
+                ':id'      => intval($propId),
+                ':code'    => $req_code
+            ]);
+            $upCount++;
+        }
+        $pdo->commit();
+        $message = "Đã hoàn tất Sơ duyệt cho yêu cầu [{$req_code}]. Bạn có thể in phiếu Trình ký hoặc bấm Phê duyệt!";
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        $error = "Lỗi sơ duyệt: " . $e->getMessage();
+    }
+}
+
+// 1.2 Phê duyệt chính thức
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'approve_group_proposals') {
+    $req_code       = trim($_POST['request_code'] ?? '');
+    $items_approved = $_POST['approved_quantities'] ?? [];
+    $item_notes     = $_POST['item_notes'] ?? [];
+
+    try {
+        if (empty($req_code)) throw new Exception("Không xác định được mã yêu cầu đề xuất!");
+        if (empty($items_approved)) throw new Exception("Không có danh sách mặt hàng để phê duyệt!");
+
+        $pdo->beginTransaction();
+        $upCount = 0;
+        foreach ($items_approved as $propId => $qty) {
+            $q = max(0, intval($qty));
+            $note = trim($item_notes[$propId] ?? '');
+            $stmtUp = $pdo->prepare("
+                UPDATE vpp_proposals 
+                SET status = 'Đã duyệt', approved_quantity = :appr_qty, approval_note = :appr_note 
+                WHERE id = :id AND request_code = :code
+            ");
+            $stmtUp->execute([
+                ':appr_qty'  => $q,
+                ':appr_note' => $note,
+                ':id'        => intval($propId),
+                ':code'      => $req_code
+            ]);
+            $upCount++;
+        }
+        $pdo->commit();
+        $message = "Đã phê duyệt toàn bộ {$upCount} mặt hàng trong yêu cầu [{$req_code}] thành công!";
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        $error = "Lỗi duyệt đề xuất: " . $e->getMessage();
+    }
+}
+
+// 1.3 Chỉnh sửa thông tin đợt đề xuất
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'edit_group_proposals') {
+    $req_code      = trim($_POST['request_code'] ?? '');
+    $receiver_name = trim($_POST['receiver_name'] ?? '');
+    $department    = trim($_POST['department'] ?? '');
+    $delivery_loc  = trim($_POST['delivery_location'] ?? '');
+    $edit_items    = $_POST['items_qty'] ?? [];
+
+    try {
+        if (empty($req_code)) throw new Exception("Mã yêu cầu không hợp lệ!");
+        if (empty($receiver_name) || empty($department)) throw new Exception("Vui lòng điền đầy đủ người nhận và phòng ban!");
+
+        $pdo->beginTransaction();
+        $stmtUpInfo = $pdo->prepare("
+            UPDATE vpp_proposals 
+            SET receiver_name = :rec, department = :dept, delivery_location = :loc 
+            WHERE request_code = :code
+        ");
+        $stmtUpInfo->execute([':rec' => $receiver_name, ':dept' => $department, ':loc' => $delivery_loc, ':code' => $req_code]);
+
+        $stmtUpQty = $pdo->prepare("UPDATE vpp_proposals SET quantity = :qty WHERE id = :id AND request_code = :code");
+        foreach ($edit_items as $propId => $qty) {
+            $q = max(1, intval($qty));
+            $stmtUpQty->execute([':qty' => $q, ':id' => intval($propId), ':code' => $req_code]);
+        }
+
+        $pdo->commit();
+        $message = "Đã cập nhật thông tin đợt đề xuất [{$req_code}] thành công!";
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        $error = "Lỗi sửa đề xuất: " . $e->getMessage();
+    }
+}
+
+// 1.4 Cấp phát theo mã yêu cầu
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'deliver_group_proposals') {
+    $req_code      = trim($_POST['request_code'] ?? '');
+    $receiver_name = trim($_POST['receiver_name'] ?? '');
+    $department    = trim($_POST['department'] ?? '');
+    $delivery_loc  = trim($_POST['delivery_location'] ?? '');
+    $custom_notes  = trim($_POST['notes'] ?? '');
+    $deliver_items = $_POST['deliver_quantities'] ?? [];
+
+    try {
+        if (empty($req_code)) throw new Exception("Không xác định được mã yêu cầu đề xuất!");
+        $pdo->beginTransaction();
+
+        $stmtProps = $pdo->prepare("
+            SELECT p.*, i.item_name, i.stock_qty, i.unit 
+            FROM vpp_proposals p 
+            JOIN vpp_items i ON p.item_id = i.id 
+            WHERE p.request_code = :code AND p.status IN ('Đã duyệt', 'Chờ cấp phát')
+            FOR UPDATE
+        ");
+        $stmtProps->execute([':code' => $req_code]);
+        $rows = $stmtProps->fetchAll();
+
+        if (empty($rows)) {
+            throw new Exception("Yêu cầu đề xuất chưa được duyệt hoặc đã được cấp phát từ trước!");
+        }
+
+        $stmtSub = $pdo->prepare("UPDATE vpp_items SET stock_qty = stock_qty - :qty WHERE id = :id");
+        $stmtReq = $pdo->prepare("
+            INSERT INTO vpp_requests (request_code, request_date, department, receiver_name, item_id, quantity, delivery_location, notes)
+            VALUES (:code, :r_date, :dept, :rec, :item_id, :qty, :loc, :notes)
+        ");
+        $stmtUpProp = $pdo->prepare("UPDATE vpp_proposals SET status = 'Đã cấp phát', approved_quantity = :appr_q WHERE id = :id");
+
+        $itemDeliveredCount = 0;
+        foreach ($rows as $p) {
+            $propId = $p['id'];
+            $giveQty = isset($deliver_items[$propId]) ? max(0, intval($deliver_items[$propId])) : intval($p['approved_quantity'] !== null ? $p['approved_quantity'] : $p['quantity']);
+
+            if ($giveQty <= 0) {
+                $stmtUpProp->execute([':appr_q' => 0, ':id' => $propId]);
+                continue;
+            }
+
+            if ($p['stock_qty'] < $giveQty) {
+                throw new Exception("Tồn kho không đủ để cấp mặt hàng [{$p['item_name']}]! Tồn kho hiện có: {$p['stock_qty']} {$p['unit']}, cần cấp: {$giveQty} {$p['unit']}.");
+            }
+
+            $stmtSub->execute([':qty' => $giveQty, ':id' => $p['item_id']]);
+            $stmtReq->execute([
+                ':code'    => $req_code,
+                ':r_date'  => date('Y-m-d'),
+                ':dept'    => $department ?: $p['department'],
+                ':rec'     => $receiver_name ?: $p['receiver_name'],
+                ':item_id' => $p['item_id'],
+                ':qty'     => $giveQty,
+                ':loc'     => $delivery_loc ?: $p['delivery_location'],
+                ':notes'   => $custom_notes
+            ]);
+            $stmtUpProp->execute([':appr_q' => $giveQty, ':id' => $propId]);
+            $itemDeliveredCount++;
+        }
+
+        $pdo->commit();
+        $message = "Đã xác nhận cấp phát thành công {$itemDeliveredCount} mặt hàng cho yêu cầu [{$req_code}]!";
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        $error = "Lỗi cấp phát: " . $e->getMessage();
+    }
+}
+
+// 1.5 Từ chối
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'reject_group_proposals') {
+    $req_code = trim($_POST['request_code'] ?? '');
+    $reason   = trim($_POST['reject_reason'] ?? 'Tạm thời hết hàng');
+    try {
+        $stmt = $pdo->prepare("UPDATE vpp_proposals SET status = 'Từ chối', reject_reason = :reason WHERE request_code = :code");
+        $stmt->execute([':reason' => $reason, ':code' => $req_code]);
+        $message = "Đã từ chối toàn bộ yêu cầu đề xuất [{$req_code}]!";
+    } catch (PDOException $e) { $error = "Lỗi: " . $e->getMessage(); }
+}
+
+// 1.6 Xóa đề xuất
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_group_proposals') {
+    $req_code = trim($_POST['request_code'] ?? '');
+    if (!empty($req_code)) {
+        try {
+            $stmtDel = $pdo->prepare("DELETE FROM vpp_proposals WHERE request_code = :code");
+            $stmtDel->execute([':code' => $req_code]);
+            $message = "Đã xóa toàn bộ đề xuất thuộc mã yêu cầu [{$req_code}] thành công!";
+        } catch (PDOException $e) {
+            $error = "Lỗi khi xóa đề xuất: " . $e->getMessage();
+        }
+    }
+}
+
+// ==================== 2. XỬ LÝ NHẬP KHO & NHÀ CUNG CẤP ====================
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'import_stock') {
+    $imp_date      = trim($_POST['import_date'] ?? $today);
+    $invoice_no    = trim($_POST['invoice_no'] ?? '');
+    $supplier_name = trim($_POST['supplier_name'] ?? '');
+    $item_id       = intval($_POST['item_id'] ?? 0);
+    $add_qty       = intval($_POST['add_qty'] ?? 0);
+    $notes         = trim($_POST['notes'] ?? '');
+
+    if ($item_id > 0 && $add_qty > 0 && !empty($supplier_name)) {
+        try {
+            $pdo->beginTransaction();
+            $stmtImp = $pdo->prepare("
+                INSERT INTO vpp_imports (invoice_no, supplier_name, import_date, item_id, quantity, notes)
+                VALUES (:inv, :sup, :imp_d, :it_id, :qty, :n)
+            ");
+            $stmtImp->execute([
+                ':inv'   => $invoice_no, ':sup'   => $supplier_name, ':imp_d' => $imp_date,
+                ':it_id' => $item_id,    ':qty'   => $add_qty,       ':n'     => $notes
+            ]);
+
+            $stmtUpW = $pdo->prepare("UPDATE vpp_items SET stock_qty = stock_qty + :q1, total_imported = total_imported + :q2 WHERE id = :id");
+            $stmtUpW->execute([':q1' => $add_qty, ':q2' => $add_qty, ':id' => $item_id]);
+
+            $pdo->commit();
+            $message = "Đã nhập thêm {$add_qty} sản phẩm từ NCC [" . htmlspecialchars($supplier_name) . "] vào kho thành công!";
+        } catch (Exception $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            $error = "Lỗi nhập kho: " . $e->getMessage();
+        }
+    } else {
+        $error = "Vui lòng nhập đầy đủ tên nhà cung cấp, mặt hàng VPP và số lượng nhập!";
+    }
+}
+
+// ==================== 3. SỬA / XÓA PHIẾU NHẬP KHO ====================
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'update_import') {
+    $imp_id     = intval($_POST['import_id']);
+    $new_date   = trim($_POST['import_date']);
+    $new_inv    = trim($_POST['invoice_no'] ?? '');
+    $new_sup    = trim($_POST['supplier_name'] ?? '');
+    $new_item   = intval($_POST['item_id']);
+    $new_qty    = intval($_POST['quantity']);
+    $new_notes  = trim($_POST['notes'] ?? '');
+
+    try {
+        $pdo->beginTransaction();
+        $stmtOld = $pdo->prepare("SELECT * FROM vpp_imports WHERE id = :id FOR UPDATE");
+        $stmtOld->execute([':id' => $imp_id]);
+        $oldImp = $stmtOld->fetch();
+
+        if (!$oldImp) throw new Exception("Phiếu nhập kho không tồn tại!");
+
+        if (intval($oldImp['item_id']) === $new_item) {
+            $diff = $new_qty - intval($oldImp['quantity']);
+            $stmtUpStock = $pdo->prepare("UPDATE vpp_items SET stock_qty = GREATEST(0, stock_qty + :d1), total_imported = GREATEST(0, total_imported + :d2) WHERE id = :id");
+            $stmtUpStock->execute([':d1' => $diff, ':d2' => $diff, ':id' => $new_item]);
+        } else {
+            $stmtRev = $pdo->prepare("UPDATE vpp_items SET stock_qty = GREATEST(0, stock_qty - :q1), total_imported = GREATEST(0, total_imported - :q2) WHERE id = :id");
+            $stmtRev->execute([':q1' => $oldImp['quantity'], ':q2' => $oldImp['quantity'], ':id' => $oldImp['item_id']]);
+
+            $stmtAdd = $pdo->prepare("UPDATE vpp_items SET stock_qty = stock_qty + :q1, total_imported = total_imported + :q2 WHERE id = :id");
+            $stmtAdd->execute([':q1' => $new_qty, ':q2' => $new_qty, ':id' => $new_item]);
+        }
+
+        $stmtUp = $pdo->prepare("
+            UPDATE vpp_imports 
+            SET invoice_no = :inv, supplier_name = :sup, import_date = :idate, item_id = :item, quantity = :qty, notes = :n 
+            WHERE id = :id
+        ");
+        $stmtUp->execute([
+            ':inv' => $new_inv, ':sup' => $new_sup, ':idate' => $new_date, 
+            ':item' => $new_item, ':qty' => $new_qty, ':n' => $new_notes, ':id' => $imp_id
+        ]);
+
+        $pdo->commit();
+        $message = "Đã cập nhật thông tin phiếu nhập kho VPP thành công!";
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        $error = "Lỗi cập nhật: " . $e->getMessage();
+    }
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_import') {
+    $imp_id = intval($_POST['import_id']);
+    try {
+        $pdo->beginTransaction();
+        $stmtGet = $pdo->prepare("SELECT * FROM vpp_imports WHERE id = :id FOR UPDATE");
+        $stmtGet->execute([':id' => $imp_id]);
+        $imp = $stmtGet->fetch();
+
+        if ($imp) {
+            $stmtSub = $pdo->prepare("UPDATE vpp_items SET stock_qty = GREATEST(0, stock_qty - :q1), total_imported = GREATEST(0, total_imported - :q2) WHERE id = :id");
+            $stmtSub->execute([':q1' => $imp['quantity'], ':q2' => $imp['quantity'], ':id' => $imp['item_id']]);
+
+            $stmtDel = $pdo->prepare("DELETE FROM vpp_imports WHERE id = :id");
+            $stmtDel->execute([':id' => $imp_id]);
+        }
+        $pdo->commit();
+        $message = "Đã xóa phiếu nhập kho và trừ bớt tồn kho thực tế!";
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        $error = "Lỗi xóa: " . $e->getMessage();
+    }
+}
+
+// ==================== 4. SỬA / XÓA LỊCH SỬ CẤP PHÁT ====================
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'update_request') {
+    $req_id   = intval($_POST['request_id']);
+    $new_date = $_POST['request_date'];
+    $new_dept = trim($_POST['department']);
+    $new_rec  = trim($_POST['receiver_name'] ?? '');
+    $new_item = intval($_POST['item_id']);
+    $new_qty  = intval($_POST['quantity']);
+    $new_loc  = trim($_POST['delivery_location'] ?? '');
+    $new_notes= trim($_POST['notes'] ?? '');
+
+    try {
+        $pdo->beginTransaction();
+        $stmtOld = $pdo->prepare("SELECT * FROM vpp_requests WHERE id = :id FOR UPDATE");
+        $stmtOld->execute([':id' => $req_id]);
+        $oldReq = $stmtOld->fetch();
+
+        if (!$oldReq) throw new Exception("Bản ghi cấp phát không tồn tại!");
+
+        $stmtIt = $pdo->prepare("SELECT item_name, specification, stock_qty, unit FROM vpp_items WHERE id = :id FOR UPDATE");
+        $stmtIt->execute([':id' => $new_item]);
+        $it = $stmtIt->fetch();
+        if (!$it) throw new Exception("Mặt hàng VPP không tồn tại!");
+
+        if (intval($oldReq['item_id']) === $new_item) {
+            $diff = $new_qty - intval($oldReq['quantity']);
+            if ($diff > 0 && $diff > $it['stock_qty']) {
+                throw new Exception("Không đủ hàng trong kho để tăng số lượng cấp! Còn thiếu {$diff} {$it['unit']}.");
+            }
+            $stmtUpStock = $pdo->prepare("UPDATE vpp_items SET stock_qty = GREATEST(0, stock_qty - :diff) WHERE id = :id");
+            $stmtUpStock->execute([':diff' => $diff, ':id' => $new_item]);
+        } else {
+            $stmtBack = $pdo->prepare("UPDATE vpp_items SET stock_qty = stock_qty + :q WHERE id = :id");
+            $stmtBack->execute([':q' => $oldReq['quantity'], ':id' => $oldReq['item_id']]);
+
+            if ($new_qty > $it['stock_qty']) {
+                throw new Exception("Không đủ tồn kho mặt hàng mới để cấp! Tồn: {$it['stock_qty']} {$it['unit']}.");
+            }
+            $stmtTake = $pdo->prepare("UPDATE vpp_items SET stock_qty = stock_qty - :q WHERE id = :id");
+            $stmtTake->execute([':q' => $new_qty, ':id' => $new_item]);
+        }
+
+        $stmtUpReq = $pdo->prepare("
+            UPDATE vpp_requests 
+            SET request_date = :r_date, department = :dept, receiver_name = :rec, item_id = :item_id, 
+                quantity = :qty, delivery_location = :loc, notes = :notes 
+            WHERE id = :id
+        ");
+        $stmtUpReq->execute([
+            ':r_date'  => $new_date, ':dept'    => $new_dept, ':rec'     => $new_rec,
+            ':item_id' => $new_item, ':qty'     => $new_qty,
+            ':loc'     => $new_loc,  ':notes'   => $new_notes, ':id'     => $req_id
+        ]);
+
+        $pdo->commit();
+        $message = "Đã cập nhật bản ghi lịch sử cấp phát VPP thành công!";
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        $error = "Lỗi cập nhật: " . $e->getMessage();
+    }
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_request') {
+    $req_id = intval($_POST['request_id']);
+    try {
+        $pdo->beginTransaction();
+        $stmtGet = $pdo->prepare("SELECT * FROM vpp_requests WHERE id = :id FOR UPDATE");
+        $stmtGet->execute([':id' => $req_id]);
+        $req = $stmtGet->fetch();
+
+        if ($req) {
+            $stmtRet = $pdo->prepare("UPDATE vpp_items SET stock_qty = stock_qty + :qty WHERE id = :item_id");
+            $stmtRet->execute([':qty' => $req['quantity'], ':item_id' => $req['item_id']]);
+
+            $stmtDel = $pdo->prepare("DELETE FROM vpp_requests WHERE id = :id");
+            $stmtDel->execute([':id' => $req_id]);
+        }
+        $pdo->commit();
+        $message = "Đã xóa bản ghi cấp phát và hoàn trả {$req['quantity']} vào kho VPP!";
+    } catch (PDOException $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        $error = "Lỗi xóa: " . $e->getMessage();
+    }
+}
+
+// ==================== 5. THAO TÁC CRUD SẢN PHẨM & KHO ====================
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    $act = $_POST['action'];
+
+    if ($act === 'add_item') {
+        $code = trim($_POST['item_code'] ?? '');
+        $name = trim($_POST['item_name'] ?? '');
+        $spec = trim($_POST['specification'] ?? '');
+        $unit = trim($_POST['unit'] ?? 'Cái');
+        $init = intval($_POST['initial_stock'] ?? 0);
+        if ($name) {
+            $stmt = $pdo->prepare("INSERT INTO vpp_items (item_code, item_name, specification, unit, initial_stock, total_imported, stock_qty) VALUES (:c, :n, :s, :u, :i, 0, :st)");
+            $stmt->execute([':c'=>$code, ':n'=>$name, ':s'=>$spec, ':u'=>$unit, ':i'=>$init, ':st'=>$init]);
+            $message = "Đã thêm mặt hàng văn phòng phẩm mới vào kho!";
+        }
+    }
+
+    if ($act === 'update_item') {
+        $item_id = intval($_POST['item_id']);
+        $code    = trim($_POST['item_code'] ?? '');
+        $name    = trim($_POST['item_name'] ?? '');
+        $spec    = trim($_POST['specification'] ?? '');
+        $unit    = trim($_POST['unit'] ?? 'Cái');
+        $init    = intval($_POST['initial_stock'] ?? 0);
+
+        if (!empty($name) && $item_id > 0) {
+            try {
+                $pdo->beginTransaction();
+                $stmtOld = $pdo->prepare("SELECT initial_stock, stock_qty FROM vpp_items WHERE id = :id FOR UPDATE");
+                $stmtOld->execute([':id' => $item_id]);
+                $oldItem = $stmtOld->fetch();
+
+                $diffInit = $init - intval($oldItem['initial_stock']);
+                $newStock = max(0, intval($oldItem['stock_qty']) + $diffInit);
+
+                $stmt = $pdo->prepare("
+                    UPDATE vpp_items 
+                    SET item_code = :code, item_name = :name, specification = :spec, unit = :unit, initial_stock = :init, stock_qty = :stock 
+                    WHERE id = :id
+                ");
+                $stmt->execute([
+                    ':code'  => $code, ':name'  => $name, ':spec'  => $spec, ':unit'  => $unit,
+                    ':init'  => $init, ':stock' => $newStock, ':id'    => $item_id
+                ]);
+                $pdo->commit();
+                $message = "Đã cập nhật thông tin mặt hàng VPP thành công!";
+            } catch (PDOException $e) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                $error = "Lỗi cập nhật: " . $e->getMessage();
+            }
+        }
+    }
+
+    if ($act === 'delete_item') {
+        $item_id = intval($_POST['item_id']);
+        try {
+            $stmt = $pdo->prepare("DELETE FROM vpp_items WHERE id = :id");
+            $stmt->execute([':id' => $item_id]);
+            $message = "Đã xóa mặt hàng khỏi danh mục VPP!";
+        } catch (PDOException $e) {
+            $error = "Không thể xóa do mặt hàng này đang có dữ liệu trong lịch sử: " . $e->getMessage();
+        }
+    }
+
+    if ($act === 'add_manual_request') {
+        $r_date  = $_POST['request_date'];
+        $dept    = trim($_POST['department']);
+        $rec     = trim($_POST['receiver_name'] ?? '');
+        $item_id = intval($_POST['item_id']);
+        $qty     = intval($_POST['quantity']);
+        $loc     = trim($_POST['delivery_location'] ?? '');
+        $notes   = trim($_POST['notes'] ?? '');
+
+        $manual_code = generateUniqueVppCode($pdo, 'vpp_requests', date('Y-m-d H:i:s'));
+
+        try {
+            $pdo->beginTransaction();
+            $stmtSub = $pdo->prepare("UPDATE vpp_items SET stock_qty = GREATEST(0, stock_qty - :q) WHERE id = :id");
+            $stmtSub->execute([':q' => $qty, ':id' => $item_id]);
+
+            $stmtReq = $pdo->prepare("
+                INSERT INTO vpp_requests (request_code, request_date, department, receiver_name, item_id, quantity, delivery_location, notes)
+                VALUES (:code, :rd, :dept, :rec, :it, :q, :loc, :n)
+            ");
+            $stmtReq->execute([':code'=>$manual_code, ':rd'=>$r_date, ':dept'=>$dept, ':rec'=>$rec, ':it'=>$item_id, ':q'=>$qty, ':loc'=>$loc, ':n'=>$notes]);
+            $pdo->commit();
+            $message = "Đã cấp phát VPP thành công (Mã: $manual_code)!";
+        } catch (Exception $e) { $pdo->rollBack(); $error = "Lỗi: " . $e->getMessage(); }
+    }
+}
+
+// ==================== 6. XUẤT EXCEL THEO BỘ LỌC ====================
+if (isset($_GET['export_stock_full'])) {
+    $date_str = date('d-m-Y');
+    header("Content-Type: application/vnd.ms-excel; charset=UTF-8");
+    header("Content-Disposition: attachment; filename=Bao_Cao_Ton_Kho_VPP_{$date_str}.xls");
+    header("Pragma: no-cache"); header("Expires: 0"); echo "\xEF\xBB\xBF";
+
+    $itemsExport = $pdo->query("
+        SELECT i.*, COALESCE((SELECT SUM(r.quantity) FROM vpp_requests r WHERE r.item_id = i.id), 0) AS total_exported 
+        FROM vpp_items i ORDER BY i.item_code ASC, i.item_name ASC
+    ")->fetchAll();
+
+    echo '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"></head><body><table border="1">';
+    echo '<tr><td colspan="7" style="font-size:16pt; font-weight:bold; text-align:center;">BÁO CÁO TỔNG HỢP XUẤT - NHẬP - TỒN KHO VĂN PHÒNG PHẨM</td></tr>';
+    echo '<tr style="background:#10b981; color:#fff; font-weight:bold; text-align:center;"><th>STT</th><th>Mã VPP</th><th>Tên Mặt Hàng</th><th>ĐVT</th><th>Tổng Nhập Kho</th><th>Tổng Xuất Kho</th><th>Số Lượng Tồn Kho</th></tr>';
+
+    $stt1 = 1;
+    foreach ($itemsExport as $it) {
+        echo "<tr><td>{$stt1}</td><td>" . htmlspecialchars($it['item_code'] ?? '—') . "</td><td><b>" . htmlspecialchars($it['item_name']) . "</b></td><td>" . htmlspecialchars($it['unit']) . "</td><td>{$it['total_imported']}</td><td>{$it['total_exported']}</td><td>{$it['stock_qty']}</td></tr>";
+        $stt1++;
+    }
+    echo '</table></body></html>'; exit;
+}
+
+if (isset($_GET['export_imports_report'])) {
+    $date_str = date('d-m-Y');
+    header("Content-Type: application/vnd.ms-excel; charset=UTF-8");
+    header("Content-Disposition: attachment; filename=Bao_Cao_Nhap_Kho_VPP_{$date_str}.xls");
+    header("Pragma: no-cache"); header("Expires: 0"); echo "\xEF\xBB\xBF";
+
+    $impRows = $pdo->query("
+        SELECT imp.*, i.item_code, i.item_name, i.specification, i.unit 
+        FROM vpp_imports imp JOIN vpp_items i ON imp.item_id = i.id ORDER BY imp.id DESC
+    ")->fetchAll();
+
+    echo '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"></head><body><table border="1">';
+    echo '<tr><td colspan="9" style="font-size:16pt; font-weight:bold; text-align:center;">BÁO CÁO CHI TIẾT NHẬP KHO VĂN PHÒNG PHẨM</td></tr>';
+    echo '<tr style="background:#10b981; color:#fff; font-weight:bold; text-align:center;"><th>STT</th><th>Số Chứng Từ / HĐ</th><th>Ngày Nhập</th><th>Nhà Cung Cấp</th><th>Mặt Hàng Nhập</th><th>Quy Cách</th><th>Số Lượng</th><th>ĐVT</th><th>Ghi Chú</th></tr>';
+    $stt = 1;
+    foreach ($impRows as $row) {
+        echo "<tr><td>{$stt}</td><td>" . htmlspecialchars($row['invoice_no'] ?: '—') . "</td><td>" . date('d/m/Y', strtotime($row['import_date'])) . "</td><td><b>" . htmlspecialchars($row['supplier_name']) . "</b></td><td>" . htmlspecialchars($row['item_name']) . "</td><td>" . htmlspecialchars($row['specification'] ?: '—') . "</td><td>{$row['quantity']}</td><td>" . htmlspecialchars($row['unit']) . "</td><td>" . htmlspecialchars($row['notes'] ?: '—') . "</td></tr>";
+        $stt++;
+    }
+    echo '</table></body></html>'; exit;
+}
+
+if (isset($_GET['export_report'])) {
+    $date_str = date('d-m-Y');
+    header("Content-Type: application/vnd.ms-excel; charset=UTF-8");
+    header("Content-Disposition: attachment; filename=Bao_Cao_Cap_Phat_VPP_{$date_str}.xls");
+    header("Pragma: no-cache"); header("Expires: 0"); echo "\xEF\xBB\xBF";
+
+    $reportRows = $pdo->query("
+        SELECT r.*, i.item_name, i.specification, i.unit 
+        FROM vpp_requests r JOIN vpp_items i ON r.item_id = i.id ORDER BY r.id DESC
+    ")->fetchAll();
+
+    echo '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"></head><body><table border="1">';
+    echo '<tr><td colspan="8" style="font-size:16pt; font-weight:bold; text-align:center;">BÁO CÁO CHI TIẾT CẤP PHÁT VĂN PHÒNG PHẨM</td></tr>';
+    echo '<tr style="background:#0284c7; color:#fff; font-weight:bold; text-align:center;"><th>STT</th><th>Mã Cấp Phát</th><th>Ngày</th><th>Người Nhận</th><th>Phòng Ban</th><th>Mặt Hàng VPP</th><th>Số Lượng</th><th>Ghi Chú</th></tr>';
+    $stt = 1;
+    foreach ($reportRows as $row) {
+        echo "<tr><td>{$stt}</td><td>" . getDisplayCode($row) . "</td><td>" . date('d/m/Y', strtotime($row['request_date'])) . "</td><td>" . htmlspecialchars($row['receiver_name'] ?: '—') . "</td><td>" . htmlspecialchars($row['department']) . "</td><td>" . htmlspecialchars($row['item_name']) . "</td><td>{$row['quantity']} " . htmlspecialchars($row['unit']) . "</td><td>" . htmlspecialchars($row['notes'] ?: '') . "</td></tr>";
+        $stt++;
+    }
+    echo '</table></body></html>'; exit;
+}
+
+// ==================== 7. TRUY VẤN DỮ LIỆU ĐỀ XUẤT ====================
+$week_start_date = date('Y-m-d 00:00:00', strtotime('monday this week'));
+$week_end_date   = date('Y-m-d 23:59:59', strtotime('sunday this week'));
+
+$weekPropStmt = $pdo->prepare("
+    SELECT 
+        COUNT(DISTINCT request_code) AS count_req_week,
+        COUNT(DISTINCT CASE WHEN status IN ('Đã duyệt', 'Đã cấp phát') THEN request_code ELSE NULL END) AS count_appr_week,
+        COUNT(DISTINCT CASE WHEN status = 'Từ chối' THEN request_code ELSE NULL END) AS count_rej_week
+    FROM vpp_proposals 
+    WHERE created_at BETWEEN :ws AND :we
+");
+$weekPropStmt->execute([':ws' => $week_start_date, ':we' => $week_end_date]);
+$weekPropData = $weekPropStmt->fetch();
+$total_week_req  = intval($weekPropData['count_req_week'] ?? 0);
+$total_week_appr = intval($weekPropData['count_appr_week'] ?? 0);
+$total_week_rej  = intval($weekPropData['count_rej_week'] ?? 0);
+
+$f_prop_search = trim($_GET['f_prop_search'] ?? '');
+$f_prop_status = trim($_GET['f_prop_status'] ?? '');
+
+$whereP = ["1=1"];
+$paramsP = [];
+
+if (!empty($f_prop_search)) {
+    $whereP[] = "(p.request_code LIKE :ps1 OR DATE_FORMAT(p.created_at, '%d%m%Y%H%i%s') LIKE :ps2 OR p.receiver_name LIKE :ps3 OR i.item_name LIKE :ps4)";
+    $paramsP[':ps1'] = "%$f_prop_search%";
+    $paramsP[':ps2'] = "%$f_prop_search%";
+    $paramsP[':ps3'] = "%$f_prop_search%";
+    $paramsP[':ps4'] = "%$f_prop_search%";
+}
+if (!empty($f_prop_status)) {
+    if ($f_prop_status === 'Chờ duyệt') {
+        $whereP[] = "p.status = 'Chờ duyệt'";
+    } elseif ($f_prop_status === 'Đã sơ duyệt') {
+        $whereP[] = "p.status = 'Đã sơ duyệt'";
+    } elseif ($f_prop_status === 'Đã duyệt') {
+        $whereP[] = "p.status IN ('Đã duyệt', 'Đã cấp phát', 'Chờ cấp phát')";
+    } elseif ($f_prop_status === 'Từ chối') {
+        $whereP[] = "p.status = 'Từ chối'";
+    }
+}
+
+$countPropStmt = $pdo->prepare("SELECT COUNT(DISTINCT p.request_code) FROM vpp_proposals p JOIN vpp_items i ON p.item_id = i.id WHERE " . implode(' AND ', $whereP));
+$countPropStmt->execute($paramsP);
+$total_proposals = intval($countPropStmt->fetchColumn() ?? 0);
+
+$pages_prop = ceil($total_proposals / $limit) ?: 1;
+if ($p_prop > $pages_prop) $p_prop = $pages_prop;
+$offset_prop = max(0, ($p_prop - 1) * $limit);
+
+$sqlProposals = "
+    SELECT 
+        p.id, p.request_code, p.employee_id, p.receiver_name, p.department, p.delivery_location, p.status, p.reject_reason, p.created_at,
+        COUNT(p.id) AS item_count,
+        SUM(p.quantity) AS total_qty_requested,
+        SUM(COALESCE(p.pre_approved_quantity, p.quantity)) AS total_qty_pre_approved,
+        SUM(COALESCE(p.approved_quantity, p.pre_approved_quantity, p.quantity)) AS total_qty_approved,
+        GROUP_CONCAT(DISTINCT p.approval_note SEPARATOR ' | ') AS combined_approval_note,
+        JSON_ARRAYAGG(
+            JSON_OBJECT(
+                'proposal_id', p.id,
+                'item_id', p.item_id,
+                'item_name', i.item_name,
+                'item_code', i.item_code,
+                'specification', i.specification,
+                'unit', i.unit,
+                'stock_qty', i.stock_qty,
+                'quantity', p.quantity,
+                'pre_approved_quantity', p.pre_approved_quantity,
+                'approved_quantity', p.approved_quantity,
+                'approval_note', p.approval_note
+            )
+        ) AS items_json
+    FROM vpp_proposals p
+    JOIN vpp_items i ON p.item_id = i.id
+    WHERE " . implode(' AND ', $whereP) . "
+    GROUP BY p.request_code, p.employee_id, p.receiver_name, p.department, p.delivery_location, p.status, p.reject_reason, p.created_at
+    ORDER BY (p.status = 'Chờ duyệt') DESC, (p.status = 'Đã sơ duyệt') DESC, (p.status = 'Đã duyệt' OR p.status = 'Chờ cấp phát') DESC, MAX(p.id) DESC
+    LIMIT " . intval($limit) . " OFFSET " . intval($offset_prop) . "
+";
+$stmtPropList = $pdo->prepare($sqlProposals);
+$stmtPropList->execute($paramsP);
+$proposals = $stmtPropList->fetchAll();
+
+// ==================== 8. TRUY VẤN DỮ LIỆU KHO ====================
+$whereW = ["1=1"]; $paramsW = [];
+if (!empty($search_vpp)) {
+    $whereW[] = "(i.item_code LIKE :s1 OR i.item_name LIKE :s2 OR i.specification LIKE :s3)";
+    $paramsW[':s1'] = "%$search_vpp%"; $paramsW[':s2'] = "%$search_vpp%"; $paramsW[':s3'] = "%$search_vpp%";
+}
+$countStmt = $pdo->prepare("SELECT COUNT(*) FROM vpp_items i WHERE " . implode(' AND ', $whereW));
+$countStmt->execute($paramsW);
+$total_vpp = $countStmt->fetchColumn();
+$pages_vpp = ceil($total_vpp / $limit) ?: 1;
+if ($p_vpp > $pages_vpp) $p_vpp = $pages_vpp;
+$offset_vpp = max(0, ($p_vpp - 1) * $limit);
+
+$sqlW = "
+    SELECT i.*, COALESCE((SELECT SUM(r.quantity) FROM vpp_requests r WHERE r.item_id = i.id), 0) AS total_exported 
+    FROM vpp_items i 
+    WHERE " . implode(' AND ', $whereW) . " 
+    ORDER BY i.item_code ASC, i.item_name ASC 
+    LIMIT " . intval($limit) . " OFFSET " . intval($offset_vpp) . "
+";
+$stmtW = $pdo->prepare($sqlW); $stmtW->execute($paramsW);
+$items = $stmtW->fetchAll();
+
+$allItemsForModal = $pdo->query("SELECT * FROM vpp_items ORDER BY item_code ASC, item_name ASC")->fetchAll();
+
+$existingSuppliers = [];
+try {
+    $existingSuppliers = $pdo->query("SELECT DISTINCT supplier_name FROM vpp_imports WHERE supplier_name != '' ORDER BY supplier_name ASC")->fetchAll(PDO::FETCH_COLUMN);
+} catch (PDOException $e) {}
+
+// ==================== 9. TRUY VẤN LỊCH SỬ NHẬP KHO ====================
+$f_imp_search = trim($_GET['f_imp_search'] ?? '');
+$whereImp = ["1=1"];
+$paramsImp = [];
+
+if (!empty($f_imp_search)) {
+    $whereImp[] = "(imp.invoice_no LIKE :is1 OR imp.supplier_name LIKE :is2 OR i.item_name LIKE :is3)";
+    $paramsImp[':is1'] = "%$f_imp_search%"; $paramsImp[':is2'] = "%$f_imp_search%"; $paramsImp[':is3'] = "%$f_imp_search%";
+}
+
+$countImpStmt = $pdo->prepare("SELECT COUNT(*), SUM(imp.quantity) AS sum_q FROM vpp_imports imp JOIN vpp_items i ON imp.item_id = i.id WHERE " . implode(' AND ', $whereImp));
+$countImpStmt->execute($paramsImp);
+$impSumData = $countImpStmt->fetch();
+$total_imports = intval($impSumData['COUNT(*)'] ?? 0);
+$total_imp_qty = intval($impSumData['sum_q'] ?? 0);
+
+$pages_imp = ceil($total_imports / $limit) ?: 1;
+if ($p_imp > $pages_imp) $p_imp = $pages_imp;
+$offset_imp = max(0, ($p_imp - 1) * $limit);
+
+$sqlImp = "
+    SELECT imp.*, i.item_code, i.item_name, i.specification, i.unit 
+    FROM vpp_imports imp JOIN vpp_items i ON imp.item_id = i.id 
+    WHERE " . implode(' AND ', $whereImp) . " ORDER BY imp.id DESC LIMIT " . intval($limit) . " OFFSET " . intval($offset_imp);
+$stmtImpList = $pdo->prepare($sqlImp);
+$stmtImpList->execute($paramsImp);
+$importHistory = $stmtImpList->fetchAll();
+
+// ==================== 10. TRUY VẤN LỊCH SỬ CẤP PHÁT ====================
+$f_hist_search = trim($_GET['f_hist_search'] ?? '');
+$whereH = ["1=1"];
+$paramsH = [];
+
+if (!empty($f_hist_search)) {
+    $whereH[] = "(r.request_code LIKE :hs1 OR DATE_FORMAT(r.created_at, '%d%m%Y%H%i%s') LIKE :hs2 OR r.receiver_name LIKE :hs3 OR i.item_name LIKE :hs4)";
+    $paramsH[':hs1'] = "%$f_hist_search%"; $paramsH[':hs2'] = "%$f_hist_search%"; $paramsH[':hs3'] = "%$f_hist_search%"; $paramsH[':hs4'] = "%$f_hist_search%";
+}
+
+$countHistStmt = $pdo->prepare("SELECT COUNT(*), SUM(r.quantity) AS sum_q FROM vpp_requests r JOIN vpp_items i ON r.item_id = i.id WHERE " . implode(' AND ', $whereH));
+$countHistStmt->execute($paramsH);
+$histSumData = $countHistStmt->fetch();
+$total_history = intval($histSumData['COUNT(*)'] ?? 0);
+$total_hist_qty = intval($histSumData['sum_q'] ?? 0);
+
+$pages_hist = ceil($total_history / $limit) ?: 1;
+if ($p_hist > $pages_hist) $p_hist = $pages_hist;
+$offset_hist = max(0, ($p_hist - 1) * $limit);
+
+$sqlH = "
+    SELECT r.*, i.item_code, i.item_name, i.specification, i.unit 
+    FROM vpp_requests r JOIN vpp_items i ON r.item_id = i.id 
+    WHERE " . implode(' AND ', $whereH) . " ORDER BY r.id DESC LIMIT " . intval($limit) . " OFFSET " . intval($offset_hist);
+$stmtH = $pdo->prepare($sqlH);
+$stmtH->execute($paramsH);
+$history = $stmtH->fetchAll();
+
+include 'header.php';
+?>
+
+<style>
+    .vpp-wrapper { max-width: 1420px; margin: 25px auto; padding: 0 16px; }
+    .vpp-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 20px; }
+    .vpp-title { font-size: 1.55rem; font-weight: 800; color: #0f172a; }
+
+    .proposal-notice-box { background: #ffffff; border: 2px solid #0284c7; border-radius: 10px; padding: 18px 20px; margin-bottom: 25px; box-shadow: 0 4px 12px rgba(2,132,199,0.08); }
+    .notice-title { font-size: 1.15rem; font-weight: 800; color: #0369a1; display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 10px; }
+    
+    .filter-bar { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+    .filter-bar input, .filter-bar select { padding: 7px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.86rem; outline: none; background:#fff; }
+
+    .table-proposal { width: 100%; border-collapse: collapse; font-size: 0.88rem; min-width: 1050px; }
+    .table-proposal th, .table-proposal td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
+    .table-proposal th { background: #f0f9ff; color: #0369a1; font-weight: 700; }
+    
+    .prop-action-group { display: flex; align-items: center; justify-content: center; gap: 6px; }
+    .prop-dropdown { position: relative; display: inline-block; }
+    
+    .btn-prop-status-btn { border: none; padding: 6px 12px; border-radius: 6px; font-weight: 700; font-size: 0.82rem; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; text-decoration: none; }
+    .btn-status-wait { background: #f59e0b; color: #ffffff; }
+    .btn-status-wait:hover { background: #d97706; }
+    .btn-status-print { background: #6366f1; color: #ffffff; }
+    .btn-status-print:hover { background: #4f46e5; }
+    .btn-status-approve { background: #0284c7; color: #ffffff; }
+    .btn-status-approve:hover { background: #0369a1; }
+    .btn-status-give { background: #10b981; color: #ffffff; }
+    .btn-status-give:hover { background: #059669; }
+
+    .prop-dropdown-menu { display: none; position: absolute; right: 0; top: 115%; background: #ffffff; min-width: 155px; box-shadow: 0 8px 20px rgba(0,0,0,0.15); border: 1px solid #e2e8f0; border-radius: 8px; padding: 5px 0; z-index: 80; }
+    .prop-dropdown-menu.show { display: block; }
+    .prop-dropdown-item { width: 100%; background: none; border: none; text-align: left; padding: 8px 12px; font-size: 0.82rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+    .prop-dropdown-item:hover { background: #f8fafc; }
+
+    .prop-pencil-dropdown { position: relative; display: inline-block; }
+    .btn-prop-pencil { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; width: 30px; height: 30px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; font-size: 0.88rem; padding: 0; }
+    .prop-pencil-menu { display: none; position: absolute; right: 0; top: 115%; background: #ffffff; min-width: 130px; box-shadow: 0 8px 20px rgba(0,0,0,0.15); border: 1px solid #e2e8f0; border-radius: 8px; padding: 4px 0; z-index: 85; }
+    .prop-pencil-menu.show { display: block; }
+    .prop-pencil-item { width: 100%; background: none; border: none; text-align: left; padding: 7px 12px; font-size: 0.82rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+    .prop-pencil-item:hover { background: #f8fafc; }
+
+    .badge-status-p { padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 700; display: inline-block; }
+    .b-approved { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+    .b-rejected { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
+
+    .btn-action { background: #0284c7; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+    .btn-export { background: #10b981; color: #fff; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; }
+    
+    .data-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; overflow-x: auto; margin-bottom: 12px; }
+    .vpp-table { width: 100%; border-collapse: collapse; text-align: left; min-width: 1000px; font-size: 0.88rem; }
+    .vpp-table th, .vpp-table td { padding: 11px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+    .vpp-table th { background: #f8fafc; color: #475569; font-weight: 600; }
+
+    .btn-tbl-edit { background: #f1f5f9; color: #0284c7; border: 1px solid #cbd5e1; padding: 4px 8px; border-radius: 4px; font-weight: 600; font-size: 0.8rem; cursor: pointer; }
+    .btn-tbl-del { background: #fee2e2; color: #dc2626; border: 1px solid #fecaca; padding: 4px 8px; border-radius: 4px; font-weight: 700; font-size: 0.8rem; cursor: pointer; }
+
+    .pagination-wrapper { display: flex; justify-content: center; align-items: center; gap: 6px; margin: 12px 0 25px; }
+    .page-link { display: inline-flex; align-items: center; justify-content: center; min-width: 34px; height: 34px; padding: 0 8px; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; color: #334155; font-size: 0.88rem; font-weight: 600; text-decoration: none; }
+    .page-link.active { background-color: #0284c7; color: #fff; border-color: #0284c7; }
+    .page-link.disabled { color: #cbd5e1; border-color: #e2e8f0; cursor: not-allowed; }
+
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.5); z-index: 1000; align-items: center; justify-content: center; padding: 15px; }
+    .modal-box { background: #fff; width: 100%; max-width: 950px; border-radius: 8px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.15); max-height: 90vh; display: flex; flex-direction: column; }
+    .modal-header { padding: 14px 20px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-weight: 700; display: flex; justify-content: space-between; align-items: center; }
+    .modal-body { padding: 20px; overflow-y: auto; flex: 1; }
+    .modal-body label { font-size: 0.85rem; font-weight: 600; color: #334155; display: block; margin-bottom: 4px; }
+    .modal-body input, .modal-body select, .modal-body textarea { width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; outline: none; }
+
+    .popup-scroll-container { max-height: 52vh; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 6px; }
+    .items-popup-table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+    .items-popup-table th, .items-popup-table td { padding: 9px 12px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
+    .items-popup-table th { background: #f8fafc; color: #334155; font-weight: 700; text-align: left; position: sticky; top: 0; z-index: 5; }
+
+    /* Ô hiển thị tương tác chuẩn cap-phat-nuoc-uong.php */
+    .appr-cell-box { display: flex; align-items: center; justify-content: space-between; width: 100%; position: relative; }
+    .appr-val-left { text-align: left; font-weight: 700; white-space: nowrap; }
+    .appr-note-arrow-btn { background: #f1f5f9; border: 1px solid #cbd5e1; color: #475569; cursor: pointer; border-radius: 4px; padding: 1px 5px; font-size: 0.72rem; font-weight: bold; line-height: 1.2; margin-left: 6px; transition: all 0.15s ease; user-select: none; }
+    .appr-note-arrow-btn:hover { background: #e2e8f0; color: #0284c7; border-color: #94a3b8; }
+    .note-interactive-container { position: relative; display: inline-block; }
+    .note-popover { display: none; position: absolute; bottom: 130%; right: 0; background: #ffffff; color: #1e293b; font-size: 0.8rem; font-weight: 500; line-height: 1.4; padding: 8px 12px; border-radius: 6px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.1); border: 1px solid #cbd5e1; width: 230px; text-align: left; white-space: normal; word-break: break-word; z-index: 120; }
+    .note-popover::after { content: ''; position: absolute; top: 100%; right: 10px; border-width: 5px; border-style: solid; border-color: #ffffff transparent transparent transparent; }
+    .note-popover.show { display: block; }
+
+    .alert-box { padding: 14px 18px; border-radius: 8px; font-size: 0.9rem; margin-bottom: 18px; }
+    .alert-success { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+    .alert-danger { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+
+    /* KHUNG IN BIỂU MẪU CHUẨN AUSTRALIS VIETNAM */
+    .print-document-container {
+        font-family: 'Times New Roman', Times, serif;
+        color: #000;
+        background: #fff;
+        padding: 24px;
+        line-height: 1.4;
+    }
+    .print-header-table { width: 100%; border: none; margin-bottom: 8px; }
+    .print-header-table td { border: none; vertical-align: top; }
+    .print-company-name { font-size: 1.25rem; font-weight: 800; color: #0b4b75; }
+    .print-form-title { font-size: 1.45rem; font-weight: 800; color: #0b4b75; text-align: center; margin: 8px 0 2px 0; }
+    .print-form-sub { font-size: 0.95rem; font-style: italic; color: #555; text-align: center; margin-bottom: 14px; }
+    
+    .print-info-grid { display: flex; justify-content: space-between; margin-bottom: 15px; font-size: 1.02rem; }
+    .print-info-col { width: 49%; }
+    .print-info-row { margin-bottom: 6px; display: flex; align-items: center; }
+    .print-dotted { border-bottom: 1px dotted #333; display: inline-block; flex: 1; font-weight: bold; padding-left: 5px; min-height: 19px; }
+
+    .print-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+    .print-table th, .print-table td { border: 1px solid #000; padding: 6px 8px; font-size: 0.95rem; }
+    .print-table th { background-color: #0b4b75 !important; color: #fff !important; text-align: center; font-weight: bold; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .print-table td { text-align: center; }
+    .print-table td.text-left { text-align: left; }
+
+    .print-signatures { width: 100%; margin-top: 20px; text-align: center; border: none; page-break-inside: avoid; }
+    .print-signatures td { border: none; vertical-align: top; width: 33.33%; }
+    .sign-title { font-weight: bold; font-size: 1.05rem; color: #0b4b75; }
+    .sign-sub { font-style: italic; font-size: 0.88rem; color: #444; }
+
+    @page {
+        size: A4 portrait;
+        margin: 12mm 15mm 12mm 15mm;
+    }
+
+    @media print {
+        body * { visibility: hidden !important; }
+        #modal-print-view, #modal-print-view * { visibility: visible !important; }
+        #modal-print-view {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            height: auto !important;
+            background: #fff !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            display: block !important;
+        }
+        .modal-box {
+            box-shadow: none !important;
+            border: none !important;
+            max-width: 100% !important;
+            width: 100% !important;
+            max-height: none !important;
+            height: auto !important;
+        }
+        .modal-body {
+            background: #fff !important;
+            padding: 0 !important;
+            overflow: visible !important;
+        }
+        .print-document-container {
+            padding: 0 !important;
+            width: 100% !important;
+        }
+        .no-print { display: none !important; }
+        .print-table {
+            page-break-inside: auto;
+        }
+        .print-table thead {
+            display: table-header-group !important;
+        }
+        .print-table tr {
+            page-break-inside: avoid !important;
+            page-break-after: auto !important;
+        }
+    }
+</style>
+
+<div class="vpp-wrapper">
+    <div class="vpp-header">
+        <div>
+            <h1 class="vpp-title">Quản Lý & Cấp Phát Văn Phòng Phẩm</h1>
+            <p style="font-size: 0.88rem; color: #64748b; margin-top: 4px;">
+                Quy trình tiếp nhận đề xuất nhân viên, sơ duyệt, xuất phiếu trình ký, phê duyệt và cấp phát văn phòng phẩm.
+            </p>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center;">
+            <a href="de-xuat-van-phong-pham.php" target="_blank" class="btn-action" style="background:#8b5cf6;">🔗 Mở Form Đề Xuất VPP</a>
+            <button class="btn-action" onclick="openModal('modal-manual-give')">+ Cấp Phát Thủ Công</button>
+            <button type="button" class="btn-action" style="background:#10b981;" onclick="openModal('modal-import')">📦 Nhập Kho</button>
+        </div>
+    </div>
+
+    <?php if ($message): ?><div class="alert-box alert-success"><?= $message ?></div><?php endif; ?>
+    <?php if ($error): ?><div class="alert-box alert-danger"><?= $error ?></div><?php endif; ?>
+
+    <!-- KHỐI 1: DANH SÁCH ĐỀ XUẤT VPP -->
+    <div class="proposal-notice-box">
+        <div class="notice-title">
+            <span>
+                📬 DANH SÁCH ĐỀ XUẤT VĂN PHÒNG PHẨM 
+                <span style="font-weight:700; font-size:0.92rem; color:#475569; margin-left:6px;">
+                    (Trong tuần: Yêu cầu: <strong style="color:#0284c7;"><?= $total_week_req ?></strong> đợt, Đã duyệt: <strong style="color:#15803d;"><?= $total_week_appr ?></strong>, Từ chối: <strong style="color:#dc2626;"><?= $total_week_rej ?></strong>)
+                </span>
+            </span>
+        </div>
+
+        <form method="GET" action="van-phong-pham.php" class="filter-bar">
+            <input type="text" name="f_prop_search" value="<?= htmlspecialchars($f_prop_search) ?>" placeholder="🔍 Tìm mã yêu cầu, người nhận..." style="width: 230px;">
+            <select name="f_prop_status">
+                <option value="">-- Tất cả trạng thái --</option>
+                <option value="Chờ duyệt" <?= $f_prop_status === 'Chờ duyệt' ? 'selected' : '' ?>>Chờ duyệt</option>
+                <option value="Đã sơ duyệt" <?= $f_prop_status === 'Đã sơ duyệt' ? 'selected' : '' ?>>Đã sơ duyệt</option>
+                <option value="Đã duyệt" <?= $f_prop_status === 'Đã duyệt' ? 'selected' : '' ?>>Đã duyệt</option>
+                <option value="Từ chối" <?= $f_prop_status === 'Từ chối' ? 'selected' : '' ?>>Từ chối</option>
+            </select>
+            <button type="submit" class="btn-action" style="padding: 7px 14px;">Lọc</button>
+            <?php if ($f_prop_search || $f_prop_status): ?>
+                <a href="van-phong-pham.php" style="font-size:0.85rem; color:#64748b; text-decoration:none;">Xóa lọc</a>
+            <?php endif; ?>
+        </form>
+        
+        <div style="overflow-x:auto;">
+            <table class="table-proposal">
+                <thead>
+                    <tr>
+                        <th style="width:40px; text-align:center;">STT</th>
+                        <th style="width:135px;">Mã Yêu Cầu</th>
+                        <th style="width:125px; text-align:center;">Thời Gian Gửi</th>
+                        <th style="min-width:150px;">Người Nhận / Mã NV</th>
+                        <th style="min-width:160px;">Phòng Ban</th>
+                        <th style="min-width:210px;">Danh Sách Mặt Hàng</th>
+                        <th style="width:100px; text-align:center;">Tổng Y/C</th>
+                        <th style="width:115px; text-align:left;">S.L Duyệt</th>
+                        <th style="width:230px; text-align:center;">Thao Tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (!empty($proposals)): ?>
+                        <?php 
+                        $sttP = $offset_prop + 1;
+                        foreach ($proposals as $p): 
+                            $jsonEncoded = json_encode($p, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
+                            
+                            $apprDisplay = '--';
+                            $apprStyle = 'color:#94a3b8; font-weight:bold;';
+                            $arrowBtn = '';
+
+                            if (in_array($p['status'], ['Đã duyệt', 'Đã cấp phát'])) {
+                                $apprDisplay = intval($p['total_qty_approved']);
+                                $apprStyle = 'color:#15803d; font-weight:800; font-size:1.05rem;';
+                                if (!empty($p['combined_approval_note'])) {
+                                    $arrowBtn = "
+                                    <div class='note-interactive-container'>
+                                        <button type='button' class='appr-note-arrow-btn' title='Bấm để xem ghi chú duyệt' onclick='toggleNotePopover(event, this)'>&#9656;</button>
+                                        <div class='note-popover'>
+                                            <strong style='color:#15803d;'>📝 Ghi chú duyệt:</strong><br>
+                                            " . nl2br(htmlspecialchars($p['combined_approval_note'])) . "
+                                        </div>
+                                    </div>";
+                                }
+                            } elseif ($p['status'] === 'Đã sơ duyệt') {
+                                $apprDisplay = 'Đã sơ duyệt';
+                                $apprStyle = 'color:#6366f1; font-weight:bold; font-size:0.85rem;';
+                            } elseif ($p['status'] === 'Từ chối') {
+                                $apprDisplay = 'Từ chối';
+                                $apprStyle = 'color:#dc2626; font-weight:bold;';
+                                if (!empty($p['reject_reason'])) {
+                                    $arrowBtn = "
+                                    <div class='note-interactive-container'>
+                                        <button type='button' class='appr-note-arrow-btn' style='color:#dc2626;' title='Bấm để xem lý do từ chối' onclick='toggleNotePopover(event, this)'>&#9656;</button>
+                                        <div class='note-popover'>
+                                            <strong style='color:#dc2626;'>✗ Lý do từ chối:</strong><br>
+                                            " . nl2br(htmlspecialchars($p['reject_reason'])) . "
+                                        </div>
+                                    </div>";
+                                }
+                            }
+                        ?>
+                            <tr>
+                                <td style="text-align:center;"><b><?= $sttP++ ?></b></td>
+                                <td>
+                                    <span style="background:#e0f2fe; color:#0369a1; padding:3px 6px; border-radius:4px; font-weight:700; font-size:0.80rem;">
+                                        <?= htmlspecialchars($p['request_code']) ?>
+                                    </span>
+                                </td>
+                                <td style="text-align:center; font-size:0.85rem;">
+                                    <strong><?= date('d/m/Y', strtotime($p['created_at'])) ?></strong><br>
+                                    <span style="color:#64748b; font-size:0.8rem;"><?= date('H:i:s', strtotime($p['created_at'])) ?></span>
+                                </td>
+                                <td>
+                                    <strong><?= htmlspecialchars($p['receiver_name']) ?></strong>
+                                    <?= $p['employee_id'] ? ("<br><span style='font-size:0.75rem; color:#64748b;'>Mã NV: #{$p['employee_id']}</span>") : '' ?>
+                                </td>
+                                <td><b><?= htmlspecialchars($p['department']) ?></b></td>
+                                <td>
+                                    <button type="button" class="btn-action" style="background:#f5f3ff; color:#7c3aed; border:1px solid #ddd6fe; padding:4px 10px; font-size:0.82rem;" onclick='openProposalDetailsModal(<?= $jsonEncoded ?>)'>
+                                        📦 Xem mặt hàng (<?= $p['item_count'] ?> món)
+                                    </button>
+                                </td>
+                                <td style="text-align:center; font-weight:bold; color:#0284c7;">
+                                    <?= $p['total_qty_requested'] ?>
+                                </td>
+                                <!-- Cột S.L Duyệt có mũi tên popover ghi chú -->
+                                <td style="text-align:left;">
+                                    <div class="appr-cell-box">
+                                        <span class="appr-val-left" style="<?= $apprStyle ?>"><?= $apprDisplay ?></span>
+                                        <?= $arrowBtn ?>
+                                    </div>
+                                </td>
+                                <td style="text-align:center;">
+                                    <div class="prop-action-group">
+                                        <?php if ($p['status'] === 'Chờ duyệt'): ?>
+                                            <div class="prop-dropdown">
+                                                <button type="button" class="btn-prop-status-btn btn-status-wait" onclick="togglePropDropdown(event, '<?= $p['request_code'] ?>')">
+                                                    ⏳ Chờ duyệt ▾
+                                                </button>
+                                                <div class="prop-dropdown-menu" id="prop_dropdown_<?= $p['request_code'] ?>">
+                                                    <button type="button" class="prop-dropdown-item" style="color:#6366f1;" onclick='closeAllPropDropdowns(); openPreApproveModal(<?= $jsonEncoded ?>)'>
+                                                        🔍 Sơ duyệt
+                                                    </button>
+                                                    <button type="button" class="prop-dropdown-item" style="color:#dc2626;" onclick='closeAllPropDropdowns(); openRejectGroupModal("<?= htmlspecialchars($p['request_code']) ?>")'>
+                                                        ✗ Từ chối
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        <?php elseif ($p['status'] === 'Đã sơ duyệt'): ?>
+                                            <!-- Trình ký và Nút Duyệt có dropdown Phê duyệt / Từ chối -->
+                                            <button type="button" class="btn-prop-status-btn btn-status-print" onclick='openPrintDocModal(<?= $jsonEncoded ?>)'>
+                                                🖨️ Trình ký
+                                            </button>
+                                            <div class="prop-dropdown">
+                                                <button type="button" class="btn-prop-status-btn btn-status-approve" onclick="togglePropDropdown(event, 'appr_<?= $p['request_code'] ?>')">
+                                                    📋 Duyệt ▾
+                                                </button>
+                                                <div class="prop-dropdown-menu" id="prop_dropdown_appr_<?= $p['request_code'] ?>">
+                                                    <button type="button" class="prop-dropdown-item" style="color:#0284c7;" onclick='closeAllPropDropdowns(); openApproveGroupModal(<?= $jsonEncoded ?>)'>
+                                                        📋 Phê duyệt
+                                                    </button>
+                                                    <button type="button" class="prop-dropdown-item" style="color:#dc2626;" onclick='closeAllPropDropdowns(); openRejectGroupModal("<?= htmlspecialchars($p['request_code']) ?>")'>
+                                                        ✗ Từ chối
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        <?php elseif ($p['status'] === 'Đã duyệt' || $p['status'] === 'Chờ cấp phát'): ?>
+                                            <button type="button" class="btn-prop-status-btn btn-status-give" onclick='openDeliverGroupModal(<?= $jsonEncoded ?>)'>
+                                                ⚡ Cấp phát
+                                            </button>
+                                        <?php elseif ($p['status'] === 'Đã cấp phát'): ?>
+                                            <span class="badge-status-p b-approved">✓ Đã cấp phát</span>
+                                        <?php else: ?>
+                                            <span class="badge-status-p b-rejected" title="<?= htmlspecialchars($p['reject_reason']) ?>">✗ Từ chối</span>
+                                        <?php endif; ?>
+
+                                        <div class="prop-pencil-dropdown">
+                                            <button type="button" class="btn-prop-pencil" onclick="togglePropPencilDropdown(event, '<?= $p['request_code'] ?>')">✏️</button>
+                                            <div class="prop-pencil-menu" id="prop_pencil_menu_<?= $p['request_code'] ?>">
+                                                <button type="button" class="prop-pencil-item" style="color:#0284c7;" onclick='closeAllPencilDropdowns(); openEditGroupModal(<?= $jsonEncoded ?>)'>✏️ Sửa</button>
+                                                <form method="POST" action="van-phong-pham.php" onsubmit="return confirm('Xóa toàn bộ đợt đề xuất này?');" style="margin:0;">
+                                                    <input type="hidden" name="action" value="delete_group_proposals">
+                                                    <input type="hidden" name="request_code" value="<?= htmlspecialchars($p['request_code']) ?>">
+                                                    <button type="submit" class="prop-pencil-item" style="color:#dc2626;">🗑️ Xóa</button>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <tr><td colspan="9" style="text-align:center; padding:25px; color:#64748b;">Không có dữ liệu đề xuất văn phòng phẩm phù hợp.</td></tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+        <?php renderPaginationBar($p_prop, $pages_prop, 'p_prop'); ?>
+    </div>
+
+    <!-- KHỐI 2: DANH MỤC & TỒN KHO VĂN PHÒNG PHẨM -->
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
+        <h3 style="font-size:1.1rem; color:#334155; margin:0;">📁 Danh Mục & Tồn Kho Văn Phòng Phẩm (Tổng: <?= $total_vpp ?> mặt hàng)</h3>
+        
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <a href="van-phong-pham.php?export_stock_full=1" class="btn-export" title="Xuất báo cáo tồn kho">
+                📊 Xuất Excel Tồn Kho
+            </a>
+            <form method="GET" action="van-phong-pham.php" style="display:flex; gap:8px; align-items:center; margin:0;">
+                <input type="text" name="search_vpp" value="<?= htmlspecialchars($search_vpp) ?>" placeholder="🔍 Tìm mã hoặc tên..." style="padding:6px 12px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.85rem; width:180px; outline:none;">
+                <button type="submit" class="btn-action" style="padding:6px 12px; font-size:0.85rem;">Tìm</button>
+            </form>
+            <button type="button" class="btn-action" style="background:#8b5cf6;" onclick="openModal('modal-add-item')">+ Thêm Mặt Hàng VPP</button>
+        </div>
+    </div>
+
+    <div class="data-card">
+        <table class="vpp-table">
+            <thead>
+                <tr>
+                    <th style="width:50px; text-align:center;">STT</th>
+                    <th style="width:120px;">Mã VPP</th>
+                    <th>Tên Mặt Hàng</th>
+                    <th style="width:80px; text-align:center;">Đơn Vị Tính</th>
+                    <th style="text-align:center; width:130px;">Tổng Nhập Kho</th>
+                    <th style="text-align:center; width:130px;">Tổng Xuất Kho</th>
+                    <th style="text-align:center; width:140px;">Số Lượng Tồn Kho</th>
+                    <th style="width:115px; text-align:center;">Thao Tác</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (!empty($items)): ?>
+                    <?php $sttW = $offset_vpp + 1; foreach ($items as $it): ?>
+                        <tr>
+                            <td style="text-align:center;"><strong><?= $sttW++ ?></strong></td>
+                            <td><span style="background:#f1f5f9; padding:2px 6px; border-radius:4px; font-weight:700;"><?= htmlspecialchars($it['item_code'] ?: '—') ?></span></td>
+                            <td>
+                                <strong><?= htmlspecialchars($it['item_name']) ?></strong>
+                                <?php if (!empty($it['specification'])): ?>
+                                    <span style="font-size:0.8rem; color:#64748b;">(<?= htmlspecialchars($it['specification']) ?>)</span>
+                                <?php endif; ?>
+                            </td>
+                            <td style="text-align:center;"><?= htmlspecialchars($it['unit']) ?></td>
+                            <td style="text-align:center; font-weight:600; color:#10b981;"><?= $it['total_imported'] ?></td>
+                            <td style="text-align:center; color:#ea580c; font-weight:700;"><?= $it['total_exported'] ?></td>
+                            <td style="text-align:center; color:#0284c7; font-weight:800; font-size:1rem;"><?= $it['stock_qty'] ?> <?= htmlspecialchars($it['unit']) ?></td>
+                            <td style="text-align:center;">
+                                <div style="display:flex; gap:5px; justify-content:center;">
+                                    <button type="button" class="btn-tbl-edit" onclick='openEditItemModal(<?= json_encode($it, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>)'>Sửa</button>
+                                    <form method="POST" action="van-phong-pham.php" onsubmit="return confirm('Xóa mặt hàng [<?= htmlspecialchars($it['item_name']) ?>] khỏi kho?');" style="margin:0;">
+                                        <input type="hidden" name="action" value="delete_item">
+                                        <input type="hidden" name="item_id" value="<?= $it['id'] ?>">
+                                        <button type="submit" class="btn-tbl-del">Xóa</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <tr><td colspan="8" style="text-align:center; padding:25px;">Chưa có mặt hàng văn phòng phẩm nào trong kho.</td></tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+    <?php renderPaginationBar($p_vpp, $pages_vpp, 'p_vpp'); ?>
+
+    <!-- KHỐI 3: QUẢN LÝ NHẬP KHO & NHÀ CUNG CẤP -->
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; margin-top:20px; flex-wrap:wrap; gap:10px;">
+        <h3 style="font-size:1.1rem; color:#334155; margin:0;">🚚 Lịch Sử Nhập Kho & Nhà Cung Cấp (Tổng: <?= $total_imports ?> lần nhập)</h3>
+        <div style="display:flex; gap:8px;">
+            <a href="van-phong-pham.php?export_imports_report=1" class="btn-export">
+                📊 Xuất Excel Báo Cáo Nhập Kho
+            </a>
+            <button type="button" class="btn-action" style="background:#10b981;" onclick="openModal('modal-import')">+ Nhập Hàng Mới</button>
+        </div>
+    </div>
+
+    <form method="GET" action="van-phong-pham.php" class="filter-bar">
+        <input type="text" name="f_imp_search" value="<?= htmlspecialchars($f_imp_search) ?>" placeholder="🔍 Tìm chứng từ, nhà cung cấp, mặt hàng..." style="width: 250px;">
+        <button type="submit" class="btn-action" style="padding: 7px 14px;">Lọc</button>
+    </form>
+
+    <div class="data-card">
+        <table class="vpp-table">
+            <thead>
+                <tr>
+                    <th style="width:40px; text-align:center;">STT</th>
+                    <th style="width:130px;">Số Chứng Từ / HĐ</th>
+                    <th style="width:90px;">Ngày Nhập</th>
+                    <th style="width:80px; text-align:center;">Giờ Nhập</th>
+                    <th>Nhà Cung Cấp</th>
+                    <th>Mặt Hàng Nhập</th>
+                    <th style="width:80px; text-align:center;">Số Lượng</th>
+                    <th style="width:60px; text-align:center;">ĐVT</th>
+                    <th>Ghi Chú</th>
+                    <th style="width:105px; text-align:center;">Thao Tác</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (!empty($importHistory)): ?>
+                    <?php 
+                    $sttImp = $offset_imp + 1;
+                    foreach ($importHistory as $imp):
+                    ?>
+                        <tr>
+                            <td style="text-align:center;"><b><?= $sttImp++ ?></b></td>
+                            <td><span style="background:#f1f5f9; padding:2px 6px; border-radius:4px; font-weight:700; font-size:0.8rem;"><?= htmlspecialchars($imp['invoice_no'] ?: '—') ?></span></td>
+                            <td><?= date('d/m/Y', strtotime($imp['import_date'])) ?></td>
+                            <td style="text-align:center; color:#64748b;"><?= date('H:i:s', strtotime($imp['created_at'])) ?></td>
+                            <td><strong style="color:#0369a1;"><?= htmlspecialchars($imp['supplier_name']) ?></strong></td>
+                            <td><?= htmlspecialchars($imp['item_name']) ?> (<?= htmlspecialchars($imp['specification'] ?: '—') ?>)</td>
+                            <td style="color:#10b981; font-weight:800; text-align:center; font-size:1rem;"><?= $imp['quantity'] ?></td>
+                            <td style="text-align:center;"><?= htmlspecialchars($imp['unit']) ?></td>
+                            <td style="color:#64748b; font-size:0.83rem;"><?= htmlspecialchars($imp['notes'] ?: '—') ?></td>
+                            <td style="text-align:center;">
+                                <div style="display:flex; gap:5px; justify-content:center;">
+                                    <button type="button" class="btn-tbl-edit" onclick='openEditImportModal(<?= json_encode($imp, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>)'>Sửa</button>
+                                    <form method="POST" action="van-phong-pham.php" onsubmit="return confirm('Xóa phiếu nhập này? Tồn kho sẽ bị trừ lại.');" style="margin:0;">
+                                        <input type="hidden" name="action" value="delete_import">
+                                        <input type="hidden" name="import_id" value="<?= $imp['id'] ?>">
+                                        <button type="submit" class="btn-tbl-del">Xóa</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <tr><td colspan="10" style="text-align:center; padding:25px;">Chưa có lịch sử nhập hàng nào.</td></tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+    <?php renderPaginationBar($p_imp, $pages_imp, 'p_imp'); ?>
+
+    <!-- KHỐI 4: LỊCH SỬ CẤP PHÁT VPP -->
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; margin-top:20px; flex-wrap:wrap; gap:10px;">
+        <h3 style="font-size:1.1rem; color:#334155; margin:0;">📜 Lịch Sử Cấp Phát Văn Phòng Phẩm (Tổng: <?= $total_history ?> lượt)</h3>
+        <div style="display:flex; gap:8px;">
+            <a href="van-phong-pham.php?export_report=1" class="btn-export">
+                📊 Xuất Excel Báo Cáo Cấp Phát
+            </a>
+        </div>
+    </div>
+
+    <form method="GET" action="van-phong-pham.php" class="filter-bar">
+        <input type="text" name="f_hist_search" value="<?= htmlspecialchars($f_hist_search) ?>" placeholder="🔍 Tìm mã cấp phát, người nhận, mặt hàng..." style="width: 250px;">
+        <button type="submit" class="btn-action" style="padding: 7px 14px;">Lọc</button>
+    </form>
+
+    <div class="data-card">
+        <table class="vpp-table">
+            <thead>
+                <tr>
+                    <th style="width:40px; text-align:center;">STT</th>
+                    <th style="width:135px;">Mã Cấp Phát</th>
+                    <th style="width:85px;">Ngày Cấp</th>
+                    <th style="width:145px; text-align:center;">Thời Gian Gửi</th>
+                    <th>Phòng Ban Nhận</th>
+                    <th>Người Nhận</th>
+                    <th>Mặt Hàng VPP</th>
+                    <th style="width:75px; text-align:center;">Số Lượng</th>
+                    <th>Vị Trí Giao</th>
+                    <th>Ghi Chú</th>
+                    <th style="width:105px; text-align:center;">Thao Tác</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (!empty($history)): ?>
+                    <?php 
+                    $sttH = $offset_hist + 1;
+                    foreach ($history as $h): 
+                    ?>
+                        <tr>
+                            <td style="text-align:center;"><b><?= $sttH++ ?></b></td>
+                            <td><span style="background:#f1f5f9; padding:2px 6px; border-radius:4px; font-weight:700; font-size:0.80rem;"><?= htmlspecialchars(getDisplayCode($h)) ?></span></td>
+                            <td><?= date('d/m/Y', strtotime($h['request_date'])) ?></td>
+                            <td style="text-align:center; font-weight:600; color:#475569;"><?= date('d/m/Y H:i:s', strtotime($h['created_at'])) ?></td>
+                            <td><b><?= htmlspecialchars($h['department']) ?></b></td>
+                            <td><strong><?= htmlspecialchars($h['receiver_name'] ?: '—') ?></strong></td>
+                            <td><?= htmlspecialchars($h['item_name']) ?> (<?= htmlspecialchars($h['specification'] ?: '—') ?>)</td>
+                            <td style="color:#0284c7; font-weight:700; text-align:center;"><?= $h['quantity'] ?> <?= htmlspecialchars($h['unit']) ?></td>
+                            <td style="color:#475569; font-size:0.83rem;"><?= htmlspecialchars($h['delivery_location'] ?: '—') ?></td>
+                            <td style="color:#64748b; font-size:0.83rem;"><?= htmlspecialchars($h['notes'] ?: '') ?></td>
+                            <td style="text-align:center;">
+                                <div style="display:flex; gap:5px; justify-content:center;">
+                                    <button type="button" class="btn-tbl-edit" onclick='openEditHistoryModal(<?= json_encode($h, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>)'>Sửa</button>
+                                    <form method="POST" action="van-phong-pham.php" onsubmit="return confirm('Xóa bản ghi này? Số lượng sẽ được hoàn trả lại vào kho.');" style="margin:0;">
+                                        <input type="hidden" name="action" value="delete_request">
+                                        <input type="hidden" name="request_id" value="<?= $h['id'] ?>">
+                                        <button type="submit" class="btn-tbl-del">Xóa</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <tr><td colspan="11" style="text-align:center; padding:25px;">Chưa có lịch sử cấp phát văn phòng phẩm nào.</td></tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+    <?php renderPaginationBar($p_hist, $pages_hist, 'p_hist'); ?>
+</div>
+
+<!-- ==================== CÁC MODAL HỆ THỐNG ==================== -->
+
+<!-- 1. MODAL SƠ DUYỆT (Có cột Ghi Chú) -->
+<div id="modal-pre-approve" class="modal-overlay">
+    <div class="modal-box">
+        <form method="POST" action="van-phong-pham.php">
+            <input type="hidden" name="action" value="pre_approve_group_proposals">
+            <input type="hidden" name="request_code" id="pre_request_code">
+
+            <div class="modal-header">
+                <span style="color:#6366f1; font-weight:bold;">🔍 Sơ Duyệt Đề Xuất Văn Phòng Phẩm</span>
+                <span style="cursor:pointer;" onclick="closeModal('modal-pre-approve')">&times;</span>
+            </div>
+
+            <div class="modal-body">
+                <div style="background:#f8fafc; border:1px solid #cbd5e1; padding:12px 14px; border-radius:6px; font-size:0.9rem; margin-bottom:12px; line-height:1.6;">
+                    Mã yêu cầu: <strong id="pre_code_text" style="color:#0284c7;"></strong> | 
+                    Người nhận: <strong id="pre_receiver" style="color:#0f172a;"></strong> 
+                    <span id="pre_empid_wrapper" style="color:#64748b;"></span><br>
+                    Phòng ban: <strong id="pre_department" style="color:#0f172a;"></strong>
+                </div>
+
+                <label style="font-weight:700; color:#334155; margin-bottom:6px;">Điều chỉnh số lượng sơ duyệt và ghi chú (nếu có):</label>
+                <div class="popup-scroll-container">
+                    <table class="items-popup-table">
+                        <thead>
+                            <tr>
+                                <th style="width:40px; text-align:center;">STT</th>
+                                <th style="width:105px;">Mã VPP</th>
+                                <th style="min-width:180px;">Mặt Hàng VPP</th>
+                                <th style="width:65px; text-align:center;">Đơn Vị</th>
+                                <th style="width:75px; text-align:center;">Tồn Kho</th>
+                                <th style="width:80px; text-align:center;">SL Y/C</th>
+                                <th style="width:100px; text-align:center;">SL Sơ Duyệt *</th>
+                                <th style="min-width:140px;">Ghi Chú</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pre_items_tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div style="padding:12px 20px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end; gap:8px;">
+                <button type="button" class="btn-action" style="background:#e2e8f0; color:#475569;" onclick="closeModal('modal-pre-approve')">Hủy</button>
+                <button type="submit" class="btn-action" style="background:#6366f1; font-weight:bold;">XÁC NHẬN SƠ DUYỆT</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 2. MODAL XUẤT PHIẾU TRÌNH KÝ (Căn lề phải khối thông tin BM, để trống ghi chú) -->
+<div id="modal-print-view" class="modal-overlay">
+    <div class="modal-box" style="max-width: 900px;">
+        <div class="modal-header no-print">
+            <span>🖨️ Phiếu Cấp Phát Văn Phòng Phẩm (Bản In Trình Ký)</span>
+            <span style="cursor:pointer;" onclick="closeModal('modal-print-view')">&times;</span>
+        </div>
+        <div class="modal-body" style="background:#eaedf1; padding:15px;">
+            <div class="print-document-container" id="printable-area">
+                <table class="print-header-table">
+                    <tr>
+                        <td style="width:60%;">
+                            <div class="print-company-name">AUSTRALIS VIETNAM</div>
+                            <div style="font-size:0.95rem; font-weight:bold; color:#333;">BỘ PHẬN HÀNH CHÍNH - NHÂN SỰ</div>
+                            <div style="font-size:0.85rem; color:#666;">Australis Aquaculture Vietnam Ltd.</div>
+                        </td>
+                        <!-- Căn lề phải hoàn toàn cho 3 hàng góc trên bên phải -->
+                        <td style="width:40%; text-align:right;">
+                            <div style="font-size:0.9rem; font-weight:bold;">Mã BM: BM-04/HC-VPP</div>
+                            <div style="font-size:0.95rem; font-weight:bold; margin-top:3px;">Số phiếu: <span style="font-weight:normal; letter-spacing:1px;">....................</span></div>
+                            <div style="font-size:0.9rem; font-style:italic; margin-top:3px;">Ngày cấp: ......./......./............</div>
+                        </td>
+                    </tr>
+                </table>
+                <div style="border-top: 2px solid #0b4b75; margin-bottom: 12px;"></div>
+
+                <div class="print-form-title">PHIẾU CẤP PHÁT VĂN PHÒNG PHẨM</div>
+                <div class="print-form-sub">STATIONERY ISSUANCE & HANDOVER FORM</div>
+
+                <div class="print-info-grid">
+                    <div class="print-info-col">
+                        <div class="print-info-row">
+                            <strong>Người nhận:&nbsp;</strong> 
+                            <span id="prn_receiver_name" class="print-dotted"></span>
+                        </div>
+                        <div class="print-info-row">
+                            <strong>Người cấp phát:&nbsp;</strong> 
+                            <span class="print-dotted"><?= htmlspecialchars($currentUserFullName) ?></span>
+                        </div>
+                    </div>
+                    <div class="print-info-col">
+                        <div class="print-info-row" style="font-size: 0.9rem;">
+                            <strong>Mã NV/Bộ phận:&nbsp;</strong> 
+                            <span id="prn_dept_info" class="print-dotted" style="font-size: 0.88rem;"></span>
+                        </div>
+                        <div class="print-info-row">
+                            <strong>Lý do cấp:&nbsp;</strong> 
+                            <span style="display:inline-flex; align-items:center; gap:16px;">
+                                <label style="cursor:pointer; display:inline-flex; align-items:center; gap:4px; font-weight:bold; margin:0;">
+                                    Định kỳ <input type="checkbox" style="width:15px; height:15px; margin:0;">
+                                </label>
+                                <label style="cursor:pointer; display:inline-flex; align-items:center; gap:4px; font-weight:bold; margin:0;">
+                                    Phát sinh <input type="checkbox" style="width:15px; height:15px; margin:0;">
+                                </label>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <table class="print-table">
+                    <thead>
+                        <tr>
+                            <th style="width:45px;">STT<br><i style="font-size:0.8rem; font-weight:normal;">No.</i></th>
+                            <th style="width:115px;">Mã VPP<br><i style="font-size:0.8rem; font-weight:normal;">Item Code</i></th>
+                            <th>Tên văn phòng phẩm<br><i style="font-size:0.8rem; font-weight:normal;">Description</i></th>
+                            <th style="width:65px;">ĐVT<br><i style="font-size:0.8rem; font-weight:normal;">Unit</i></th>
+                            <th style="width:75px;">SL Cấp<br><i style="font-size:0.8rem; font-weight:normal;">Issued</i></th>
+                            <th style="width:95px;">Tồn sau cấp<br><i style="font-size:0.8rem; font-weight:normal;">Stock left</i></th>
+                            <th style="width:125px;">Ghi chú<br><i style="font-size:0.8rem; font-weight:normal;">Remark</i></th>
+                        </tr>
+                    </thead>
+                    <tbody id="prn_items_tbody"></tbody>
+                    <tfoot>
+                        <tr style="font-weight: bold; background-color: #f0f7fa;">
+                            <td colspan="4" style="text-align: center;">TỔNG CỘNG / TOTAL:</td>
+                            <td id="prn_total_qty" style="text-align: center;">0</td>
+                            <td colspan="2"></td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                <table class="print-signatures">
+                    <tr>
+                        <td>
+                            <div class="sign-title">NGƯỜI NHẬN</div>
+                            <div class="sign-sub">Receiver<br>(Ký và ghi rõ họ tên)</div>
+                            <div style="height: 60px;"></div>
+                            <div id="prn_sign_receiver" style="font-weight: bold;"></div>
+                        </td>
+                        <td>
+                            <div class="sign-title">NGƯỜI CẤP PHÁT</div>
+                            <div class="sign-sub">Issued by<br>(Ký và ghi rõ họ tên)</div>
+                            <div style="height: 60px;"></div>
+                            <div style="font-weight: bold;"><?= htmlspecialchars($currentUserFullName) ?></div>
+                        </td>
+                        <td>
+                            <div class="sign-title">TRƯỞNG BỘ PHẬN DUYỆT</div>
+                            <div class="sign-sub">Approved by<br>(Ký và ghi rõ họ tên)</div>
+                            <div style="height: 60px;"></div>
+                            <div style="font-weight: bold;">......................................</div>
+                        </td>
+                    </tr>
+                </table>
+
+                <div style="margin-top: 20px; font-size: 0.85rem; font-style: italic; color: #444; border-top: 1px dashed #ccc; padding-top: 6px;">
+                    <strong>Ghi chú:</strong> Người nhận kiểm tra đúng số lượng & chất lượng VPP trước khi rời kho. Phiếu được lập thành 02 bản (01 bản lưu tại HC-NS, 01 bản bàn giao người nhận).
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer no-print" style="padding:12px 20px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end; gap:8px;">
+            <button type="button" class="btn-action" style="background:#e2e8f0; color:#475569;" onclick="closeModal('modal-print-view')">Đóng</button>
+            <button type="button" class="btn-action" style="background:#0284c7;" onclick="window.print()">🖨️ In Phiếu Trình Ký</button>
+        </div>
+    </div>
+</div>
+
+<!-- 3. MODAL PHÊ DUYỆT (Đầy đủ STT, Mặt hàng, ĐVT, Tồn kho, SL Yêu cầu, SL Duyệt, Ghi chú) -->
+<div id="modal-approve-group" class="modal-overlay">
+    <div class="modal-box">
+        <form method="POST" action="van-phong-pham.php">
+            <input type="hidden" name="action" value="approve_group_proposals">
+            <input type="hidden" name="request_code" id="apg_request_code">
+
+            <div class="modal-header">
+                <span style="color:#0369a1; font-weight:bold;">📋 Phê Duyệt Đề Xuất Cấp VPP</span>
+                <span style="cursor:pointer;" onclick="closeModal('modal-approve-group')">&times;</span>
+            </div>
+
+            <div class="modal-body">
+                <div style="background:#f0f9ff; border:1px solid #bae6fd; padding:10px 14px; border-radius:6px; font-size:0.85rem; color:#0369a1; margin-bottom:12px;">
+                    Mã yêu cầu: <strong id="apg_code_text"></strong> | Người nhận: <strong id="apg_receiver"></strong>
+                </div>
+
+                <label style="font-weight:700; color:#334155; margin-bottom:6px;">Xác nhận số lượng duyệt chính thức và ghi chú (nếu có):</label>
+                <div class="popup-scroll-container">
+                    <table class="items-popup-table">
+                        <thead>
+                            <tr>
+                                <th style="width:40px; text-align:center;">STT</th>
+                                <th style="min-width:180px;">Mặt Hàng VPP</th>
+                                <th style="width:65px; text-align:center;">Đơn Vị</th>
+                                <th style="text-align:center; width:75px;">Tồn Kho</th>
+                                <th style="text-align:center; width:80px;">SL Yêu Cầu</th>
+                                <th style="text-align:center; width:100px;">SL Duyệt *</th>
+                                <th style="min-width:160px;">Ghi Chú Duyệt</th>
+                            </tr>
+                        </thead>
+                        <tbody id="apg_items_tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div style="padding:12px 20px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end; gap:8px;">
+                <button type="button" class="btn-action" style="background:#e2e8f0; color:#475569;" onclick="closeModal('modal-approve-group')">Hủy</button>
+                <button type="submit" class="btn-action" style="background:#0284c7; font-weight:bold;">XÁC NHẬN PHÊ DUYỆT</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 4. MODAL XEM CHI TIẾT CÁC MẶT HÀNG (Ẩn số lượng & ghi chú nếu chưa Duyệt xong) -->
+<div id="modal-view-details" class="modal-overlay">
+    <div class="modal-box">
+        <div class="modal-header">
+            <span>📦 Chi Tiết Các Mặt Hàng Yêu Cầu [<span id="vd_req_code" style="color:#0284c7;"></span>]</span>
+            <span style="cursor:pointer;" onclick="closeModal('modal-view-details')">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div style="margin-bottom:12px; font-size:0.88rem; color:#475569; background:#f8fafc; padding:10px 12px; border-radius:6px; border:1px solid #e2e8f0;">
+                Người nhận: <strong id="vd_receiver" style="color:#0f172a;"></strong> | 
+                Phòng ban: <strong id="vd_dept" style="color:#0f172a;"></strong>
+            </div>
+            <div class="popup-scroll-container">
+                <table class="items-popup-table">
+                    <thead>
+                        <tr>
+                            <th style="width:40px; text-align:center;">STT</th>
+                            <th style="width:105px;">Mã VPP</th>
+                            <th>Tên Mặt Hàng</th>
+                            <th style="width:65px; text-align:center;">Đơn Vị</th>
+                            <th style="text-align:center; width:80px;">SL Y/C</th>
+                            <th style="text-align:center; width:85px;">SL Duyệt</th>
+                            <th style="text-align:center; width:80px;">Tồn Kho</th>
+                            <th style="min-width:140px;">Ghi Chú Duyệt</th>
+                        </tr>
+                    </thead>
+                    <tbody id="vd_items_tbody"></tbody>
+                </table>
+            </div>
+        </div>
+        <div style="padding:12px 20px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end;">
+            <button type="button" class="btn-action" style="background:#e2e8f0; color:#475569;" onclick="closeModal('modal-view-details')">Đóng</button>
+        </div>
+    </div>
+</div>
+
+<!-- 5. MODAL SỬA ĐỢT ĐỀ XUẤT -->
+<div id="modal-edit-group" class="modal-overlay">
+    <div class="modal-box">
+        <form method="POST" action="van-phong-pham.php">
+            <input type="hidden" name="action" value="edit_group_proposals">
+            <input type="hidden" name="request_code" id="edg_request_code">
+
+            <div class="modal-header">
+                <span>✏️ Chỉnh Sửa Thông Tin Đề Xuất VPP</span>
+                <span style="cursor:pointer;" onclick="closeModal('modal-edit-group')">&times;</span>
+            </div>
+
+            <div class="modal-body">
+                <div style="display:flex; gap:10px; margin-bottom:10px;">
+                    <div style="flex:1;">
+                        <label>Người nhận: *</label>
+                        <input type="text" name="receiver_name" id="edg_receiver" required>
+                    </div>
+                    <div style="flex:1;">
+                        <label>Phòng ban: *</label>
+                        <select name="department" id="edg_department" required>
+                            <?php foreach ($DEFAULT_DEPARTMENTS as $d): ?>
+                                <option value="<?= htmlspecialchars($d) ?>"><?= htmlspecialchars($d) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="margin-bottom:12px;">
+                    <label>Vị trí nhận / Ghi chú:</label>
+                    <input type="text" name="delivery_location" id="edg_location">
+                </div>
+
+                <label>Chỉnh sửa số lượng yêu cầu từng mặt hàng:</label>
+                <div class="popup-scroll-container">
+                    <table class="items-popup-table">
+                        <thead>
+                            <tr>
+                                <th>Mặt Hàng VPP</th>
+                                <th style="text-align:center; width:80px;">ĐVT</th>
+                                <th style="text-align:center; width:110px;">Số Lượng Sửa *</th>
+                            </tr>
+                        </thead>
+                        <tbody id="edg_items_tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div style="padding:12px 20px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end; gap:8px;">
+                <button type="button" class="btn-action" style="background:#e2e8f0; color:#475569;" onclick="closeModal('modal-edit-group')">Hủy</button>
+                <button type="submit" class="btn-action" style="background:#0284c7;">Lưu Cập Nhật</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 6. MODAL CẤP PHÁT ĐỀ XUẤT -->
+<div id="modal-deliver-group" class="modal-overlay">
+    <div class="modal-box">
+        <form method="POST" action="van-phong-pham.php" onsubmit="return confirm('Bạn có chắc chắn muốn xuất kho cấp phát toàn bộ các mặt hàng này không?');">
+            <input type="hidden" name="action" value="deliver_group_proposals">
+            <input type="hidden" name="request_code" id="dlg_request_code">
+
+            <div class="modal-header">
+                <span style="color:#15803d; font-weight:bold;">⚡ Xác Nhận Cấp Phát Văn Phòng Phẩm</span>
+                <span style="cursor:pointer;" onclick="closeModal('modal-deliver-group')">&times;</span>
+            </div>
+
+            <div class="modal-body">
+                <div style="display:flex; gap:10px; margin-bottom:12px;">
+                    <div style="flex:1;">
+                        <label>Người nhận:</label>
+                        <input type="text" name="receiver_name" id="dlg_receiver" required>
+                    </div>
+                    <div style="flex:1;">
+                        <label>Phòng ban:</label>
+                        <input type="text" name="department" id="dlg_department" required>
+                    </div>
+                </div>
+
+                <label>Số lượng xuất kho cấp phát thực tế:</label>
+                <div class="popup-scroll-container">
+                    <table class="items-popup-table">
+                        <thead>
+                            <tr>
+                                <th>Mặt Hàng VPP</th>
+                                <th style="text-align:center; width:85px;">Tồn Kho</th>
+                                <th style="text-align:center; width:85px;">SL Duyệt</th>
+                                <th style="text-align:center; width:110px;">SL Cấp Phát *</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dlg_items_tbody"></tbody>
+                    </table>
+                </div>
+
+                <div style="margin-top:10px;">
+                    <label>Ghi chú của người cấp phát:</label>
+                    <input type="text" name="notes" placeholder="Nhập ghi chú hoặc bỏ trống...">
+                </div>
+            </div>
+
+            <div style="padding:12px 20px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end; gap:8px;">
+                <button type="button" class="btn-action" style="background:#e2e8f0; color:#475569;" onclick="closeModal('modal-deliver-group')">Hủy</button>
+                <button type="submit" class="btn-action" style="background:#10b981; font-weight:bold;">XÁC NHẬN CẤP PHÁT</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 7. MODAL TỪ CHỐI -->
+<div id="modal-reject-group" class="modal-overlay">
+    <div class="modal-box" style="max-width: 440px;">
+        <form method="POST" action="van-phong-pham.php">
+            <input type="hidden" name="action" value="reject_group_proposals">
+            <input type="hidden" name="request_code" id="rej_group_code">
+            <div class="modal-header">
+                <span style="color:#b91c1c; font-weight:bold;">✗ Từ Chối Yêu Cầu Đề Xuất</span>
+                <span style="cursor:pointer;" onclick="closeModal('modal-reject-group')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <label>Lý do từ chối: *</label>
+                <textarea name="reject_reason" rows="3" required placeholder="Nhập lý do từ chối cụ thể..."></textarea>
+            </div>
+            <div style="padding:12px 20px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end; gap:8px;">
+                <button type="button" class="btn-action" style="background:#e2e8f0; color:#475569;" onclick="closeModal('modal-reject-group')">Hủy</button>
+                <button type="submit" class="btn-action" style="background:#dc2626;">Xác Nhận Từ Chối</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 8. MODAL NHẬP KHO THỦ CÔNG -->
+<div id="modal-import" class="modal-overlay">
+    <div class="modal-box">
+        <form method="POST" action="van-phong-pham.php">
+            <input type="hidden" name="action" value="import_stock">
+            <div class="modal-header">
+                <span>📦 Phiếu Nhập Kho Thủ Công (Từ Nhà Cung Cấp)</span>
+                <span style="cursor:pointer;" onclick="closeModal('modal-import')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div><label>Ngày nhập kho: *</label><input type="date" name="import_date" value="<?= $today ?>" required></div>
+                <div>
+                    <label>Nhà cung cấp VPP: *</label>
+                    <input type="text" name="supplier_name" list="supplier_list" placeholder="VD: Công ty Thiên Long, Fahasa..." required>
+                    <datalist id="supplier_list">
+                        <?php foreach ($existingSuppliers as $sup): ?>
+                            <option value="<?= htmlspecialchars($sup) ?>">
+                        <?php endforeach; ?>
+                    </datalist>
+                </div>
+                <div><label>Số hóa đơn / Chứng từ giao hàng:</label><input type="text" name="invoice_no" placeholder="VD: HD-VPP-0012..."></div>
+                <div>
+                    <label>Chọn mặt hàng nhập kho: *</label>
+                    <select name="item_id" required>
+                        <?php foreach ($allItemsForModal as $it): ?>
+                            <option value="<?= $it['id'] ?>">
+                                <?= htmlspecialchars($it['item_name']) ?> (<?= htmlspecialchars($it['specification'] ?: '—') ?>) - Hiện tồn: <?= $it['stock_qty'] ?> <?= htmlspecialchars($it['unit']) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div><label>Số lượng nhập thêm: *</label><input type="number" name="add_qty" min="1" value="10" required></div>
+                <div><label>Ghi chú phiếu nhập:</label><input type="text" name="notes" placeholder="VD: Đợt nhập định kỳ..."></div>
+            </div>
+            <div style="padding:12px 20px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end; gap:8px;">
+                <button type="button" class="btn-action" style="background:#e2e8f0; color:#475569;" onclick="closeModal('modal-import')">Hủy</button>
+                <button type="submit" class="btn-action" style="background:#10b981;">Lưu Phiếu Nhập Kho</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 9. MODAL SỬA PHIẾU NHẬP KHO -->
+<div id="modal-edit-import" class="modal-overlay">
+    <div class="modal-box">
+        <form method="POST" action="van-phong-pham.php">
+            <input type="hidden" name="action" value="update_import">
+            <input type="hidden" name="import_id" id="ei_import_id">
+            <div class="modal-header">
+                <span>✏️ Chỉnh Sửa Phiếu Nhập Kho VPP</span>
+                <span style="cursor:pointer;" onclick="closeModal('modal-edit-import')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div><label>Ngày nhập kho: *</label><input type="date" name="import_date" id="ei_import_date" required></div>
+                <div><label>Nhà cung cấp: *</label><input type="text" name="supplier_name" id="ei_supplier_name" required></div>
+                <div><label>Số hóa đơn / Chứng từ:</label><input type="text" name="invoice_no" id="ei_invoice_no"></div>
+                <div>
+                    <label>Mặt hàng nhập: *</label>
+                    <select name="item_id" id="ei_item_id" required>
+                        <?php foreach ($allItemsForModal as $it): ?>
+                            <option value="<?= $it['id'] ?>"><?= htmlspecialchars($it['item_name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div><label>Số lượng nhập: *</label><input type="number" name="quantity" id="ei_quantity" min="1" required></div>
+                <div><label>Ghi chú:</label><input type="text" name="notes" id="ei_notes"></div>
+            </div>
+            <div style="padding:12px 20px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end; gap:8px;">
+                <button type="button" class="btn-action" style="background:#e2e8f0; color:#475569;" onclick="closeModal('modal-edit-import')">Hủy</button>
+                <button type="submit" class="btn-action" style="background:#0284c7;">Lưu Thay Đổi</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 10. MODAL SỬA LỊCH SỬ CẤP PHÁT -->
+<div id="modal-edit-history" class="modal-overlay">
+    <div class="modal-box">
+        <form method="POST" action="van-phong-pham.php">
+            <input type="hidden" name="action" value="update_request">
+            <input type="hidden" name="request_id" id="eh_request_id">
+            <div class="modal-header">
+                <span>✏️ Chỉnh Sửa Lịch Sử Cấp Phát VPP</span>
+                <span style="cursor:pointer;" onclick="closeModal('modal-edit-history')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div><label>Ngày cấp phát *</label><input type="date" name="request_date" id="eh_request_date" required></div>
+                <div>
+                    <label>Phòng ban nhận *</label>
+                    <select name="department" id="eh_department" required>
+                        <?php foreach ($DEFAULT_DEPARTMENTS as $d): ?>
+                            <option value="<?= htmlspecialchars($d) ?>"><?= htmlspecialchars($d) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div><label>Người đại diện nhận</label><input type="text" name="receiver_name" id="eh_receiver_name"></div>
+                <div>
+                    <label>Mặt hàng VPP *</label>
+                    <select name="item_id" id="eh_item_id" required>
+                        <?php foreach ($allItemsForModal as $it): ?>
+                            <option value="<?= $it['id'] ?>"><?= htmlspecialchars($it['item_name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div><label>Số lượng cấp *</label><input type="number" name="quantity" id="eh_quantity" min="1" required></div>
+                <div><label>Vị trí nhận / Giao hàng</label><input type="text" name="delivery_location" id="eh_delivery_location"></div>
+                <div><label>Ghi chú của người phát</label><input type="text" name="notes" id="eh_notes"></div>
+            </div>
+            <div style="padding:12px 20px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end; gap:8px;">
+                <button type="button" class="btn-action" style="background:#e2e8f0; color:#475569;" onclick="closeModal('modal-edit-history')">Hủy</button>
+                <button type="submit" class="btn-action" style="background:#0284c7;">Lưu Thay Đổi</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 11. MODAL SỬA MẶT HÀNG VPP -->
+<div id="modal-edit-item" class="modal-overlay">
+    <div class="modal-box">
+        <form method="POST" action="van-phong-pham.php">
+            <input type="hidden" name="action" value="update_item">
+            <input type="hidden" name="item_id" id="edit_item_id">
+            <div class="modal-header">
+                <span>✏️ Chỉnh Sửa Mặt Hàng Văn Phòng Phẩm</span>
+                <span style="cursor:pointer;" onclick="closeModal('modal-edit-item')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div><label>Mã VPP</label><input type="text" name="item_code" id="edit_item_code"></div>
+                <div><label>Tên mặt hàng *</label><input type="text" name="item_name" id="edit_item_name" required></div>
+                <div><label>Quy cách / Mô tả</label><input type="text" name="specification" id="edit_item_spec"></div>
+                <div><label>Đơn vị tính *</label><input type="text" name="unit" id="edit_item_unit" required></div>
+                <div><label>Tồn kho ban đầu</label><input type="number" name="initial_stock" id="edit_item_init" min="0"></div>
+            </div>
+            <div style="padding:12px 20px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end; gap:8px;">
+                <button type="button" class="btn-action" style="background:#e2e8f0; color:#475569;" onclick="closeModal('modal-edit-item')">Hủy</button>
+                <button type="submit" class="btn-action" style="background:#0284c7;">Lưu Cập Nhật</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 12. MODAL THÊM MẶT HÀNG THỦ CÔNG -->
+<div id="modal-add-item" class="modal-overlay">
+    <div class="modal-box">
+        <form method="POST" action="van-phong-pham.php">
+            <input type="hidden" name="action" value="add_item">
+            <div class="modal-header"><span>Thêm Mặt Hàng VPP Mới</span><span style="cursor:pointer;" onclick="closeModal('modal-add-item')">&times;</span></div>
+            <div class="modal-body">
+                <div><label>Mã VPP</label><input type="text" name="item_code" placeholder="VD: VPP-GAY4, VPP-BTL01"></div>
+                <div><label>Tên mặt hàng *</label><input type="text" name="item_name" placeholder="VD: Giấy A4 Double A..." required></div>
+                <div><label>Quy cách đóng gói</label><input type="text" name="specification" placeholder="VD: Ram 500 tờ..."></div>
+                <div><label>Đơn vị tính *</label><input type="text" name="unit" value="Cái" required></div>
+                <div><label>Tồn kho ban đầu</label><input type="number" name="initial_stock" min="0" value="0"></div>
+            </div>
+            <div style="padding:12px 20px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end; gap:8px;">
+                <button type="button" class="btn-action" style="background:#e2e8f0; color:#475569;" onclick="closeModal('modal-add-item')">Hủy</button>
+                <button type="submit" class="btn-action" style="background:#8b5cf6;">Thêm Mới</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 13. MODAL CẤP PHÁT THỦ CÔNG -->
+<div id="modal-manual-give" class="modal-overlay">
+    <div class="modal-box">
+        <form method="POST" action="van-phong-pham.php">
+            <input type="hidden" name="action" value="add_manual_request">
+            <div class="modal-header"><span>Cấp Phát VPP Cho Phòng Ban</span><span style="cursor:pointer;" onclick="closeModal('modal-manual-give')">&times;</span></div>
+            <div class="modal-body">
+                <div><label>Ngày cấp phát *</label><input type="date" name="request_date" value="<?= $today ?>" required></div>
+                <div>
+                    <label>Phòng ban nhận *</label>
+                    <select name="department" required>
+                        <?php foreach ($DEFAULT_DEPARTMENTS as $d): ?>
+                            <option value="<?= htmlspecialchars($d) ?>"><?= htmlspecialchars($d) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div><label>Người đại diện nhận</label><input type="text" name="receiver_name" placeholder="Họ tên người nhận..."></div>
+                <div>
+                    <label>Chọn mặt hàng VPP *</label>
+                    <select name="item_id" required>
+                        <?php foreach ($allItemsForModal as $it): ?>
+                            <option value="<?= $it['id'] ?>"><?= htmlspecialchars($it['item_name']) ?> (Tồn: <?= $it['stock_qty'] ?> <?= htmlspecialchars($it['unit']) ?>)</option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div><label>Số lượng cấp *</label><input type="number" name="quantity" min="1" value="1" required></div>
+                <div><label>Vị trí nhận / Ghi chú</label><input type="text" name="delivery_location"></div>
+                <div><label>Ghi chú</label><input type="text" name="notes"></div>
+            </div>
+            <div style="padding:12px 20px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end; gap:8px;">
+                <button type="button" class="btn-action" style="background:#e2e8f0; color:#475569;" onclick="closeModal('modal-manual-give')">Hủy</button>
+                <button type="submit" class="btn-action">Cấp Phát</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+function togglePropDropdown(e, code) {
+    if (e) e.stopPropagation();
+    const currentMenu = document.getElementById('prop_dropdown_' + code);
+    if (!currentMenu) return;
+    const isShown = currentMenu.classList.contains('show');
+    closeAllPropDropdowns();
+    closeAllPencilDropdowns();
+    closeAllNotePopovers();
+    if (!isShown) currentMenu.classList.add('show');
+}
+
+function closeAllPropDropdowns() {
+    document.querySelectorAll('.prop-dropdown-menu').forEach(el => el.classList.remove('show'));
+}
+
+function togglePropPencilDropdown(e, code) {
+    if (e) e.stopPropagation();
+    const currentMenu = document.getElementById('prop_pencil_menu_' + code);
+    if (!currentMenu) return;
+    const isShown = currentMenu.classList.contains('show');
+    closeAllPropDropdowns();
+    closeAllPencilDropdowns();
+    closeAllNotePopovers();
+    if (!isShown) currentMenu.classList.add('show');
+}
+
+function closeAllPencilDropdowns() {
+    document.querySelectorAll('.prop-pencil-menu').forEach(el => el.classList.remove('show'));
+}
+
+// Bật / tắt popover lý do từ chối hoặc ghi chú duyệt
+function toggleNotePopover(e, btn) {
+    if (e) e.stopPropagation();
+    const container = btn.closest('.note-interactive-container');
+    if (!container) return;
+    const pop = container.querySelector('.note-popover');
+    if (!pop) return;
+    const isShown = pop.classList.contains('show');
+    closeAllNotePopovers();
+    closeAllPropDropdowns();
+    closeAllPencilDropdowns();
+    if (!isShown) {
+        pop.classList.add('show');
+    }
+}
+
+function closeAllNotePopovers() {
+    document.querySelectorAll('.note-popover').forEach(el => el.classList.remove('show'));
+}
+
+window.onclick = function(e) {
+    if (e.target.classList.contains('modal-overlay')) e.target.style.display = 'none';
+    if (!e.target.closest('.prop-dropdown')) closeAllPropDropdowns();
+    if (!e.target.closest('.prop-pencil-dropdown')) closeAllPencilDropdowns();
+    if (!e.target.closest('.note-interactive-container')) closeAllNotePopovers();
+}
+
+// 1. MỞ MODAL SƠ DUYỆT (Có cột Ghi Chú)
+function openPreApproveModal(p) {
+    document.getElementById('pre_request_code').value = p.request_code;
+    document.getElementById('pre_code_text').innerText = p.request_code;
+    document.getElementById('pre_receiver').innerText = p.receiver_name;
+    document.getElementById('pre_department').innerText = p.department;
+    document.getElementById('pre_empid_wrapper').innerText = p.employee_id ? `(Mã NV: #${p.employee_id})` : '';
+
+    const tbody = document.getElementById('pre_items_tbody');
+    tbody.innerHTML = '';
+    const items = JSON.parse(p.items_json || '[]');
+
+    items.forEach((it, idx) => {
+        const tr = document.createElement('tr');
+        const defaultPre = (it.pre_approved_quantity !== null) ? it.pre_approved_quantity : it.quantity;
+        const currentNote = it.approval_note || '';
+        tr.innerHTML = `
+            <td style="text-align:center; font-weight:bold; color:#64748b;">${idx + 1}</td>
+            <td><span style="background:#f1f5f9; padding:2px 5px; border-radius:4px; font-weight:600;">${it.item_code || '—'}</span></td>
+            <td>
+                <b>${it.item_name}</b>
+                ${it.specification ? '<br><span style="font-size:0.75rem; color:#64748b;">(' + it.specification + ')</span>' : ''}
+            </td>
+            <td style="text-align:center; font-weight:600;">${it.unit}</td>
+            <td style="text-align:center; font-weight:bold; ${it.stock_qty > 0 ? 'color:#15803d;' : 'color:#dc2626;'}">
+                ${it.stock_qty}
+            </td>
+            <td style="text-align:center; color:#0284c7; font-weight:bold;">
+                ${it.quantity}
+            </td>
+            <td style="text-align:center;">
+                <input type="number" name="pre_approved_quantities[${it.proposal_id}]" min="0" value="${defaultPre}" required
+                       style="width:75px; padding:4px 6px; border:1.5px solid #6366f1; border-radius:4px; text-align:center; font-weight:bold; color:#6366f1;">
+            </td>
+            <td>
+                <input type="text" name="pre_item_notes[${it.proposal_id}]" value="${currentNote}" placeholder="Lý do tăng/giảm..."
+                       style="width:100%; padding:4px 8px; border:1px solid #cbd5e1; border-radius:4px; font-size:0.83rem;">
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    openModal('modal-pre-approve');
+}
+
+// 2. MỞ CỬA SỔ IN BIỂU MẪU TRÌNH KÝ (Cột ghi chú để trống)
+function openPrintDocModal(p) {
+    document.getElementById('prn_receiver_name').innerText = p.receiver_name;
+    document.getElementById('prn_sign_receiver').innerText = p.receiver_name;
+    
+    const empInfo = p.employee_id ? `#${p.employee_id} / ${p.department}` : p.department;
+    document.getElementById('prn_dept_info').innerText = empInfo;
+
+    const tbody = document.getElementById('prn_items_tbody');
+    tbody.innerHTML = '';
+    const rawItems = JSON.parse(p.items_json || '[]');
+    let totalQty = 0;
+    let validRowIndex = 1;
+
+    rawItems.forEach(it => {
+        const qtyToIssue = (it.pre_approved_quantity !== null) ? parseInt(it.pre_approved_quantity) : parseInt(it.quantity);
+        
+        // Bỏ qua các mặt hàng có số lượng bằng 0
+        if (qtyToIssue <= 0) return;
+
+        totalQty += qtyToIssue;
+        const stockLeft = Math.max(0, parseInt(it.stock_qty) - qtyToIssue);
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${validRowIndex++}</td>
+            <td>${it.item_code || '—'}</td>
+            <td class="text-left"><b>${it.item_name}</b> ${it.specification ? '(' + it.specification + ')' : ''}</td>
+            <td>${it.unit}</td>
+            <td style="font-weight:bold;">${qtyToIssue}</td>
+            <td>${stockLeft}</td>
+            <td></td> <!-- Cột ghi chú để trống hoàn toàn -->
+        `;
+        tbody.appendChild(tr);
+    });
+
+    const currentRowsCount = validRowIndex - 1;
+    const emptyRowsCount = Math.max(0, 6 - currentRowsCount);
+    for (let i = 0; i < emptyRowsCount; i++) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${currentRowsCount + i + 1}</td><td></td><td></td><td></td><td></td><td></td><td></td>`;
+        tbody.appendChild(tr);
+    }
+
+    document.getElementById('prn_total_qty').innerText = totalQty;
+    openModal('modal-print-view');
+}
+
+// 3. MỞ MODAL PHÊ DUYỆT (Đầy đủ STT, Mặt hàng, ĐVT, Tồn kho, SL Yêu cầu, SL Duyệt, Ghi chú)
+function openApproveGroupModal(p) {
+    document.getElementById('apg_request_code').value = p.request_code;
+    document.getElementById('apg_code_text').innerText = p.request_code;
+    document.getElementById('apg_receiver').innerText = p.receiver_name + ' (' + p.department + ')';
+
+    const tbody = document.getElementById('apg_items_tbody');
+    tbody.innerHTML = '';
+    const items = JSON.parse(p.items_json || '[]');
+
+    items.forEach((it, idx) => {
+        const tr = document.createElement('tr');
+        const defaultAppr = (it.approved_quantity !== null) ? it.approved_quantity : ((it.pre_approved_quantity !== null) ? it.pre_approved_quantity : it.quantity);
+        const currentNote = it.approval_note || '';
+        tr.innerHTML = `
+            <td style="text-align:center; font-weight:bold; color:#64748b;">${idx + 1}</td>
+            <td>
+                <b>${it.item_name}</b><br>
+                <span style="font-size:0.75rem; color:#64748b;">Mã: ${it.item_code || '—'} ${it.specification ? '| ' + it.specification : ''}</span>
+            </td>
+            <td style="text-align:center; font-weight:600;">${it.unit}</td>
+            <td style="text-align:center; font-weight:bold; ${it.stock_qty > 0 ? 'color:#15803d;' : 'color:#dc2626;'}">
+                ${it.stock_qty}
+            </td>
+            <td style="text-align:center; color:#0284c7; font-weight:bold;">
+                ${it.quantity}
+            </td>
+            <td style="text-align:center;">
+                <input type="number" name="approved_quantities[${it.proposal_id}]" min="0" value="${defaultAppr}" required
+                       style="width:75px; padding:4px 6px; border:1.5px solid #0284c7; border-radius:4px; text-align:center; font-weight:bold; color:#15803d;">
+            </td>
+            <td>
+                <input type="text" name="item_notes[${it.proposal_id}]" value="${currentNote}" placeholder="Ghi chú lý do tăng/giảm..."
+                       style="width:100%; padding:4px 8px; border:1px solid #cbd5e1; border-radius:4px; font-size:0.83rem;">
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    openModal('modal-approve-group');
+}
+
+// 4. MỞ MODAL XEM CHI TIẾT (Ẩn số lượng sơ duyệt & ghi chú khi chưa Duyệt xong)
+function openProposalDetailsModal(p) {
+    document.getElementById('vd_req_code').innerText = p.request_code;
+    document.getElementById('vd_receiver').innerText = p.receiver_name + (p.employee_id ? ' (#' + p.employee_id + ')' : '');
+    document.getElementById('vd_dept').innerText = p.department;
+
+    const tbody = document.getElementById('vd_items_tbody');
+    tbody.innerHTML = '';
+    const items = JSON.parse(p.items_json || '[]');
+    const isApprovedFinal = (p.status === 'Đã duyệt' || p.status === 'Đã cấp phát');
+
+    items.forEach((it, idx) => {
+        const tr = document.createElement('tr');
+        
+        // Khi mới sơ duyệt: SL duyệt và ghi chú hiển thị là '--', chỉ hiển thị sau khi đã Phê Duyệt xong
+        const apprText = isApprovedFinal && (it.approved_quantity !== null) ? it.approved_quantity : '--';
+        const apprNote = isApprovedFinal && it.approval_note ? it.approval_note : '—';
+
+        tr.innerHTML = `
+            <td style="text-align:center; color:#64748b; font-weight:bold;">${idx + 1}</td>
+            <td><span style="background:#f1f5f9; padding:2px 5px; border-radius:4px; font-weight:600;">${it.item_code || '—'}</span></td>
+            <td><b>${it.item_name}</b> ${it.specification ? '<br><span style="font-size:0.75rem; color:#64748b;">(' + it.specification + ')</span>' : ''}</td>
+            <td style="text-align:center; font-weight:600;">${it.unit}</td>
+            <td style="text-align:center; font-weight:bold; color:#0284c7;">${it.quantity}</td>
+            <td style="text-align:center; font-weight:bold; color:#15803d;">${apprText}</td>
+            <td style="text-align:center; font-weight:bold; ${it.stock_qty > 0 ? 'color:#15803d;' : 'color:#dc2626;'}">${it.stock_qty}</td>
+            <td style="color:#64748b; font-size:0.83rem;">${apprNote}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    openModal('modal-view-details');
+}
+
+// 5. CẤP PHÁT ĐỀ XUẤT
+function openDeliverGroupModal(p) {
+    document.getElementById('dlg_request_code').value = p.request_code;
+    document.getElementById('dlg_receiver').value = p.receiver_name;
+    document.getElementById('dlg_department').value = p.department;
+
+    const tbody = document.getElementById('dlg_items_tbody');
+    tbody.innerHTML = '';
+    const items = JSON.parse(p.items_json || '[]');
+
+    items.forEach(it => {
+        const tr = document.createElement('tr');
+        const defaultQty = it.approved_quantity !== null ? it.approved_quantity : it.quantity;
+        tr.innerHTML = `
+            <td><b>${it.item_name}</b> (${it.unit})</td>
+            <td style="text-align:center; font-weight:bold;">${it.stock_qty}</td>
+            <td style="text-align:center; color:#15803d; font-weight:bold;">${defaultQty}</td>
+            <td style="text-align:center;">
+                <input type="number" name="deliver_quantities[${it.proposal_id}]" min="0" value="${defaultQty}" required
+                       style="width:75px; padding:4px 6px; border:1.5px solid #10b981; border-radius:4px; text-align:center; font-weight:bold;">
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    openModal('modal-deliver-group');
+}
+
+// 6. SỬA ĐỢT ĐỀ XUẤT
+function openEditGroupModal(p) {
+    document.getElementById('edg_request_code').value = p.request_code;
+    document.getElementById('edg_receiver').value = p.receiver_name;
+    document.getElementById('edg_department').value = p.department;
+    document.getElementById('edg_location').value = p.delivery_location || '';
+
+    const tbody = document.getElementById('edg_items_tbody');
+    tbody.innerHTML = '';
+    const items = JSON.parse(p.items_json || '[]');
+
+    items.forEach(it => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>
+                <b>${it.item_name}</b><br>
+                <span style="font-size:0.75rem; color:#64748b;">Mã: ${it.item_code || '—'}</span>
+            </td>
+            <td style="text-align:center;">${it.unit}</td>
+            <td style="text-align:center;">
+                <input type="number" name="items_qty[${it.proposal_id}]" min="1" value="${it.quantity}" required
+                       style="width:80px; padding:5px 8px; border:1px solid #cbd5e1; border-radius:4px; text-align:center; font-weight:bold; color:#0284c7;">
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    openModal('modal-edit-group');
+}
+
+function openRejectGroupModal(reqCode) {
+    document.getElementById('rej_group_code').value = reqCode;
+    openModal('modal-reject-group');
+}
+
+function openEditItemModal(it) {
+    document.getElementById('edit_item_id').value = it.id;
+    document.getElementById('edit_item_code').value = it.item_code || '';
+    document.getElementById('edit_item_name').value = it.item_name || '';
+    document.getElementById('edit_item_spec').value = it.specification || '';
+    document.getElementById('edit_item_unit').value = it.unit || 'Cái';
+    document.getElementById('edit_item_init').value = it.initial_stock || 0;
+    openModal('modal-edit-item');
+}
+
+function openEditImportModal(imp) {
+    document.getElementById('ei_import_id').value = imp.id;
+    document.getElementById('ei_import_date').value = imp.import_date;
+    document.getElementById('ei_supplier_name').value = imp.supplier_name;
+    document.getElementById('ei_invoice_no').value = imp.invoice_no || '';
+    document.getElementById('ei_item_id').value = imp.item_id;
+    document.getElementById('ei_quantity').value = imp.quantity;
+    document.getElementById('ei_notes').value = imp.notes || '';
+    openModal('modal-edit-import');
+}
+
+function openEditHistoryModal(h) {
+    document.getElementById('eh_request_id').value = h.id;
+    document.getElementById('eh_request_date').value = h.request_date;
+    document.getElementById('eh_department').value = h.department;
+    document.getElementById('eh_receiver_name').value = h.receiver_name || '';
+    document.getElementById('eh_item_id').value = h.item_id;
+    document.getElementById('eh_quantity').value = h.quantity;
+    document.getElementById('eh_delivery_location').value = h.delivery_location || '';
+    document.getElementById('eh_notes').value = h.notes || '';
+    openModal('modal-edit-history');
+}
+</script>
+
+<?php include 'footer.php'; ?>

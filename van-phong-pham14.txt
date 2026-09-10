@@ -12,9 +12,9 @@ $currentUserFullName = $_SESSION['fullname'] ?? $_SESSION['name'] ?? $_SESSION['
 $message = '';
 $error = '';
 $today = date('Y-m-d');
-$limit = 15; // Giới hạn cố định 15 dòng trên mỗi trang cho tất cả các khối
+$limit = 15; // Giới hạn cố định 15 dòng trên mỗi trang
 
-// Khai báo an toàn các biến phân trang cho từng khối
+// Khai báo an toàn các biến phân trang
 $p_vpp  = max(1, intval($_GET['p_vpp'] ?? 1));
 $p_prop = max(1, intval($_GET['p_prop'] ?? 1));
 $p_hist = max(1, intval($_GET['p_hist'] ?? 1));
@@ -742,7 +742,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 }
 
-// ==================== 4. THAO TÁC CRUD SẢN PHẨM & KHO ====================
+// ==================== 4. THAO TÁC CRUD SẢN PHẨM & KHO (Bao gồm Tùy chỉnh tồn kho hàng loạt) ====================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $act = $_POST['action'];
 
@@ -852,10 +852,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
     }
 
-    if ($act === 'manual_set_stock') {
-        $stmt = $pdo->prepare("UPDATE vpp_items SET stock_qty = :q WHERE id = :id");
-        $stmt->execute([':q' => intval($_POST['new_qty']), ':id' => intval($_POST['item_id'])]);
-        $message = "Đã tùy chỉnh tồn kho thực tế thành công!";
+    // Xử lý lưu tồn kho hàng loạt từ modal tùy chỉnh tồn kho
+    if ($act === 'bulk_update_stock') {
+        $stocks = $_POST['stock_qty'] ?? [];
+        try {
+            $pdo->beginTransaction();
+            $stmtUp = $pdo->prepare("UPDATE vpp_items SET stock_qty = :q WHERE id = :id");
+            foreach ($stocks as $itemId => $qty) {
+                $q = max(0, intval($qty));
+                $stmtUp->execute([':q' => $q, ':id' => intval($itemId)]);
+            }
+            $pdo->commit();
+            $message = "Đã lưu tùy chỉnh tồn kho thực tế hàng loạt thành công!";
+        } catch (Exception $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            $error = "Lỗi lưu tồn kho: " . $e->getMessage();
+        }
     }
 
     if ($act === 'reset_all_data') {
@@ -1045,10 +1057,9 @@ $stmtPropList = $pdo->prepare($sqlProposals);
 $stmtPropList->execute($paramsP);
 $proposals = $stmtPropList->fetchAll();
 
-// Tổng số lượng yêu cầu và duyệt toàn hệ thống cho bảng đề xuất
 $sumPropTotal = $pdo->query("SELECT COALESCE(SUM(quantity),0) AS req, COALESCE(SUM(COALESCE(approved_quantity, pre_approved_quantity, quantity)),0) AS appr FROM vpp_proposals")->fetch();
 
-// ==================== 7. TRUY VẤN DỮ LIỆU KHO (15 dòng / trang + Tổng) ====================
+// ==================== 7. TRUY VẤN DỮ LIỆU KHO (15 dòng/trang + Tổng) ====================
 $whereW = ["1=1"]; $paramsW = [];
 if (!empty($search_vpp)) {
     $whereW[] = "(i.item_code LIKE :s1 OR i.item_name LIKE :s2 OR i.specification LIKE :s3)";
@@ -1071,10 +1082,9 @@ try {
     $existingSuppliers = $pdo->query("SELECT DISTINCT supplier_name FROM vpp_imports WHERE supplier_name != '' ORDER BY supplier_name ASC")->fetchAll(PDO::FETCH_COLUMN);
 } catch (PDOException $e) {}
 
-// Tổng kho toàn hệ thống
 $sumStockTotal = $pdo->query("SELECT COALESCE(SUM(total_imported),0) as imp, COALESCE(SUM(stock_qty),0) as stk, COALESCE((SELECT SUM(quantity) FROM vpp_requests),0) as exp FROM vpp_items")->fetch();
 
-// ==================== 8. TRUY VẤN LỊCH SỬ NHẬP KHO (15 dòng / trang + Tổng) ====================
+// ==================== 8. TRUY VẤN LỊCH SỬ NHẬP KHO (15 dòng/trang + Tổng) ====================
 $f_imp_search = trim($_GET['f_imp_search'] ?? '');
 $f_imp_mode   = trim($_GET['f_imp_mode'] ?? 'month');
 $f_imp_date   = trim($_GET['f_imp_date'] ?? $today);
@@ -1115,7 +1125,7 @@ $stmtImpList = $pdo->prepare($sqlImp);
 $stmtImpList->execute($paramsImp);
 $importHistory = $stmtImpList->fetchAll();
 
-// ==================== 9. TRUY VẤN LỊCH SỬ CẤP PHÁT (15 dòng / trang + Tổng) ====================
+// ==================== 9. TRUY VẤN LỊCH SỬ CẤP PHÁT (15 dòng/trang + Tổng) ====================
 $f_hist_search = trim($_GET['f_hist_search'] ?? '');
 $f_hist_dept   = trim($_GET['f_hist_dept'] ?? '');
 $whereH = ["1=1"]; $paramsH = [];
@@ -1282,7 +1292,7 @@ include 'header.php';
                 Tiếp nhận đề xuất nhân viên, sơ duyệt, xuất phiếu trình ký, phê duyệt và xuất kho cấp phát văn phòng phẩm.
             </p>
         </div>
-        <!-- Trên cùng bên phải: Nút Nhập Kho và nút Xem thêm (chứa Tùy chỉnh tồn kho và Reset về 0) -->
+        <!-- Trên cùng bên phải: Nút Nhập Kho và nút Xem Thêm (chứa Tùy chỉnh tồn kho và Reset về 0) -->
         <div style="display:flex; gap:8px; align-items:center;">
             <a href="de-xuat-van-phong-pham.php" target="_blank" class="btn-action" style="background:#8b5cf6;">🔗 Mở Form Đề Xuất VPP</a>
 
@@ -1296,7 +1306,7 @@ include 'header.php';
                 </div>
             </div>
 
-            <!-- Nút Xem Thêm ẩn Tùy chỉnh tồn kho và Reset về 0 -->
+            <!-- Nút Xem Thêm (chứa Tùy chỉnh tồn kho và Reset về 0) -->
             <div class="dropdown-action-box">
                 <button type="button" class="btn-action" style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1;" onclick="toggleDropdownMenu(event, 'more_settings_menu')">
                     ⚙️ Xem Thêm ▾
@@ -1319,7 +1329,7 @@ include 'header.php';
     <?php if ($message): ?><div class="alert-box alert-success"><?= $message ?></div><?php endif; ?>
     <?php if ($error): ?><div class="alert-box alert-danger"><?= $error ?></div><?php endif; ?>
 
-    <!-- KHỐI 1: DANH SÁCH ĐỀ XUẤT VPP (15 dòng / trang + Dòng Tổng) -->
+    <!-- KHỐI 1: DANH SÁCH ĐỀ XUẤT VPP (15 dòng/trang + Dòng Tổng) -->
     <div class="proposal-notice-box">
         <div class="notice-title">
             <span>
@@ -1505,7 +1515,7 @@ include 'header.php';
         <?php renderPaginationBar($p_prop, $pages_prop, 'p_prop'); ?>
     </div>
 
-    <!-- KHỐI 2: DANH MỤC & TỒN KHO VĂN PHÒNG PHẨM (15 dòng / trang + Dòng Tổng) -->
+    <!-- KHỐI 2: DANH MỤC & TỒN KHO VĂN PHÒNG PHẨM (15 dòng/trang + Dòng Tổng) -->
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
         <h3 style="font-size:1.1rem; color:#334155; margin:0;">📁 Danh Mục & Tồn Kho Văn Phòng Phẩm (Tổng: <?= $total_vpp ?> mặt hàng)</h3>
         
@@ -1589,7 +1599,7 @@ include 'header.php';
     </div>
     <?php renderPaginationBar($p_vpp, $pages_vpp, 'p_vpp'); ?>
 
-    <!-- KHỐI 3: LỊCH SỬ NHẬP KHO & NHÀ CUNG CẤP (15 dòng / trang + Dòng Tổng) -->
+    <!-- KHỐI 3: LỊCH SỬ NHẬP KHO & NHÀ CUNG CẤP (15 dòng/trang + Dòng Tổng) -->
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; margin-top:20px; flex-wrap:wrap; gap:10px;">
         <h3 style="font-size:1.1rem; color:#334155; margin:0;">🚚 Lịch Sử Nhập Kho & Nhà Cung Cấp (Tổng: <?= $total_imports ?> lần nhập)</h3>
         <div style="display:flex; gap:8px;">
@@ -1648,7 +1658,6 @@ include 'header.php';
             </thead>
             <tbody>
                 <?php if (!empty($importHistory)): ?>
-                    <?> 
                     <?php 
                     $sttImp = $offset_imp + 1;
                     $pageQtyImp = 0;
@@ -1694,7 +1703,7 @@ include 'header.php';
     </div>
     <?php renderPaginationBar($p_imp, $pages_imp, 'p_imp'); ?>
 
-    <!-- KHỐI 4: LỊCH SỬ CẤP PHÁT VPP (15 dòng / trang + Dòng Tổng) -->
+    <!-- KHỐI 4: LỊCH SỬ CẤP PHÁT VPP (15 dòng/trang + Dòng Tổng) -->
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; margin-top:20px; flex-wrap:wrap; gap:10px;">
         <h3 style="font-size:1.1rem; color:#334155; margin:0;">📜 Lịch Sử Cấp Phát Văn Phòng Phẩm (Tổng: <?= $total_history ?> lượt)</h3>
         <div style="display:flex; gap:8px;">
@@ -1738,7 +1747,6 @@ include 'header.php';
             </thead>
             <tbody>
                 <?php if (!empty($history)): ?>
-                    <?>
                     <?php 
                     $sttH = $offset_hist + 1;
                     $pageQtyHist = 0;

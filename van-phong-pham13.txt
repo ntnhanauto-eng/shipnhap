@@ -12,7 +12,7 @@ $currentUserFullName = $_SESSION['fullname'] ?? $_SESSION['name'] ?? $_SESSION['
 $message = '';
 $error = '';
 $today = date('Y-m-d');
-$limit = 15; // Số dòng trên mỗi trang
+$limit = 15; // Giới hạn cố định 15 dòng trên mỗi trang
 
 // Khai báo an toàn các biến phân trang
 $p_vpp  = max(1, intval($_GET['p_vpp'] ?? 1));
@@ -925,6 +925,221 @@ if (isset($_GET['export_report'])) {
     echo '</table></body></html>'; exit;
 }
 
+// ==================== 6. TRUY VẤN DỮ LIỆU ĐỀ XUẤT ====================
+$week_start_date = date('Y-m-d 00:00:00', strtotime('monday this week'));
+$week_end_date   = date('Y-m-d 23:59:59', strtotime('sunday this week'));
+
+$weekPropStmt = $pdo->prepare("
+    SELECT 
+        COUNT(DISTINCT request_code) AS count_req_week,
+        COUNT(DISTINCT CASE WHEN status IN ('Đã duyệt', 'Đã cấp phát') THEN request_code ELSE NULL END) AS count_appr_week,
+        COUNT(DISTINCT CASE WHEN status = 'Từ chối' THEN request_code ELSE NULL END) AS count_rej_week
+    FROM vpp_proposals 
+    WHERE created_at BETWEEN :ws AND :we
+");
+$weekPropStmt->execute([':ws' => $week_start_date, ':we' => $week_end_date]);
+$weekPropData = $weekPropStmt->fetch();
+$total_week_req  = intval($weekPropData['count_req_week'] ?? 0);
+$total_week_appr = intval($weekPropData['count_appr_week'] ?? 0);
+$total_week_rej  = intval($weekPropData['count_rej_week'] ?? 0);
+
+$f_prop_search = trim($_GET['f_prop_search'] ?? '');
+$f_prop_dept   = trim($_GET['f_prop_dept'] ?? '');
+$f_prop_status = trim($_GET['f_prop_status'] ?? '');
+$f_prop_mode   = trim($_GET['f_prop_mode'] ?? 'month');
+$f_prop_date   = trim($_GET['f_prop_date'] ?? $today);
+$f_prop_week   = trim($_GET['f_prop_week'] ?? date('Y-\WW'));
+$f_prop_month  = trim($_GET['f_prop_month'] ?? date('Y-m'));
+$f_prop_year   = trim($_GET['f_prop_year'] ?? date('Y'));
+
+$whereP = ["1=1"];
+$paramsP = [];
+
+if (!empty($f_prop_search)) {
+    $whereP[] = "(p.request_code LIKE :ps1 OR p.receiver_name LIKE :ps2 OR p.employee_id LIKE :ps3 OR i.item_name LIKE :ps4 OR i.item_code LIKE :ps5)";
+    $paramsP[':ps1'] = "%$f_prop_search%";
+    $paramsP[':ps2'] = "%$f_prop_search%";
+    $paramsP[':ps3'] = "%$f_prop_search%";
+    $paramsP[':ps4'] = "%$f_prop_search%";
+    $paramsP[':ps5'] = "%$f_prop_search%";
+}
+
+if (!empty($f_prop_dept)) {
+    $whereP[] = "p.department = :pdept";
+    $paramsP[':pdept'] = $f_prop_dept;
+}
+
+if (!empty($f_prop_status)) {
+    if ($f_prop_status === 'Chờ duyệt') {
+        $whereP[] = "p.status = 'Chờ duyệt'";
+    } elseif ($f_prop_status === 'Đã sơ duyệt') {
+        $whereP[] = "p.status = 'Đã sơ duyệt'";
+    } elseif ($f_prop_status === 'Đã duyệt') {
+        $whereP[] = "p.status IN ('Đã duyệt', 'Đã cấp phát', 'Chờ cấp phát')";
+    } elseif ($f_prop_status === 'Từ chối') {
+        $whereP[] = "p.status = 'Từ chối'";
+    }
+}
+
+if ($f_prop_mode === 'day') {
+    $whereP[] = "DATE(p.created_at) = :pd";
+    $paramsP[':pd'] = $f_prop_date;
+} elseif ($f_prop_mode === 'week') {
+    $yw = substr($f_prop_week, 0, 4);
+    $ww = substr($f_prop_week, 6);
+    $dto = new DateTime();
+    $dto->setISODate(intval($yw), intval($ww));
+    $ws = $dto->format('Y-m-d 00:00:00');
+    $dto->modify('+6 days');
+    $we = $dto->format('Y-m-d 23:59:59');
+    $whereP[] = "p.created_at BETWEEN :pws AND :pwe";
+    $paramsP[':pws'] = $ws;
+    $paramsP[':pwe'] = $we;
+} elseif ($f_prop_mode === 'year') {
+    $whereP[] = "DATE_FORMAT(p.created_at, '%Y') = :py";
+    $paramsP[':py'] = $f_prop_year;
+} else {
+    $whereP[] = "DATE_FORMAT(p.created_at, '%Y-%m') = :pm";
+    $paramsP[':pm'] = $f_prop_month;
+}
+
+$countPropStmt = $pdo->prepare("SELECT COUNT(DISTINCT p.request_code) FROM vpp_proposals p JOIN vpp_items i ON p.item_id = i.id WHERE " . implode(' AND ', $whereP));
+$countPropStmt->execute($paramsP);
+$total_proposals = intval($countPropStmt->fetchColumn() ?? 0);
+
+$pages_prop = ceil($total_proposals / $limit) ?: 1;
+if ($p_prop > $pages_prop) $p_prop = $pages_prop;
+$offset_prop = max(0, ($p_prop - 1) * $limit);
+
+$sqlProposals = "
+    SELECT 
+        p.id, p.request_code, p.employee_id, p.receiver_name, p.department, p.delivery_location, p.status, p.reject_reason, p.created_at,
+        COUNT(p.id) AS item_count,
+        SUM(p.quantity) AS total_qty_requested,
+        SUM(COALESCE(p.pre_approved_quantity, p.quantity)) AS total_qty_pre_approved,
+        SUM(COALESCE(p.approved_quantity, p.pre_approved_quantity, p.quantity)) AS total_qty_approved,
+        GROUP_CONCAT(DISTINCT p.approval_note SEPARATOR ' | ') AS combined_approval_note,
+        JSON_ARRAYAGG(
+            JSON_OBJECT(
+                'proposal_id', p.id,
+                'item_id', p.item_id,
+                'item_name', i.item_name,
+                'item_code', i.item_code,
+                'specification', i.specification,
+                'unit', i.unit,
+                'stock_qty', i.stock_qty,
+                'quantity', p.quantity,
+                'pre_approved_quantity', p.pre_approved_quantity,
+                'approved_quantity', p.approved_quantity,
+                'approval_note', p.approval_note
+            )
+        ) AS items_json
+    FROM vpp_proposals p
+    JOIN vpp_items i ON p.item_id = i.id
+    WHERE " . implode(' AND ', $whereP) . "
+    GROUP BY p.request_code, p.employee_id, p.receiver_name, p.department, p.delivery_location, p.status, p.reject_reason, p.created_at
+    ORDER BY (p.status = 'Chờ duyệt') DESC, (p.status = 'Đã sơ duyệt') DESC, (p.status = 'Đã duyệt' OR p.status = 'Chờ cấp phát') DESC, MAX(p.id) DESC
+    LIMIT " . intval($limit) . " OFFSET " . intval($offset_prop) . "
+";
+$stmtPropList = $pdo->prepare($sqlProposals);
+$stmtPropList->execute($paramsP);
+$proposals = $stmtPropList->fetchAll();
+
+$sumPropTotal = $pdo->query("SELECT COALESCE(SUM(quantity),0) AS req, COALESCE(SUM(COALESCE(approved_quantity, pre_approved_quantity, quantity)),0) AS appr FROM vpp_proposals")->fetch();
+
+// ==================== 7. TRUY VẤN DỮ LIỆU KHO (15 dòng / trang + Tổng) ====================
+$whereW = ["1=1"]; $paramsW = [];
+if (!empty($search_vpp)) {
+    $whereW[] = "(i.item_code LIKE :s1 OR i.item_name LIKE :s2 OR i.specification LIKE :s3)";
+    $paramsW[':s1'] = "%$search_vpp%"; $paramsW[':s2'] = "%$search_vpp%"; $paramsW[':s3'] = "%$search_vpp%";
+}
+$countStmt = $pdo->prepare("SELECT COUNT(*) FROM vpp_items i WHERE " . implode(' AND ', $whereW));
+$countStmt->execute($paramsW);
+$total_vpp = $countStmt->fetchColumn();
+$pages_vpp = ceil($total_vpp / $limit) ?: 1;
+if ($p_vpp > $pages_vpp) $p_vpp = $pages_vpp;
+$offset_vpp = max(0, ($p_vpp - 1) * $limit);
+
+$sqlW = "SELECT i.*, COALESCE((SELECT SUM(r.quantity) FROM vpp_requests r WHERE r.item_id = i.id), 0) AS total_exported FROM vpp_items i WHERE " . implode(' AND ', $whereW) . " ORDER BY i.item_code ASC, i.item_name ASC LIMIT " . intval($limit) . " OFFSET " . intval($offset_vpp);
+$stmtW = $pdo->prepare($sqlW); $stmtW->execute($paramsW);
+$items = $stmtW->fetchAll();
+
+$allItemsForModal = $pdo->query("SELECT * FROM vpp_items ORDER BY item_code ASC, item_name ASC")->fetchAll();
+$existingSuppliers = [];
+try {
+    $existingSuppliers = $pdo->query("SELECT DISTINCT supplier_name FROM vpp_imports WHERE supplier_name != '' ORDER BY supplier_name ASC")->fetchAll(PDO::FETCH_COLUMN);
+} catch (PDOException $e) {}
+
+$sumStockTotal = $pdo->query("SELECT COALESCE(SUM(total_imported),0) as imp, COALESCE(SUM(stock_qty),0) as stk, COALESCE((SELECT SUM(quantity) FROM vpp_requests),0) as exp FROM vpp_items")->fetch();
+
+// ==================== 8. TRUY VẤN LỊCH SỬ NHẬP KHO (15 dòng / trang + Tổng) ====================
+$f_imp_search = trim($_GET['f_imp_search'] ?? '');
+$f_imp_mode   = trim($_GET['f_imp_mode'] ?? 'month');
+$f_imp_date   = trim($_GET['f_imp_date'] ?? $today);
+$f_imp_week   = trim($_GET['f_imp_week'] ?? date('Y-\WW'));
+$f_imp_month  = trim($_GET['f_imp_month'] ?? date('Y-m'));
+$f_imp_year   = trim($_GET['f_imp_year'] ?? date('Y'));
+
+$whereImp = ["1=1"]; $paramsImp = [];
+if (!empty($f_imp_search)) {
+    $whereImp[] = "(imp.invoice_no LIKE :is1 OR imp.supplier_name LIKE :is2 OR i.item_name LIKE :is3)";
+    $paramsImp[':is1'] = "%$f_imp_search%"; $paramsImp[':is2'] = "%$f_imp_search%"; $paramsImp[':is3'] = "%$f_imp_search%";
+}
+if ($f_imp_mode === 'day') {
+    $whereImp[] = "imp.import_date = :idate"; $paramsImp[':idate'] = $f_imp_date;
+} elseif ($f_imp_mode === 'week') {
+    $yw = substr($f_imp_week, 0, 4); $ww = substr($f_imp_week, 6);
+    $dto = new DateTime(); $dto->setISODate(intval($yw), intval($ww));
+    $ws = $dto->format('Y-m-d'); $dto->modify('+6 days'); $we = $dto->format('Y-m-d');
+    $whereImp[] = "imp.import_date BETWEEN :iws AND :iwe"; $paramsImp[':iws'] = $ws; $paramsImp[':iwe'] = $we;
+} elseif ($f_imp_mode === 'year') {
+    $whereImp[] = "DATE_FORMAT(imp.import_date, '%Y') = :iyear"; $paramsImp[':iyear'] = $f_imp_year;
+} else {
+    $whereImp[] = "DATE_FORMAT(imp.import_date, '%Y-%m') = :imonth"; $paramsImp[':imonth'] = $f_imp_month;
+}
+
+$countImpStmt = $pdo->prepare("SELECT COUNT(*), SUM(imp.quantity) AS sum_q FROM vpp_imports imp JOIN vpp_items i ON imp.item_id = i.id WHERE " . implode(' AND ', $whereImp));
+$countImpStmt->execute($paramsImp);
+$impSumData = $countImpStmt->fetch();
+$total_imports = intval($impSumData['COUNT(*)'] ?? 0);
+$total_imp_qty = intval($impSumData['sum_q'] ?? 0);
+
+$pages_imp = ceil($total_imports / $limit) ?: 1;
+if ($p_imp > $pages_imp) $p_imp = $pages_imp;
+$offset_imp = max(0, ($p_imp - 1) * $limit);
+
+$sqlImp = "SELECT imp.*, i.item_code, i.item_name, i.specification, i.unit FROM vpp_imports imp JOIN vpp_items i ON imp.item_id = i.id WHERE " . implode(' AND ', $whereImp) . " ORDER BY imp.id DESC LIMIT " . intval($limit) . " OFFSET " . intval($offset_imp);
+$stmtImpList = $pdo->prepare($sqlImp);
+$stmtImpList->execute($paramsImp);
+$importHistory = $stmtImpList->fetchAll();
+
+// ==================== 9. TRUY VẤN LỊCH SỬ CẤP PHÁT (15 dòng / trang + Tổng) ====================
+$f_hist_search = trim($_GET['f_hist_search'] ?? '');
+$f_hist_dept   = trim($_GET['f_hist_dept'] ?? '');
+$whereH = ["1=1"]; $paramsH = [];
+if (!empty($f_hist_search)) {
+    $whereH[] = "(r.request_code LIKE :hs1 OR r.receiver_name LIKE :hs3 OR r.employee_id LIKE :hs4 OR i.item_name LIKE :hs5)";
+    $paramsH[':hs1'] = "%$f_hist_search%"; $paramsH[':hs3'] = "%$f_hist_search%"; $paramsH[':hs4'] = "%$f_hist_search%"; $paramsH[':hs5'] = "%$f_hist_search%";
+}
+if (!empty($f_hist_dept)) {
+    $whereH[] = "r.department = :hdept"; $paramsH[':hdept'] = $f_hist_dept;
+}
+
+$countHistStmt = $pdo->prepare("SELECT COUNT(*), SUM(r.quantity) AS sum_q FROM vpp_requests r JOIN vpp_items i ON r.item_id = i.id WHERE " . implode(' AND ', $whereH));
+$countHistStmt->execute($paramsH);
+$histSumData = $countHistStmt->fetch();
+$total_history = intval($histSumData['COUNT(*)'] ?? 0);
+$total_hist_qty = intval($histSumData['sum_q'] ?? 0);
+
+$pages_hist = ceil($total_history / $limit) ?: 1;
+if ($p_hist > $pages_hist) $p_hist = $pages_hist;
+$offset_hist = max(0, ($p_hist - 1) * $limit);
+
+$sqlH = "SELECT r.*, i.item_code, i.item_name, i.specification, i.unit FROM vpp_requests r JOIN vpp_items i ON r.item_id = i.id WHERE " . implode(' AND ', $whereH) . " ORDER BY r.id DESC LIMIT " . intval($limit) . " OFFSET " . intval($offset_hist);
+$stmtH = $pdo->prepare($sqlH);
+$stmtH->execute($paramsH);
+$history = $stmtH->fetchAll();
+
 include 'header.php';
 ?>
 
@@ -1065,7 +1280,7 @@ include 'header.php';
                 Tiếp nhận đề xuất nhân viên, sơ duyệt, xuất phiếu trình ký, phê duyệt và xuất kho cấp phát văn phòng phẩm.
             </p>
         </div>
-        <!-- Trên cùng bên phải: Thêm 2 nút Tùy chỉnh tồn kho và Reset về 0 ẩn trong nút Xem thêm -->
+        <!-- Trên cùng bên phải: Nút Nhập Kho và nút Xem Thêm (chứa Tùy chỉnh tồn kho và Reset về 0) -->
         <div style="display:flex; gap:8px; align-items:center;">
             <a href="de-xuat-van-phong-pham.php" target="_blank" class="btn-action" style="background:#8b5cf6;">🔗 Mở Form Đề Xuất VPP</a>
 
@@ -1079,7 +1294,7 @@ include 'header.php';
                 </div>
             </div>
 
-            <!-- Nút Xem thêm chứa Tùy chỉnh tồn kho và Reset về 0 -->
+            <!-- Nút Xem Thêm (chứa Tùy chỉnh tồn kho và Reset về 0) -->
             <div class="dropdown-action-box">
                 <button type="button" class="btn-action" style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1;" onclick="toggleDropdownMenu(event, 'more_settings_menu')">
                     ⚙️ Xem Thêm ▾
@@ -1102,7 +1317,7 @@ include 'header.php';
     <?php if ($message): ?><div class="alert-box alert-success"><?= $message ?></div><?php endif; ?>
     <?php if ($error): ?><div class="alert-box alert-danger"><?= $error ?></div><?php endif; ?>
 
-    <!-- KHỐI 1: DANH SÁCH ĐỀ XUẤT VPP -->
+    <!-- KHỐI 1: DANH SÁCH ĐỀ XUẤT VPP (15 dòng/trang + Dòng Tổng) -->
     <div class="proposal-notice-box">
         <div class="notice-title">
             <span>
@@ -1178,9 +1393,12 @@ include 'header.php';
                     <?php if (!empty($proposals)): ?>
                         <?php 
                         $sttP = $offset_prop + 1;
+                        $pageReqP = 0; $pageApprP = 0;
                         foreach ($proposals as $p): 
                             $jsonEncoded = json_encode($p, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
-                            
+                            $pageReqP += intval($p['total_qty_requested']);
+                            $pageApprP += intval($p['total_qty_approved']);
+
                             $apprDisplay = '--';
                             $apprStyle = 'color:#94a3b8; font-weight:bold;';
                             $arrowBtn = '';
@@ -1188,11 +1406,9 @@ include 'header.php';
                             if (in_array($p['status'], ['Đã duyệt', 'Đã cấp phát'])) {
                                 $apprDisplay = intval($p['total_qty_approved']);
                                 $apprStyle = 'color:#15803d; font-weight:800; font-size:1.05rem;';
-                                $arrowBtn = '';
                             } elseif ($p['status'] === 'Đã sơ duyệt') {
                                 $apprDisplay = 'Đã sơ duyệt';
                                 $apprStyle = 'color:#6366f1; font-weight:bold; font-size:0.85rem;';
-                                $arrowBtn = '';
                             } elseif ($p['status'] === 'Từ chối') {
                                 $apprDisplay = 'Từ chối';
                                 $apprStyle = 'color:#dc2626; font-weight:bold;';
@@ -1210,28 +1426,16 @@ include 'header.php';
                         ?>
                             <tr>
                                 <td style="text-align:center;"><b><?= $sttP++ ?></b></td>
-                                <td>
-                                    <span style="background:#e0f2fe; color:#0369a1; padding:3px 6px; border-radius:4px; font-weight:700; font-size:0.80rem;">
-                                        <?= htmlspecialchars($p['request_code']) ?>
-                                    </span>
-                                </td>
-                                <td style="text-align:center; font-size:0.85rem;">
-                                    <strong><?= date('d/m/Y', strtotime($p['created_at'])) ?></strong><br>
-                                    <span style="color:#64748b; font-size:0.8rem;"><?= date('H:i:s', strtotime($p['created_at'])) ?></span>
-                                </td>
-                                <td>
-                                    <strong><?= htmlspecialchars($p['receiver_name']) ?></strong>
-                                    <?= $p['employee_id'] ? ("<br><span style='font-size:0.75rem; color:#64748b;'>Mã NV: #{$p['employee_id']}</span>") : '' ?>
-                                </td>
+                                <td><span style="background:#e0f2fe; color:#0369a1; padding:3px 6px; border-radius:4px; font-weight:700; font-size:0.80rem;"><?= htmlspecialchars($p['request_code']) ?></span></td>
+                                <td style="text-align:center; font-size:0.85rem;"><strong><?= date('d/m/Y', strtotime($p['created_at'])) ?></strong><br><span style="color:#64748b; font-size:0.8rem;"><?= date('H:i:s', strtotime($p['created_at'])) ?></span></td>
+                                <td><strong><?= htmlspecialchars($p['receiver_name']) ?></strong><?= $p['employee_id'] ? ("<br><span style='font-size:0.75rem; color:#64748b;'>Mã NV: #{$p['employee_id']}</span>") : '' ?></td>
                                 <td><b><?= htmlspecialchars($p['department']) ?></b></td>
                                 <td>
                                     <button type="button" class="btn-action" style="background:#f5f3ff; color:#7c3aed; border:1px solid #ddd6fe; padding:4px 10px; font-size:0.82rem;" onclick='openProposalDetailsModal(<?= $jsonEncoded ?>)'>
                                         📦 Xem mặt hàng (<?= $p['item_count'] ?> món)
                                     </button>
                                 </td>
-                                <td style="text-align:center; font-weight:bold; color:#0284c7;">
-                                    <?= $p['total_qty_requested'] ?>
-                                </td>
+                                <td style="text-align:center; font-weight:bold; color:#0284c7;"><?= $p['total_qty_requested'] ?></td>
                                 <td style="text-align:left;">
                                     <div class="appr-cell-box">
                                         <span class="appr-val-left" style="<?= $apprStyle ?>"><?= $apprDisplay ?></span>
@@ -1242,39 +1446,23 @@ include 'header.php';
                                     <div class="prop-action-group">
                                         <?php if ($p['status'] === 'Chờ duyệt'): ?>
                                             <div class="prop-dropdown">
-                                                <button type="button" class="btn-prop-status-btn btn-status-wait" onclick="togglePropDropdown(event, '<?= $p['request_code'] ?>')">
-                                                    ⏳ Chờ duyệt ▾
-                                                </button>
+                                                <button type="button" class="btn-prop-status-btn btn-status-wait" onclick="togglePropDropdown(event, '<?= $p['request_code'] ?>')">⏳ Chờ duyệt ▾</button>
                                                 <div class="prop-dropdown-menu" id="prop_dropdown_<?= $p['request_code'] ?>">
-                                                    <button type="button" class="prop-dropdown-item" style="color:#6366f1;" onclick='closeAllPropDropdowns(); openPreApproveModal(<?= $jsonEncoded ?>)'>
-                                                        🔍 Sơ duyệt
-                                                    </button>
-                                                    <button type="button" class="prop-dropdown-item" style="color:#dc2626;" onclick='closeAllPropDropdowns(); openRejectGroupModal("<?= htmlspecialchars($p['request_code']) ?>")'>
-                                                        ✗ Từ chối
-                                                    </button>
+                                                    <button type="button" class="prop-dropdown-item" style="color:#6366f1;" onclick='closeAllPropDropdowns(); openPreApproveModal(<?= $jsonEncoded ?>)'>🔍 Sơ duyệt</button>
+                                                    <button type="button" class="prop-dropdown-item" style="color:#dc2626;" onclick='closeAllPropDropdowns(); openRejectGroupModal("<?= htmlspecialchars($p['request_code']) ?>")'>✗ Từ chối</button>
                                                 </div>
                                             </div>
                                         <?php elseif ($p['status'] === 'Đã sơ duyệt'): ?>
-                                            <button type="button" class="btn-prop-status-btn btn-status-print" onclick='openPrintDocModal(<?= $jsonEncoded ?>)'>
-                                                🖨️ Trình ký
-                                            </button>
+                                            <button type="button" class="btn-prop-status-btn btn-status-print" onclick='openPrintDocModal(<?= $jsonEncoded ?>)'>🖨️ Trình ký</button>
                                             <div class="prop-dropdown">
-                                                <button type="button" class="btn-prop-status-btn btn-status-approve" onclick="togglePropDropdown(event, 'appr_<?= $p['request_code'] ?>')">
-                                                    📋 Duyệt ▾
-                                                </button>
+                                                <button type="button" class="btn-prop-status-btn btn-status-approve" onclick="togglePropDropdown(event, 'appr_<?= $p['request_code'] ?>')">📋 Duyệt ▾</button>
                                                 <div class="prop-dropdown-menu" id="prop_dropdown_appr_<?= $p['request_code'] ?>">
-                                                    <button type="button" class="prop-dropdown-item" style="color:#0284c7;" onclick='closeAllPropDropdowns(); openApproveGroupModal(<?= $jsonEncoded ?>)'>
-                                                        📋 Phê duyệt
-                                                    </button>
-                                                    <button type="button" class="prop-dropdown-item" style="color:#dc2626;" onclick='closeAllPropDropdowns(); openRejectGroupModal("<?= htmlspecialchars($p['request_code']) ?>")'>
-                                                        ✗ Từ chối
-                                                    </button>
+                                                    <button type="button" class="prop-dropdown-item" style="color:#0284c7;" onclick='closeAllPropDropdowns(); openApproveGroupModal(<?= $jsonEncoded ?>)'>📋 Phê duyệt</button>
+                                                    <button type="button" class="prop-dropdown-item" style="color:#dc2626;" onclick='closeAllPropDropdowns(); openRejectGroupModal("<?= htmlspecialchars($p['request_code']) ?>")'>✗ Từ chối</button>
                                                 </div>
                                             </div>
                                         <?php elseif ($p['status'] === 'Đã duyệt' || $p['status'] === 'Chờ cấp phát'): ?>
-                                            <button type="button" class="btn-prop-status-btn btn-status-give" onclick='openDeliverGroupModal(<?= $jsonEncoded ?>)'>
-                                                ⚡ Cấp phát
-                                            </button>
+                                            <button type="button" class="btn-prop-status-btn btn-status-give" onclick='openDeliverGroupModal(<?= $jsonEncoded ?>)'>⚡ Cấp phát</button>
                                         <?php elseif ($p['status'] === 'Đã cấp phát'): ?>
                                             <span class="badge-status-p b-approved">✓ Đã cấp phát</span>
                                         <?php else: ?>
@@ -1300,28 +1488,34 @@ include 'header.php';
                         <tr><td colspan="9" style="text-align:center; padding:25px; color:#64748b;">Không có dữ liệu đề xuất văn phòng phẩm phù hợp.</td></tr>
                     <?php endif; ?>
                 </tbody>
+                <?php if (!empty($proposals)): ?>
+                    <tfoot>
+                        <tr style="background:#f8fafc; font-weight:bold;">
+                            <td colspan="6" style="text-align:right;">TỔNG CỘNG (TRANG NÀY / TOÀN HỆ THỐNG: Y/C <?= $sumPropTotal['req'] ?> | Duyệt <?= $sumPropTotal['appr'] ?>):</td>
+                            <td style="text-align:center; color:#0284c7;"><?= $pageReqP ?></td>
+                            <td style="text-align:left; color:#15803d;"><?= $pageApprP ?></td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                <?php endif; ?>
             </table>
         </div>
         <?php renderPaginationBar($p_prop, $pages_prop, 'p_prop'); ?>
     </div>
 
-    <!-- KHỐI 2: DANH MỤC & TỒN KHO VĂN PHÒNG PHẨM -->
+    <!-- KHỐI 2: DANH MỤC & TỒN KHO VĂN PHÒNG PHẨM (15 dòng/trang + Dòng Tổng) -->
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
         <h3 style="font-size:1.1rem; color:#334155; margin:0;">📁 Danh Mục & Tồn Kho Văn Phòng Phẩm (Tổng: <?= $total_vpp ?> mặt hàng)</h3>
         
         <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-            <a href="van-phong-pham.php?export_stock_full=1" class="btn-export" title="Xuất báo cáo tồn kho">
-                📊 Xuất Excel Tồn Kho
-            </a>
+            <a href="van-phong-pham.php?export_stock_full=1" class="btn-export" title="Xuất báo cáo tồn kho">📊 Xuất Excel Tồn Kho</a>
             <form method="GET" action="van-phong-pham.php" style="display:flex; gap:8px; align-items:center; margin:0;" onsubmit="saveScrollPosition()">
                 <input type="text" name="search_vpp" value="<?= htmlspecialchars($search_vpp) ?>" placeholder="🔍 Tìm mã hoặc tên..." style="padding:6px 12px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.85rem; width:180px; outline:none;">
                 <button type="submit" class="btn-action" style="padding:6px 12px; font-size:0.85rem;">Tìm</button>
             </form>
 
             <div class="dropdown-action-box">
-                <button type="button" class="btn-action" style="background:#8b5cf6;" onclick="toggleDropdownMenu(event, 'item_dropdown_menu')">
-                    + Thêm Mặt Hàng VPP ▾
-                </button>
+                <button type="button" class="btn-action" style="background:#8b5cf6;" onclick="toggleDropdownMenu(event, 'item_dropdown_menu')">+ Thêm Mặt Hàng VPP ▾</button>
                 <div class="dropdown-action-menu" id="item_dropdown_menu">
                     <button type="button" class="dropdown-action-btn" onclick="closeAllDropdownMenus(); openModal('modal-add-item');">✍️ Thêm Thủ Công</button>
                     <button type="button" class="dropdown-action-btn" onclick="closeAllDropdownMenus(); openModal('modal-add-item-excel');">📄 Nhập Từ File Excel</button>
@@ -1346,16 +1540,18 @@ include 'header.php';
             </thead>
             <tbody>
                 <?php if (!empty($items)): ?>
-                    <?php $sttW = $offset_vpp + 1; foreach ($items as $it): ?>
+                    <?php 
+                    $sttW = $offset_vpp + 1; 
+                    $pageImpW = 0; $pageExpW = 0; $pageStkW = 0;
+                    foreach ($items as $it): 
+                        $pageImpW += intval($it['total_imported']);
+                        $pageExpW += intval($it['total_exported']);
+                        $pageStkW += intval($it['stock_qty']);
+                    ?>
                         <tr>
                             <td style="text-align:center;"><strong><?= $sttW++ ?></strong></td>
                             <td><span style="background:#f1f5f9; padding:2px 6px; border-radius:4px; font-weight:700;"><?= htmlspecialchars($it['item_code'] ?: '—') ?></span></td>
-                            <td>
-                                <strong><?= htmlspecialchars($it['item_name']) ?></strong>
-                                <?php if (!empty($it['specification'])): ?>
-                                    <span style="font-size:0.8rem; color:#64748b;">(<?= htmlspecialchars($it['specification']) ?>)</span>
-                                <?php endif; ?>
-                            </td>
+                            <td><strong><?= htmlspecialchars($it['item_name']) ?></strong><?php if (!empty($it['specification'])): ?><span style="font-size:0.8rem; color:#64748b;">(<?= htmlspecialchars($it['specification']) ?>)</span><?php endif; ?></td>
                             <td style="text-align:center;"><?= htmlspecialchars($it['unit']) ?></td>
                             <td style="text-align:center; font-weight:600; color:#10b981;"><?= $it['total_imported'] ?></td>
                             <td style="text-align:center; color:#ea580c; font-weight:700;"><?= $it['total_exported'] ?></td>
@@ -1376,21 +1572,28 @@ include 'header.php';
                     <tr><td colspan="8" style="text-align:center; padding:25px;">Chưa có mặt hàng văn phòng phẩm nào trong kho.</td></tr>
                 <?php endif; ?>
             </tbody>
+            <?php if (!empty($items)): ?>
+                <tfoot>
+                    <tr style="background:#f8fafc; font-weight:bold;">
+                        <td colspan="4" style="text-align:right;">TỔNG CỘNG (TRANG NÀY / TOÀN HỆ THỐNG: Nhập <?= $sumStockTotal['imp'] ?> | Xuất <?= $sumStockTotal['exp'] ?> | Tồn <?= $sumStockTotal['stk'] ?>):</td>
+                        <td style="text-align:center; color:#10b981;"><?= $pageImpW ?></td>
+                        <td style="text-align:center; color:#ea580c;"><?= $pageExpW ?></td>
+                        <td style="text-align:center; color:#0284c7;"><?= $pageStkW ?></td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            <?php endif; ?>
         </table>
     </div>
     <?php renderPaginationBar($p_vpp, $pages_vpp, 'p_vpp'); ?>
 
-    <!-- KHỐI 3: LỊCH SỬ NHẬP KHO & NHÀ CUNG CẤP (BỘ LỌC ĐẦY ĐỦ) -->
+    <!-- KHỐI 3: LỊCH SỬ NHẬP KHO & NHÀ CUNG CẤP (15 dòng/trang + Dòng Tổng) -->
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; margin-top:20px; flex-wrap:wrap; gap:10px;">
         <h3 style="font-size:1.1rem; color:#334155; margin:0;">🚚 Lịch Sử Nhập Kho & Nhà Cung Cấp (Tổng: <?= $total_imports ?> lần nhập)</h3>
         <div style="display:flex; gap:8px;">
-            <a href="van-phong-pham.php?export_imports_report=1" class="btn-export">
-                📊 Xuất Excel Báo Cáo Nhập Kho
-            </a>
+            <a href="van-phong-pham.php?export_imports_report=1" class="btn-export">📊 Xuất Excel Báo Cáo Nhập Kho</a>
             <div class="dropdown-action-box">
-                <button type="button" class="btn-action" style="background:#10b981;" onclick="toggleDropdownMenu(event, 'import_dropdown_menu_2')">
-                    + Nhập Hàng Mới ▾
-                </button>
+                <button type="button" class="btn-action" style="background:#10b981;" onclick="toggleDropdownMenu(event, 'import_dropdown_menu_2')">+ Nhập Hàng Mới ▾</button>
                 <div class="dropdown-action-menu" id="import_dropdown_menu_2">
                     <button type="button" class="dropdown-action-btn" onclick="closeAllDropdownMenus(); openModal('modal-import');">✍️ Nhập Thủ Công</button>
                     <button type="button" class="dropdown-action-btn" onclick="closeAllDropdownMenus(); openModal('modal-import-excel');">📄 Nhập Từ File Excel</button>
@@ -1445,7 +1648,9 @@ include 'header.php';
                 <?php if (!empty($importHistory)): ?>
                     <?php 
                     $sttImp = $offset_imp + 1;
+                    $pageQtyImp = 0;
                     foreach ($importHistory as $imp):
+                        $pageQtyImp += intval($imp['quantity']);
                     ?>
                         <tr>
                             <td style="text-align:center;"><b><?= $sttImp++ ?></b></td>
@@ -1473,17 +1678,24 @@ include 'header.php';
                     <tr><td colspan="10" style="text-align:center; padding:25px;">Chưa có lịch sử nhập hàng nào.</td></tr>
                 <?php endif; ?>
             </tbody>
+            <?php if (!empty($importHistory)): ?>
+                <tfoot>
+                    <tr style="background:#f8fafc; font-weight:bold;">
+                        <td colspan="6" style="text-align:right;">TỔNG CỘNG (TRANG NÀY / TOÀN HỆ THỐNG: <?= $total_imp_qty ?> sp):</td>
+                        <td style="text-align:center; color:#10b981;"><?= $pageQtyImp ?></td>
+                        <td colspan="3"></td>
+                    </tr>
+                </tfoot>
+            <?php endif; ?>
         </table>
     </div>
     <?php renderPaginationBar($p_imp, $pages_imp, 'p_imp'); ?>
 
-    <!-- KHỐI 4: LỊCH SỬ CẤP PHÁT VPP (BỘ LỌC ĐẦY ĐỦ: Mã cấp phát, Người nhận, Mã NV, Tên VPP, Phòng ban) -->
+    <!-- KHỐI 4: LỊCH SỬ CẤP PHÁT VPP (15 dòng/trang + Dòng Tổng) -->
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; margin-top:20px; flex-wrap:wrap; gap:10px;">
         <h3 style="font-size:1.1rem; color:#334155; margin:0;">📜 Lịch Sử Cấp Phát Văn Phòng Phẩm (Tổng: <?= $total_history ?> lượt)</h3>
         <div style="display:flex; gap:8px;">
-            <a href="van-phong-pham.php?export_report=1" class="btn-export">
-                📊 Xuất Excel Báo Cáo Cấp Phát
-            </a>
+            <a href="van-phong-pham.php?export_report=1" class="btn-export">📊 Xuất Excel Báo Cáo Cấp Phát</a>
         </div>
     </div>
 
@@ -1525,7 +1737,9 @@ include 'header.php';
                 <?php if (!empty($history)): ?>
                     <?php 
                     $sttH = $offset_hist + 1;
+                    $pageQtyHist = 0;
                     foreach ($history as $h): 
+                        $pageQtyHist += intval($h['quantity']);
                     ?>
                         <tr>
                             <td style="text-align:center;"><b><?= $sttH++ ?></b></td>
@@ -1554,6 +1768,15 @@ include 'header.php';
                     <tr><td colspan="11" style="text-align:center; padding:25px;">Chưa có lịch sử cấp phát văn phòng phẩm nào.</td></tr>
                 <?php endif; ?>
             </tbody>
+            <?php if (!empty($history)): ?>
+                <tfoot>
+                    <tr style="background:#f8fafc; font-weight:bold;">
+                        <td colspan="7" style="text-align:right;">TỔNG CỘNG (TRANG NÀY / TOÀN HỆ THỐNG: <?= $total_hist_qty ?> sp):</td>
+                        <td style="text-align:center; color:#0284c7;"><?= $pageQtyHist ?></td>
+                        <td colspan="3"></td>
+                    </tr>
+                </tfoot>
+            <?php endif; ?>
         </table>
     </div>
     <?php renderPaginationBar($p_hist, $pages_hist, 'p_hist'); ?>

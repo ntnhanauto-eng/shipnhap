@@ -9,7 +9,6 @@ if (!isset($_SESSION['user_id'])) {
 
 $today = date('Y-m-d');
 
-// Dự phòng trường hợp file db_connect.php chưa khai báo mảng $DEFAULT_DEPARTMENTS
 if (!isset($DEFAULT_DEPARTMENTS) || !is_array($DEFAULT_DEPARTMENTS)) {
     $DEFAULT_DEPARTMENTS = [
         'Ban Giám Đốc',
@@ -23,7 +22,7 @@ if (!isset($DEFAULT_DEPARTMENTS) || !is_array($DEFAULT_DEPARTMENTS)) {
     ];
 }
 
-// 1. Tự động kiểm tra và bổ sung các trường thông tin chuẩn theo mẫu cho employees & candidates
+// 1. Tự động kiểm tra và thêm cột an toàn nếu chưa có
 try {
     $existingEmpCols = [];
     $colStmt = $pdo->query("SHOW COLUMNS FROM employees");
@@ -94,11 +93,13 @@ try {
     }
 } catch (Exception $e) {}
 
-// Hàm tính thời gian làm việc (Thâm niên)
+// Hàm tính thời gian làm việc an toàn tuyệt đối
 function calculateWorkDuration($startDate) {
-    if (empty($startDate) || $startDate === '0000-00-00') return '—';
+    if (empty($startDate) || $startDate === '0000-00-00' || strpos($startDate, '0000') !== false) return '—';
     try {
-        $start = new DateTime($startDate);
+        $time = strtotime($startDate);
+        if ($time === false || $time <= 0) return '—';
+        $start = new DateTime(date('Y-m-d', $time));
         $now = new DateTime();
         if ($start > $now) return '0 ngày';
         $diff = $start->diff($now);
@@ -157,7 +158,7 @@ if (isset($_GET['export'])) {
         exit;
     }
 
-    // B. Xuất Nhân viên Trụ sở chính (Theo toàn bộ 37 cột trong ảnh mẫu)
+    // B. Xuất Nhân viên Trụ sở chính (37 cột chuẩn theo ảnh)
     if ($export_type === 'employees') {
         header("Content-Disposition: attachment; filename=Bao_Cao_Nhan_Vien_Chinh_{$date_str}.xls");
         echo "\xEF\xBB\xBF";
@@ -202,19 +203,19 @@ if (isset($_GET['export'])) {
 
         $stt = 1;
         foreach ($rows as $r) {
-            $dob_str = !empty($r['dob']) ? date('d/m/Y', strtotime($r['dob'])) : '—';
-            $s_date = !empty($r['start_date']) ? date('d/m/Y', strtotime($r['start_date'])) : '—';
-            $id_iss = !empty($r['id_issue_date']) ? date('d/m/Y', strtotime($r['id_issue_date'])) : '—';
-            $c_from = !empty($r['contract_from_date']) ? date('d/m/Y', strtotime($r['contract_from_date'])) : '—';
-            $c_to = !empty($r['contract_to_date']) ? date('d/m/Y', strtotime($r['contract_to_date'])) : '—';
-            $work_duration = calculateWorkDuration($r['start_date']);
+            $dob_str = (!empty($r['dob']) && $r['dob'] !== '0000-00-00') ? date('d/m/Y', strtotime($r['dob'])) : '—';
+            $s_date  = (!empty($r['start_date']) && $r['start_date'] !== '0000-00-00') ? date('d/m/Y', strtotime($r['start_date'])) : '—';
+            $id_iss  = (!empty($r['id_issue_date']) && $r['id_issue_date'] !== '0000-00-00') ? date('d/m/Y', strtotime($r['id_issue_date'])) : '—';
+            $c_from  = (!empty($r['contract_from_date']) && $r['contract_from_date'] !== '0000-00-00') ? date('d/m/Y', strtotime($r['contract_from_date'])) : '—';
+            $c_to    = (!empty($r['contract_to_date']) && $r['contract_to_date'] !== '0000-00-00') ? date('d/m/Y', strtotime($r['contract_to_date'])) : '—';
+            $work_duration = calculateWorkDuration($r['start_date'] ?? '');
 
             echo "<tr>
                     <td class='td-center td-bold'>{$stt}</td>
                     <td class='td-center td-bold'>{$r['id']}</td>
                     <td class='td-center'>" . htmlspecialchars($r['hr_code'] ?? '—') . "</td>
                     <td class='td-left'>" . htmlspecialchars($r['fullname_en'] ?? '—') . "</td>
-                    <td class='td-left td-bold'>" . htmlspecialchars($r['fullname']) . "</td>
+                    <td class='td-left td-bold'>" . htmlspecialchars($r['fullname'] ?? '') . "</td>
                     <td class='td-center'>{$dob_str}</td>
                     <td class='td-center'>{$s_date}</td>
                     <td class='td-center'>{$work_duration}</td>
@@ -227,7 +228,7 @@ if (isset($_GET['export'])) {
                     <td class='td-left'>" . htmlspecialchars($r['department'] ?? '—') . "</td>
                     <td class='td-left'>" . htmlspecialchars($r['team'] ?? '—') . "</td>
                     <td class='td-center'>" . htmlspecialchars($r['dept_code'] ?? '—') . "</td>
-                    <td class='td-left'>" . htmlspecialchars($r['working_location'] ?? ($r['branch'] ?: 'Trụ sở chính')) . "</td>
+                    <td class='td-left'>" . htmlspecialchars($r['working_location'] ?? ($r['branch'] ?? 'Trụ sở chính')) . "</td>
                     <td class='td-center' style='mso-number-format:\"\@\";'>" . htmlspecialchars($r['social_insurance_no'] ?? '—') . "</td>
                     <td class='td-center' style='mso-number-format:\"\@\";'>" . htmlspecialchars($r['health_insurance_no'] ?? '—') . "</td>
                     <td class='td-center'>" . htmlspecialchars($r['si_start_date'] ?? '—') . "</td>
@@ -290,13 +291,13 @@ if (isset($_GET['export'])) {
         foreach ($rows as $r) {
             echo "<tr>
                     <td class='td-center td-bold'>{$stt}</td><td class='td-center'>{$r['id']}</td>
-                    <td class='td-left td-bold'>" . htmlspecialchars($r['fullname']) . "</td>
-                    <td class='td-center td-bold'>" . htmlspecialchars($r['branch']) . "</td>
-                    <td class='td-left'>" . htmlspecialchars($r['department']) . "</td>
-                    <td class='td-left'>" . htmlspecialchars($r['position']) . "</td>
-                    <td class='td-center' style='mso-number-format:\"\@\";'>" . htmlspecialchars($r['phone']) . "</td>
-                    <td class='td-left'>" . htmlspecialchars($r['email']) . "</td>
-                    <td class='td-center'>" . htmlspecialchars($r['status']) . "</td>
+                    <td class='td-left td-bold'>" . htmlspecialchars($r['fullname'] ?? '') . "</td>
+                    <td class='td-center td-bold'>" . htmlspecialchars($r['branch'] ?? '') . "</td>
+                    <td class='td-left'>" . htmlspecialchars($r['department'] ?? '') . "</td>
+                    <td class='td-left'>" . htmlspecialchars($r['position'] ?? '') . "</td>
+                    <td class='td-center' style='mso-number-format:\"\@\";'>" . htmlspecialchars($r['phone'] ?? '') . "</td>
+                    <td class='td-left'>" . htmlspecialchars($r['email'] ?? '') . "</td>
+                    <td class='td-center'>" . htmlspecialchars($r['status'] ?? '') . "</td>
                   </tr>";
             $stt++;
         }
@@ -342,17 +343,17 @@ if (isset($_GET['export'])) {
             $tg_tuyen = !empty($r['hire_date']) ? $r['hire_date'] : ($r['hired'] ? 'Đã tuyển' : '');
             echo "<tr>
                     <td class='td-center td-bold'>{$stt}</td><td class='td-center'>{$r['id']}</td>
-                    <td class='td-left td-bold'>" . htmlspecialchars($r['fullname']) . "</td>
+                    <td class='td-left td-bold'>" . htmlspecialchars($r['fullname'] ?? '') . "</td>
                     <td class='td-center'>" . htmlspecialchars($r['gender'] ?? '') . "</td>
                     <td class='td-center'>" . htmlspecialchars($r['birth_year'] ?? '') . "</td>
                     <td class='td-center' style='mso-number-format:\"\@\";'>" . htmlspecialchars($r['id_card'] ?? '') . "</td>
                     <td class='td-left'>" . htmlspecialchars($r['address'] ?? '') . "</td>
-                    <td class='td-center' style='mso-number-format:\"\@\";'>" . htmlspecialchars($r['phone']) . "</td>
+                    <td class='td-center' style='mso-number-format:\"\@\";'>" . htmlspecialchars($r['phone'] ?? '') . "</td>
                     <td class='td-left'>" . htmlspecialchars($r['skills_note'] ?? '') . "</td>
-                    <td class='td-left'>" . htmlspecialchars($r['applied_position']) . "</td>
+                    <td class='td-left'>" . htmlspecialchars($r['applied_position'] ?? '') . "</td>
                     <td class='td-center'>" . htmlspecialchars($lich_pv) . "</td>
                     <td class='td-center'>" . htmlspecialchars($r['candidate_status'] ?? ($r['hired'] ? 'Đã tuyển dụng' : 'Chờ phỏng vấn')) . "</td>
-                    <td class='td-center'>" . htmlspecialchars($r['interview_status']) . "</td>
+                    <td class='td-center'>" . htmlspecialchars($r['interview_status'] ?? '') . "</td>
                     <td class='td-left'>" . htmlspecialchars($r['docs_needed'] ?? '') . "</td>
                     <td class='td-center'>" . htmlspecialchars($tg_tuyen) . "</td>
                     <td class='td-left'>" . htmlspecialchars($r['notes'] ?? '') . "</td>
@@ -366,87 +367,12 @@ if (isset($_GET['export'])) {
     }
 }
 
-// ==================== 3. HÀM ĐỌC FILE EXCEL/CSV & CLEAN KEY ====================
-function parseExcelOrCsvFile($filePath) {
-    $rows = [];
-    if (class_exists('ZipArchive')) {
-        $zip = new ZipArchive();
-        if ($zip->open($filePath) === TRUE) {
-            $strings = [];
-            $sharedStringsXML = $zip->getFromName('xl/sharedStrings.xml');
-            if ($sharedStringsXML) {
-                $xml = simplexml_load_string($sharedStringsXML);
-                foreach ($xml->si as $val) {
-                    $strings[] = (string)($val->t ?? ($val->r ? $val->r->t : ''));
-                }
-            }
-            $sheetXML = $zip->getFromName('xl/worksheets/sheet1.xml');
-            if ($sheetXML) {
-                $xml = simplexml_load_string($sheetXML);
-                foreach ($xml->sheetData->row as $row) {
-                    $rowCols = [];
-                    foreach ($row->c as $c) {
-                        $attrType = (string)$c['t'];
-                        $val = (string)$c->v;
-                        $rowCols[] = ($attrType === 's') ? ($strings[$val] ?? '') : $val;
-                    }
-                    if (!empty($rowCols)) $rows[] = $rowCols;
-                }
-            }
-            $zip->close();
-            if (!empty($rows)) return $rows;
-        }
-    }
-
-    $content = file_get_contents($filePath);
-    if (stripos($content, '<table') !== false) {
-        preg_match_all('/<tr[^>]*>(.*?)<\/tr>/is', $content, $trMatches);
-        if (!empty($trMatches[1])) {
-            foreach ($trMatches[1] as $tr) {
-                preg_match_all('/<(td|th)[^>]*>(.*?)<\/(td|th)>/is', $tr, $tdMatches);
-                if (!empty($tdMatches[2])) {
-                    $rowCols = array_map(function($td) {
-                        return trim(html_entity_decode(strip_tags($td), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
-                    }, $tdMatches[2]);
-                    $rows[] = $rowCols;
-                }
-            }
-        }
-        if (!empty($rows)) return $rows;
-    }
-
-    $handle = fopen($filePath, "r");
-    if ($handle !== FALSE) {
-        $firstLine = fgets($handle);
-        rewind($handle);
-        $delimiter = (substr_count($firstLine, ';') > substr_count($firstLine, ',')) ? ';' : ',';
-        while (($data = fgetcsv($handle, 3000, $delimiter)) !== FALSE) {
-            if (!empty($data)) $rows[] = array_map('trim', $data);
-        }
-        fclose($handle);
-    }
-    return $rows;
-}
-
-function cleanVietnameseKey($str) {
-    $str = mb_strtolower(trim($str), 'UTF-8');
-    $str = preg_replace('/(à|á|ạ|ả|ã|â|ầ|ấ|ậ|ẩ|ẫ|ă|ằ|ắ|ặ|ẳ|ẵ)/u', 'a', $str);
-    $str = preg_replace('/(è|é|ẹ|ẻ|ẽ|ê|ề|ế|ệ|ể|ễ)/u', 'e', $str);
-    $str = preg_replace('/(ì|í|ị|ỉ|ĩ)/u', 'i', $str);
-    $str = preg_replace('/(ò|ó|ọ|ỏ|õ|ô|ồ|ố|ộ|ổ|ỗ|ơ|ờ|ớ|ợ|ở|ỡ)/u', 'o', $str);
-    $str = preg_replace('/(ù|ú|ụ|ủ|ũ|ư|ừ|ứ|ự|ử|ữ)/u', 'u', $str);
-    $str = preg_replace('/(ỳ|ý|ỵ|ỷ|ỹ)/u', 'y', $str);
-    $str = preg_replace('/(đ)/u', 'd', $str);
-    $str = preg_replace('/[^a-z0-9]/', '', $str);
-    return $str;
-}
-
-// ==================== 4. XỬ LÝ POST / ACTION CRUD ====================
+// ==================== 3. XỬ LÝ POST / ACTION CRUD ====================
 $message = '';
 $error = '';
 $active_tab = $_POST['active_tab'] ?? ($_GET['tab'] ?? 'employees-tab');
 
-// 4.1 AJAX Preview Excel Ứng viên
+// 3.1 AJAX Preview Excel Ứng viên
 if (isset($_POST['action']) && $_POST['action'] === 'preview_candidate_excel') {
     header('Content-Type: application/json; charset=UTF-8');
     if (!isset($_FILES['excel_file']) || $_FILES['excel_file']['error'] !== UPLOAD_ERR_OK) {
@@ -550,7 +476,7 @@ if (isset($_POST['action']) && $_POST['action'] === 'preview_candidate_excel') {
     exit;
 }
 
-// 4.2 Lưu danh sách ứng viên từ preview
+// 3.2 Lưu danh sách ứng viên từ preview
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'confirm_import_candidates') {
     $rowsJson = $_POST['import_data_json'] ?? '';
     $candidatesList = json_decode($rowsJson, true);
@@ -595,7 +521,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 }
 
-// 4.3 Thêm / Cập nhật Nhân Viên (Hỗ trợ toàn diện 37 trường thông tin)
+// 3.3 Thêm / Cập nhật Nhân Viên
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && in_array($_POST['action'], ['add_employee', 'update_employee'])) {
     $isAdd                = ($_POST['action'] === 'add_employee');
     $old_id               = intval($_POST['old_id'] ?? 0);
@@ -743,7 +669,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     } catch (PDOException $e) { $error = "Lỗi: " . $e->getMessage(); }
 }
 
-// 4.4 Thao tác Ứng viên (Xóa)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_candidate') {
     $cand_id = intval($_POST['cand_id']);
     try {
@@ -753,7 +678,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     } catch (PDOException $e) { $error = "Lỗi: " . $e->getMessage(); }
 }
 
-// 4.5 ĐỒNG BỘ TUYỂN DỤNG: ĐỔ DỮ LIỆU TỪ TAB 3 SANG TAB 1 + ĐẶT LẠI MÃ MSNV MỚI
+// 3.4 ĐỒNG BỘ TUYỂN DỤNG: ĐỔ DỮ LIỆU TỪ TAB 3 SANG TAB 1 + ĐẶT LẠI MÃ MSNV MỚI
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'hire_candidate') {
     $candidate_id       = intval($_POST['candidate_id']);
     $new_msnv           = !empty($_POST['new_msnv']) ? intval($_POST['new_msnv']) : null;
@@ -780,13 +705,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 }
             }
 
-            // Tách năm sinh nếu có để gán ngày sinh tạm
             $dob_val = null;
             if (!empty($cand['birth_year']) && is_numeric($cand['birth_year'])) {
                 $dob_val = $cand['birth_year'] . '-01-01';
             }
 
-            // 1. Chuyển thông tin từ ứng viên sang nhân sự chính thức
             $sqlInsert = "
                 INSERT INTO employees (
                     id, hr_code, fullname, dob, start_date, id_card, 
@@ -828,7 +751,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $stmtEmp->execute($empParams);
             $final_emp_id = $new_msnv ?: $pdo->lastInsertId();
 
-            // 2. Tạo hợp đồng lao động
             try {
                 $stmtContract = $pdo->prepare("
                     INSERT INTO contracts (employee_id, contract_number, contract_type, start_date, end_date, basic_salary, status, notes) 
@@ -843,10 +765,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 ]);
             } catch (PDOException $e) {}
 
-            // Cập nhật số HĐ hiện tại vào employee
             $pdo->prepare("UPDATE employees SET current_contract_no = :cnum WHERE id = :id")->execute([':cnum' => $c_num, ':id' => $final_emp_id]);
-
-            // 3. Cập nhật trạng thái ứng viên
             $updateCand = $pdo->prepare("UPDATE candidates SET hired = 1, interview_status = 'Trúng tuyển', candidate_status = 'Đã tuyển dụng', hire_date = :hdate WHERE id = :id");
             $updateCand->execute([':hdate' => date('d/m/Y', strtotime($start_date)), ':id' => $candidate_id]);
 
@@ -859,26 +778,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 }
 
-// ==================== 5. BỘ LỌC TÌM KIẾM VÀ PHÂN TRANG (12 DÒNG/TRANG) ====================
+// ==================== 4. BỘ LỌC TÌM KIẾM VÀ PHÂN TRANG (12 DÒNG/TRANG) ====================
 $limit = 12;
-
-$empContracts = [];
-try {
-    $sqlContracts = "
-        SELECT c1.employee_id, c1.contract_number, c1.contract_type, c1.end_date, c1.status,
-               DATEDIFF(c1.end_date, '$today') AS days_left
-        FROM contracts c1
-        INNER JOIN (
-            SELECT employee_id, MAX(id) as max_id FROM contracts GROUP BY employee_id
-        ) c2 ON c1.id = c2.max_id
-    ";
-    $stmtC = $pdo->query($sqlContracts);
-    while ($r = $stmtC->fetch()) {
-        $empContracts[intval($r['employee_id'])] = $r;
-    }
-} catch (PDOException $e) {
-    $empContracts = [];
-}
 
 // TAB 1: NHÂN VIÊN CHÍNH
 $f1_id     = trim($_GET['f1_id'] ?? '');
@@ -956,125 +857,47 @@ $stmt3 = $pdo->prepare("SELECT * FROM candidates WHERE " . implode(' AND ', $whe
 $stmt3->execute($params3);
 $candidates = $stmt3->fetchAll();
 
+function renderPagination($currentPage, $totalPages, $paramName, $tabName) {
+    if ($totalPages <= 1) return;
+
+    $queryParams = $_GET;
+    $queryParams['tab'] = $tabName;
+
+    echo '<div class="pagination-wrapper">';
+    if ($currentPage > 1) {
+        $queryParams[$paramName] = $currentPage - 1;
+        echo '<a href="?' . http_build_query($queryParams) . '" class="page-link">&laquo;</a>';
+    } else {
+        echo '<span class="page-link disabled">&laquo;</span>';
+    }
+
+    $start = max(1, $currentPage - 1);
+    $end = min($totalPages, $currentPage + 1);
+
+    if ($currentPage == 1) {
+        $end = min($totalPages, $start + 2);
+    } elseif ($currentPage == $totalPages) {
+        $start = max(1, $end - 2);
+    }
+
+    for ($i = $start; $i <= $end; $i++) {
+        $queryParams[$paramName] = $i;
+        $activeClass = ($i == $currentPage) ? 'active' : '';
+        echo '<a href="?' . http_build_query($queryParams) . '" class="page-link ' . $activeClass . '">' . $i . '</a>';
+    }
+
+    if ($currentPage < $totalPages) {
+        $queryParams[$paramName] = $currentPage + 1;
+        echo '<a href="?' . http_build_query($queryParams) . '" class="page-link">&raquo;</a>';
+    } else {
+        echo '<span class="page-link disabled">&raquo;</span>';
+    }
+
+    echo '</div>';
+}
+
 include 'header.php';
 ?>
-
-<style>
-    .hr-wrapper { max-width: 99%; margin: 20px auto; padding: 0 12px; }
-    .hr-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 20px; }
-    .hr-title { font-size: 1.45rem; font-weight: 700; color: #0f172a; }
-    .hr-tabs { display: flex; gap: 10px; margin-bottom: 18px; border-bottom: 2px solid #e2e8f0; overflow-x: auto; }
-    .tab-btn { background: none; border: none; outline: none; padding: 10px 18px; font-size: 0.95rem; font-weight: 600; color: #64748b; cursor: pointer; border-bottom: 3px solid transparent; transition: all 0.2s; white-space: nowrap; }
-    .tab-btn.active { color: #0284c7; border-bottom-color: #0284c7; }
-
-    .filter-panel { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
-    .filter-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-    .filter-row input, .filter-row select { padding: 8px 11px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.88rem; outline: none; box-sizing: border-box; }
-    .filter-row input:focus, .filter-row select:focus { border-color: #0284c7; }
-    .btn-filter { background-color: #0284c7; color: #ffffff; border: none; padding: 8px 16px; border-radius: 6px; font-size: 0.88rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; }
-    .btn-filter:hover { background-color: #0369a1; }
-    .btn-reset { background-color: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; padding: 8px 12px; border-radius: 6px; font-size: 0.88rem; text-decoration: none; }
-    .btn-reset:hover { background-color: #e2e8f0; }
-
-    .section-toolbar { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
-    .btn-create { background-color: #0284c7; color: #ffffff; border: none; padding: 9px 15px; border-radius: 6px; font-size: 0.88rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
-    .btn-create:hover { background-color: #0369a1; }
-    .btn-excel { background-color: #10b981; color: #ffffff; border: none; padding: 9px 15px; border-radius: 6px; font-size: 0.88rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
-    .btn-excel:hover { background-color: #059669; }
-    .btn-import { background-color: #8b5cf6; color: #ffffff; border: none; padding: 9px 15px; border-radius: 6px; font-size: 0.88rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
-    .btn-import:hover { background-color: #7c3aed; }
-    .btn-template { background-color: #f8fafc; color: #0284c7; border: 1px dashed #0284c7; padding: 6px 12px; border-radius: 6px; font-size: 0.84rem; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; }
-
-    .dropdown-container { position: relative; display: inline-block; }
-    .dropdown-menu { display: none; position: absolute; right: 0; top: 105%; background: #ffffff; min-width: 210px; box-shadow: 0 10px 25px rgba(0,0,0,0.12); border: 1px solid #e2e8f0; border-radius: 8px; z-index: 100; overflow: hidden; padding: 4px 0; }
-    .dropdown-menu.show { display: block; }
-    .dropdown-item { display: flex; align-items: center; gap: 8px; padding: 10px 14px; font-size: 0.88rem; color: #334155; text-decoration: none; cursor: pointer; border: none; background: none; width: 100%; text-align: left; transition: background 0.15s; }
-    .dropdown-item:hover { background: #f8fafc; color: #0284c7; }
-
-    .data-card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); overflow-x: auto; max-width: 100%; }
-    .hr-table { width: 100%; border-collapse: collapse; text-align: left; }
-    .hr-table th, .hr-table td { padding: 9px 10px; border-bottom: 1px solid #f1f5f9; font-size: 0.84rem; vertical-align: middle; }
-    .hr-table th { background-color: #f8fafc; color: #475569; font-weight: 600; }
-    .hr-table tfoot td { background-color: #f8fafc; font-weight: 700; color: #0f172a; border-top: 2px solid #cbd5e1; padding: 12px 14px; }
-
-    /* Bảng Nhân sự chuẩn theo mẫu 37 cột trong ảnh */
-    .table-employee-full { min-width: 4400px; table-layout: fixed; }
-    .table-employee-full thead th {
-        background-color: #fde8dc !important;
-        color: #1e293b !important;
-        font-weight: 700;
-        text-align: center;
-        border: 1px solid #fed7aa;
-        white-space: normal;
-        word-wrap: break-word;
-        line-height: 1.35;
-        padding: 10px 6px;
-    }
-    .table-employee-full td {
-        border-right: 1px solid #f1f5f9;
-        word-wrap: break-word;
-        overflow-wrap: break-word;
-        line-height: 1.4;
-    }
-
-    .table-candidate { min-width: 1750px; table-layout: fixed; }
-    .table-candidate thead th {
-        background-color: #fde8dc !important;
-        color: #1e293b !important;
-        font-weight: 700;
-        text-align: center;
-        border: 1px solid #fed7aa;
-        white-space: nowrap;
-    }
-    .table-candidate td {
-        border-right: 1px solid #f1f5f9;
-        word-wrap: break-word;
-        overflow-wrap: break-word;
-    }
-
-    .action-group { display: flex; gap: 5px; align-items: center; justify-content: center; }
-    .btn-edit { background-color: #f1f5f9; color: #0284c7; border: 1px solid #cbd5e1; padding: 4px 8px; border-radius: 4px; font-size: 0.78rem; font-weight: 600; cursor: pointer; }
-    .btn-edit:hover { background-color: #e2e8f0; }
-    .btn-delete { background-color: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; padding: 4px 8px; border-radius: 4px; font-size: 0.78rem; font-weight: 600; cursor: pointer; }
-    .btn-delete:hover { background-color: #fca5a5; }
-    .btn-hire { background-color: #10b981; color: #ffffff; border: none; padding: 4px 8px; border-radius: 4px; font-size: 0.78rem; font-weight: 600; cursor: pointer; }
-    .btn-hire:hover { background-color: #059669; }
-
-    .id-tag { background-color: #f1f5f9; color: #475569; font-weight: 700; padding: 2px 6px; border-radius: 4px; border: 1px solid #e2e8f0; font-size: 0.82rem; display: inline-block; }
-    .badge-hired { background-color: #e2e8f0; color: #475569; padding: 3px 6px; border-radius: 4px; font-size: 0.75rem; white-space: nowrap; }
-    .badge-status { padding: 3px 7px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; display: inline-block; white-space: nowrap; }
-    .status-pass { background: #dcfce7; color: #166534; }
-    .status-pending { background: #fef9c3; color: #854d0e; }
-    .status-fail { background: #fee2e2; color: #991b1b; }
-
-    .pagination-wrapper { display: flex; justify-content: center; align-items: center; gap: 6px; margin-top: 18px; }
-    .page-link { display: inline-flex; align-items: center; justify-content: center; min-width: 36px; height: 36px; padding: 0 10px; border: 1px solid #cbd5e1; border-radius: 6px; background: #ffffff; color: #334155; font-size: 0.9rem; font-weight: 600; text-decoration: none; }
-    .page-link:hover:not(.disabled):not(.active) { background-color: #f1f5f9; border-color: #94a3b8; }
-    .page-link.active { background-color: #0284c7; color: #ffffff; border-color: #0284c7; }
-    .page-link.disabled { color: #cbd5e1; border-color: #e2e8f0; cursor: not-allowed; background: #f8fafc; }
-
-    .alert-box { padding: 12px 16px; border-radius: 6px; font-size: 0.9rem; margin-bottom: 18px; }
-    .alert-success { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
-    .alert-danger { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
-
-    .tab-content { display: none; }
-    .tab-content.active { display: block; }
-
-    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.55); z-index: 1000; align-items: center; justify-content: center; padding: 15px; }
-    .modal-box { background: #ffffff; width: 100%; max-width: 600px; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); overflow: hidden; max-height: 92vh; display: flex; flex-direction: column; }
-    .modal-box-large { max-width: 1250px; width: 98%; }
-    .modal-header { padding: 14px 20px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
-    .modal-title { font-size: 1.1rem; font-weight: 700; color: #0f172a; }
-    .btn-close-modal { background: none; border: none; font-size: 1.3rem; cursor: pointer; color: #64748b; }
-    .modal-body { padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 13px; }
-    .form-group label { display: block; font-size: 0.84rem; font-weight: 600; margin-bottom: 4px; color: #334155; }
-    .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.88rem; box-sizing: border-box; outline: none; }
-    .form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
-    .modal-footer { padding: 12px 20px; background: #f8fafc; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 10px; }
-    .btn-cancel { background: #e2e8f0; color: #475569; border: none; padding: 8px 14px; border-radius: 4px; cursor: pointer; }
-    .btn-save { background: #0284c7; color: #fff; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: 600; }
-</style>
 
 <div class="hr-wrapper">
     <div class="hr-header">
@@ -1089,7 +912,7 @@ include 'header.php';
     <?php endif; ?>
 
     <div class="hr-tabs">
-        <button id="btn-employees-tab" class="tab-btn" onclick="switchTab('employees-tab')">
+        <button id="btn-employees-tab" class="tab-btn active" onclick="switchTab('employees-tab')">
             👥 Danh Sách Nhân Viên (<?= $total1 ?>)
         </button>
         <button id="btn-branch-tab" class="tab-btn" onclick="switchTab('branch-tab')">
@@ -1100,8 +923,8 @@ include 'header.php';
         </button>
     </div>
 
-    <!-- TAB 1: DANH SÁCH NHÂN VIÊN (KHỚP 100% CỘT THEO ẢNH ĐÍNH KÈM) -->
-    <div id="employees-tab" class="tab-content">
+    <!-- TAB 1: DANH SÁCH NHÂN VIÊN (37 CỘT THEO HÌNH ẢNH MẪU) -->
+    <div id="employees-tab" class="tab-content active">
         <form method="GET" action="quan-tri-nhan-su.php" class="filter-panel" id="form-filter-1">
             <input type="hidden" name="tab" value="employees-tab">
             <div class="filter-row">
@@ -1182,19 +1005,19 @@ include 'header.php';
                         <?php 
                         $stt_main = $offset1 + 1; 
                         foreach ($main_employees as $emp): 
-                            $dob_str = !empty($emp['dob']) ? date('d/m/Y', strtotime($emp['dob'])) : '—';
-                            $start_d = !empty($emp['start_date']) ? date('d/m/Y', strtotime($emp['start_date'])) : '—';
-                            $id_iss  = !empty($emp['id_issue_date']) ? date('d/m/Y', strtotime($emp['id_issue_date'])) : '—';
-                            $c_from  = !empty($emp['contract_from_date']) ? date('d/m/Y', strtotime($emp['contract_from_date'])) : '—';
-                            $c_to    = !empty($emp['contract_to_date']) ? date('d/m/Y', strtotime($emp['contract_to_date'])) : '—';
-                            $work_dur = calculateWorkDuration($emp['start_date']);
+                            $dob_str = (!empty($emp['dob']) && $emp['dob'] !== '0000-00-00') ? date('d/m/Y', strtotime($emp['dob'])) : '—';
+                            $start_d = (!empty($emp['start_date']) && $emp['start_date'] !== '0000-00-00') ? date('d/m/Y', strtotime($emp['start_date'])) : '—';
+                            $id_iss  = (!empty($emp['id_issue_date']) && $emp['id_issue_date'] !== '0000-00-00') ? date('d/m/Y', strtotime($emp['id_issue_date'])) : '—';
+                            $c_from  = (!empty($emp['contract_from_date']) && $emp['contract_from_date'] !== '0000-00-00') ? date('d/m/Y', strtotime($emp['contract_from_date'])) : '—';
+                            $c_to    = (!empty($emp['contract_to_date']) && $emp['contract_to_date'] !== '0000-00-00') ? date('d/m/Y', strtotime($emp['contract_to_date'])) : '—';
+                            $work_dur = calculateWorkDuration($emp['start_date'] ?? '');
                         ?>
                             <tr>
                                 <td style="text-align: center;"><strong><?= $stt_main++ ?></strong></td>
                                 <td style="text-align: center;"><span class="id-tag">#<?= $emp['id'] ?></span></td>
                                 <td style="text-align: center;"><?= htmlspecialchars($emp['hr_code'] ?? '—') ?></td>
                                 <td><?= htmlspecialchars($emp['fullname_en'] ?? '—') ?></td>
-                                <td><strong><?= htmlspecialchars($emp['fullname']) ?></strong></td>
+                                <td><strong><?= htmlspecialchars($emp['fullname'] ?? '') ?></strong></td>
                                 <td style="text-align: center;"><?= $dob_str ?></td>
                                 <td style="text-align: center;"><?= $start_d ?></td>
                                 <td style="text-align: center;"><?= $work_dur ?></td>
@@ -1202,12 +1025,12 @@ include 'header.php';
                                 <td style="text-align: center;"><?= $id_iss ?></td>
                                 <td><?= htmlspecialchars($emp['id_issue_place'] ?? '—') ?></td>
                                 <td><?= htmlspecialchars($emp['position_en'] ?? '—') ?></td>
-                                <td><strong><?= htmlspecialchars($emp['position']) ?></strong></td>
+                                <td><strong><?= htmlspecialchars($emp['position'] ?? '—') ?></strong></td>
                                 <td style="text-align: center;"><?= htmlspecialchars($emp['level'] ?? '—') ?></td>
-                                <td><?= ($emp['department'] === 'Chưa phân bổ') ? '<span style="color:#ea580c; font-style:italic;">Chưa phân bổ</span>' : htmlspecialchars($emp['department']) ?></td>
+                                <td><?= ($emp['department'] === 'Chưa phân bổ') ? '<span style="color:#ea580c; font-style:italic;">Chưa phân bổ</span>' : htmlspecialchars($emp['department'] ?? '—') ?></td>
                                 <td><?= htmlspecialchars($emp['team'] ?? '—') ?></td>
                                 <td style="text-align: center;"><?= htmlspecialchars($emp['dept_code'] ?? '—') ?></td>
-                                <td><?= htmlspecialchars($emp['working_location'] ?? ($emp['branch'] ?: 'Trụ sở chính')) ?></td>
+                                <td><?= htmlspecialchars($emp['working_location'] ?? ($emp['branch'] ?? 'Trụ sở chính')) ?></td>
                                 <td style="text-align: center;"><?= htmlspecialchars($emp['social_insurance_no'] ?? '—') ?></td>
                                 <td style="text-align: center;"><?= htmlspecialchars($emp['health_insurance_no'] ?? '—') ?></td>
                                 <td style="text-align: center;"><?= htmlspecialchars($emp['si_start_date'] ?? '—') ?></td>
@@ -1313,13 +1136,13 @@ include 'header.php';
                             <tr>
                                 <td><strong><?= $stt_branch++ ?></strong></td>
                                 <td><span class="id-tag">#<?= $emp['id'] ?></span></td>
-                                <td><strong><?= htmlspecialchars($emp['fullname']) ?></strong></td>
-                                <td><span class="badge-branch"><?= htmlspecialchars($emp['branch']) ?></span></td>
-                                <td><?= htmlspecialchars($emp['department']) ?></td>
-                                <td><?= htmlspecialchars($emp['position']) ?></td>
+                                <td><strong><?= htmlspecialchars($emp['fullname'] ?? '') ?></strong></td>
+                                <td><span class="badge-branch"><?= htmlspecialchars($emp['branch'] ?? '') ?></span></td>
+                                <td><?= htmlspecialchars($emp['department'] ?? '') ?></td>
+                                <td><?= htmlspecialchars($emp['position'] ?? '') ?></td>
                                 <td><?= htmlspecialchars($emp['phone'] ?: '—') ?></td>
                                 <td><?= htmlspecialchars($emp['email'] ?: '—') ?></td>
-                                <td><?= htmlspecialchars($emp['status']) ?></td>
+                                <td><?= htmlspecialchars($emp['status'] ?? '') ?></td>
                                 <td>
                                     <div class="action-group">
                                         <button class="btn-edit" onclick='openEditEmp(<?= json_encode($emp, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>, "branch-tab")'>Sửa</button>
@@ -1416,23 +1239,23 @@ include 'header.php';
                             <tr>
                                 <td style="text-align: center;"><strong><?= $stt_cand++ ?></strong></td>
                                 <td style="text-align: center;"><span class="id-tag">#<?= $cand['id'] ?></span></td>
-                                <td><strong><?= htmlspecialchars($cand['fullname']) ?></strong></td>
+                                <td><strong><?= htmlspecialchars($cand['fullname'] ?? '') ?></strong></td>
                                 <td style="text-align: center;"><?= htmlspecialchars($cand['gender'] ?? '—') ?></td>
                                 <td style="text-align: center;"><?= htmlspecialchars($cand['birth_year'] ?? '—') ?></td>
                                 <td style="text-align: center;"><?= htmlspecialchars($cand['id_card'] ?? '—') ?></td>
                                 <td><?= htmlspecialchars($cand['address'] ?? '—') ?></td>
                                 <td style="text-align: center;"><?= htmlspecialchars($cand['phone'] ?: '—') ?></td>
                                 <td><?= htmlspecialchars($cand['skills_note'] ?? '—') ?></td>
-                                <td><strong><?= htmlspecialchars($cand['applied_position']) ?></strong></td>
+                                <td><strong><?= htmlspecialchars($cand['applied_position'] ?? '') ?></strong></td>
                                 <td style="text-align: center;"><?= htmlspecialchars($lich_pv) ?></td>
                                 <td style="text-align: center;"><?= htmlspecialchars($t_trang) ?></td>
                                 <td style="text-align: center;">
                                     <?php
                                         $cls = 'status-pending';
-                                        if ($cand['interview_status'] === 'Trúng tuyển') $cls = 'status-pass';
-                                        if ($cand['interview_status'] === 'Không đạt') $cls = 'status-fail';
+                                        if (($cand['interview_status'] ?? '') === 'Trúng tuyển') $cls = 'status-pass';
+                                        if (($cand['interview_status'] ?? '') === 'Không đạt') $cls = 'status-fail';
                                     ?>
-                                    <span class="badge-status <?= $cls ?>"><?= htmlspecialchars($cand['interview_status']) ?></span>
+                                    <span class="badge-status <?= $cls ?>"><?= htmlspecialchars($cand['interview_status'] ?? 'Chờ phỏng vấn') ?></span>
                                 </td>
                                 <td><?= htmlspecialchars($cand['docs_needed'] ?? '—') ?></td>
                                 <td style="text-align: center;"><?= htmlspecialchars($tg_tuyen) ?></td>
@@ -1440,7 +1263,7 @@ include 'header.php';
                                 <td>
                                     <div class="action-group">
                                         <?php if ($cand['hired']): ?>
-                                            <span class="badge-hired">✓ Đã vào Tab 1</span>
+                                            <span class="badge-hired">✓ Đã tuyển</span>
                                         <?php else: ?>
                                             <button type="button" class="btn-hire" onclick='openHireModal(<?= json_encode($cand, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>)'>+ Tuyển</button>
                                         <?php endif; ?>
@@ -1530,7 +1353,7 @@ include 'header.php';
     </div>
 </div>
 
-<!-- 2. MODAL THÊM / SỬA NHÂN VIÊN (37 TRƯỜNG THÔNG TIN TOÀN DIỆN) -->
+<!-- 2. MODAL THÊM / SỬA NHÂN VIÊN -->
 <div id="modal-emp" class="modal-overlay">
     <div class="modal-box modal-box-large">
         <form method="POST" action="quan-tri-nhan-su.php">
@@ -1747,7 +1570,7 @@ include 'header.php';
     </div>
 </div>
 
-<!-- 3. MODAL TUYỂN DỤNG ỨNG VIÊN: ĐỔ DỮ LIỆU QUA TAB 1 & ĐẶT MÃ MSNV MỚI -->
+<!-- 3. MODAL TUYỂN DỤNG: ĐỔ DỮ LIỆU QUA TAB 1 & ĐẶT MÃ MSNV MỚI -->
 <div id="modal-hire" class="modal-overlay">
     <div class="modal-box modal-box-large">
         <form method="POST" action="quan-tri-nhan-su.php">
@@ -1761,7 +1584,7 @@ include 'header.php';
             </div>
             <div class="modal-body">
                 <div style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 12px; border-radius: 6px; font-size: 0.88rem; color: #166534;">
-                    📌 <strong>Lưu ý quan trọng:</strong> Mã ID tại tab ứng viên chỉ là tạm thời. Hãy <strong>đặt lại Mã Số Nhân Viên (MSNV) chính thức</strong> dưới đây. Toàn bộ thông tin hồ sơ của ứng viên sẽ được chuyển qua <strong>Danh Sách Nhân Viên (Tab 1)</strong>.
+                    📌 <strong>Lưu ý:</strong> Mã ID tại tab ứng viên chỉ là tạm thời. Hãy <strong>nhập Mã Số Nhân Viên (MSNV) chính thức</strong> dưới đây. Toàn bộ hồ sơ của ứng viên sẽ được chuyển qua <strong>Danh Sách Nhân Viên (Tab 1)</strong>.
                 </div>
 
                 <div class="form-row-2">

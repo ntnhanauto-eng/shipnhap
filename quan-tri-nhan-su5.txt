@@ -1,0 +1,2080 @@
+<?php
+// quan-tri-nhan-su.php
+require_once 'db_connect.php';
+
+if (!isset($_SESSION['user_id'])) {
+    header('Location: login.php');
+    exit;
+}
+
+$today = date('Y-m-d');
+
+// Dự phòng trường hợp file db_connect.php chưa khai báo mảng $DEFAULT_DEPARTMENTS
+if (!isset($DEFAULT_DEPARTMENTS) || !is_array($DEFAULT_DEPARTMENTS)) {
+    $DEFAULT_DEPARTMENTS = [
+        'Ban Giám Đốc',
+        'Phòng Hành Chính - Nhân Sự',
+        'Phòng Kế Toán - Tài Chính',
+        'Phòng Kỹ Thuật - IT',
+        'Phòng Kinh Doanh - Marketing',
+        'Phòng Quản Lý Chất Lượng (QA/QC)',
+        'Bộ Phận Sản Xuất / Kho Vận',
+        'Bộ Phận Bếp & Dịch Vụ'
+    ];
+}
+
+// 1. Tự động kiểm tra và bổ sung các trường thông tin chuẩn theo mẫu cho employees & candidates
+try {
+    $existingEmpCols = [];
+    $colStmt = $pdo->query("SHOW COLUMNS FROM employees");
+    while ($col = $colStmt->fetch(PDO::FETCH_ASSOC)) {
+        $existingEmpCols[] = $col['Field'];
+    }
+    
+    $empColsToAdd = [
+        'hr_code'               => "VARCHAR(50) DEFAULT NULL",
+        'fullname_en'           => "VARCHAR(150) DEFAULT NULL",
+        'dob'                   => "DATE DEFAULT NULL",
+        'start_date'            => "DATE DEFAULT NULL",
+        'id_card'               => "VARCHAR(50) DEFAULT NULL",
+        'id_issue_date'         => "DATE DEFAULT NULL",
+        'id_issue_place'        => "VARCHAR(150) DEFAULT NULL",
+        'position_en'           => "VARCHAR(150) DEFAULT NULL",
+        'level'                 => "VARCHAR(50) DEFAULT NULL",
+        'team'                  => "VARCHAR(100) DEFAULT NULL",
+        'dept_code'             => "VARCHAR(50) DEFAULT NULL",
+        'working_location'      => "VARCHAR(150) DEFAULT NULL",
+        'social_insurance_no'   => "VARCHAR(50) DEFAULT NULL",
+        'health_insurance_no'   => "VARCHAR(50) DEFAULT NULL",
+        'si_start_date'         => "VARCHAR(50) DEFAULT NULL",
+        'baoviet_expiry_date'   => "VARCHAR(50) DEFAULT NULL",
+        'degree'                => "VARCHAR(150) DEFAULT NULL",
+        'major'                 => "VARCHAR(150) DEFAULT NULL",
+        'current_contract_no'   => "VARCHAR(100) DEFAULT NULL",
+        'contract_type'         => "VARCHAR(100) DEFAULT NULL",
+        'contract_expiry_date'  => "VARCHAR(50) DEFAULT NULL",
+        'contract_from_date'    => "DATE DEFAULT NULL",
+        'contract_to_date'      => "DATE DEFAULT NULL",
+        'permanent_address'     => "VARCHAR(255) DEFAULT NULL",
+        'temporary_address'     => "VARCHAR(255) DEFAULT NULL",
+        'merged_tdp_address'    => "VARCHAR(255) DEFAULT NULL",
+        'company_training_cert' => "TEXT DEFAULT NULL",
+        'labor_discipline'      => "TEXT DEFAULT NULL",
+        'labor_accident'        => "TEXT DEFAULT NULL",
+        'bank_account'          => "VARCHAR(100) DEFAULT NULL"
+    ];
+    
+    foreach ($empColsToAdd as $cName => $cDef) {
+        if (!in_array($cName, $existingEmpCols)) {
+            $pdo->exec("ALTER TABLE employees ADD COLUMN {$cName} {$cDef}");
+        }
+    }
+
+    $existingCandCols = [];
+    $candStmt = $pdo->query("SHOW COLUMNS FROM candidates");
+    while ($col = $candStmt->fetch(PDO::FETCH_ASSOC)) {
+        $existingCandCols[] = $col['Field'];
+    }
+    $candColsToAdd = [
+        'gender'            => "VARCHAR(20) DEFAULT NULL",
+        'birth_year'        => "VARCHAR(10) DEFAULT NULL",
+        'id_card'           => "VARCHAR(50) DEFAULT NULL",
+        'address'           => "VARCHAR(255) DEFAULT NULL",
+        'skills_note'       => "TEXT DEFAULT NULL",
+        'interview_time'    => "VARCHAR(100) DEFAULT NULL",
+        'candidate_status'  => "VARCHAR(100) DEFAULT 'Chờ phỏng vấn'",
+        'docs_needed'       => "TEXT DEFAULT NULL",
+        'hire_date'         => "VARCHAR(100) DEFAULT NULL",
+        'notes'             => "TEXT DEFAULT NULL"
+    ];
+    foreach ($candColsToAdd as $cName => $cDef) {
+        if (!in_array($cName, $existingCandCols)) {
+            $pdo->exec("ALTER TABLE candidates ADD COLUMN {$cName} {$cDef}");
+        }
+    }
+} catch (Exception $e) {}
+
+// Hàm tính thời gian làm việc (Thâm niên)
+function calculateWorkDuration($startDate) {
+    if (empty($startDate) || $startDate === '0000-00-00') return '—';
+    try {
+        $start = new DateTime($startDate);
+        $now = new DateTime();
+        if ($start > $now) return '0 ngày';
+        $diff = $start->diff($now);
+        $parts = [];
+        if ($diff->y > 0) $parts[] = $diff->y . ' năm';
+        if ($diff->m > 0) $parts[] = $diff->m . ' tháng';
+        if ($diff->d > 0) $parts[] = $diff->d . ' ngày';
+        return !empty($parts) ? implode(' ', $parts) : '0 ngày';
+    } catch (Exception $e) {
+        return '—';
+    }
+}
+
+// ==================== 2. XỬ LÝ XUẤT EXCEL & TEMPLATE ====================
+if (isset($_GET['export'])) {
+    $export_type = $_GET['export'];
+    $date_str = date('d-m-Y_H-i');
+
+    header("Content-Type: application/vnd.ms-excel; charset=UTF-8");
+    header("Pragma: no-cache");
+    header("Expires: 0");
+
+    $excel_style = '
+    <style>
+        .rpt-title { font-family: "Times New Roman", Arial; font-size: 16pt; font-weight: bold; text-align: center; color: #0f172a; height: 35px; vertical-align: middle; }
+        .rpt-time { font-family: "Times New Roman", Arial; font-size: 10pt; font-style: italic; text-align: center; color: #475569; }
+        .th-cell { font-family: "Times New Roman", Arial; font-size: 10pt; font-weight: bold; background-color: #fde8dc; color: #1e293b; text-align: center; border: 0.5pt solid #000000; height: 30px; vertical-align: middle; }
+        .td-center { font-family: "Times New Roman", Arial; font-size: 9.5pt; text-align: center; border: 0.5pt solid #000000; vertical-align: middle; }
+        .td-left { font-family: "Times New Roman", Arial; font-size: 9.5pt; text-align: left; border: 0.5pt solid #000000; vertical-align: middle; }
+        .td-bold { font-weight: bold; }
+        .tf-total { font-family: "Times New Roman", Arial; font-size: 10pt; font-weight: bold; background-color: #f1f5f9; border: 0.5pt solid #000000; height: 26px; }
+    </style>';
+
+    // A. Xuất File Mẫu Excel Cho Ứng Viên
+    if ($export_type === 'template_candidates') {
+        header("Content-Disposition: attachment; filename=Mau_Nhap_Ung_Vien_Chuan.xls");
+        echo "\xEF\xBB\xBF";
+        echo '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8">' . $excel_style . '</head><body>';
+        echo '<table border="1">';
+        echo '<tr><td colspan="16" class="rpt-title">FILE MẪU NHẬP DANH SÁCH ỨNG VIÊN TUYỂN DỤNG</td></tr>';
+        echo '<tr>
+                <th class="th-cell">STT</th><th class="th-cell">Mã ID</th><th class="th-cell">Họ và tên</th><th class="th-cell">Giới tính</th>
+                <th class="th-cell">Năm sinh</th><th class="th-cell">Số CCCD</th><th class="th-cell">Địa chỉ</th><th class="th-cell">Số đt Liên hệ</th>
+                <th class="th-cell">Ghi chú trình độ tay nghề</th><th class="th-cell">Vị trí ứng tuyển</th><th class="th-cell">Lịch hẹn PV</th>
+                <th class="th-cell">Tình trạng</th><th class="th-cell">Kết quả PV</th><th class="th-cell">Hồ sơ cần bổ sung</th>
+                <th class="th-cell">Thời gian tuyển dụng</th><th class="th-cell">Ghi chú</th>
+              </tr>';
+        echo '<tr>
+                <td class="td-center">1</td><td class="td-center"></td><td class="td-left td-bold">Nguyễn Văn An</td><td class="td-center">Nam</td>
+                <td class="td-center">1996</td><td class="td-center" style="mso-number-format:\'\@\';">038096001234</td><td class="td-left">TP. Hồ Chí Minh</td>
+                <td class="td-center" style="mso-number-format:\'\@\';">0901234567</td><td class="td-left">Trung cấp Điện</td><td class="td-left">Kỹ thuật viên</td>
+                <td class="td-center">09:00 25/10/2026</td><td class="td-center">Chờ phỏng vấn</td><td class="td-center">Chờ phỏng vấn</td><td class="td-left">Bản sao CCCD</td>
+                <td class="td-center"></td><td class="td-left">Liên hệ trước</td>
+              </tr>';
+        echo '</table></body></html>';
+        exit;
+    }
+
+    // B. Xuất Nhân viên Trụ sở chính (Theo toàn bộ 37 cột trong ảnh mẫu)
+    if ($export_type === 'employees') {
+        header("Content-Disposition: attachment; filename=Bao_Cao_Nhan_Vien_Chinh_{$date_str}.xls");
+        echo "\xEF\xBB\xBF";
+
+        $exp_id     = trim($_GET['f1_id'] ?? '');
+        $exp_name   = trim($_GET['f1_name'] ?? '');
+        $exp_dept   = trim($_GET['f1_dept'] ?? '');
+        $exp_pos    = trim($_GET['f1_pos'] ?? '');
+        $exp_status = trim($_GET['f1_status'] ?? '');
+
+        $where = ["(branch IS NULL OR branch = '' OR branch = 'Trụ sở chính')"];
+        $params = [];
+        if ($exp_id !== '')     { $where[] = "id = :id"; $params[':id'] = $exp_id; }
+        if ($exp_name !== '')   { $where[] = "fullname LIKE :name"; $params[':name'] = "%$exp_name%"; }
+        if ($exp_dept !== '')   { $where[] = "department = :dept"; $params[':dept'] = $exp_dept; }
+        if ($exp_pos !== '')    { $where[] = "position LIKE :pos"; $params[':pos'] = "%$exp_pos%"; }
+        if ($exp_status !== '') { $where[] = "status = :status"; $params[':status'] = $exp_status; }
+
+        $stmt = $pdo->prepare("SELECT * FROM employees WHERE " . implode(' AND ', $where) . " ORDER BY id ASC");
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll();
+
+        echo '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8">' . $excel_style . '</head><body>';
+        echo '<table border="1">';
+        echo '<tr><td colspan="37" class="rpt-title">DANH SÁCH NHÂN SỰ CHI TIẾT</td></tr>';
+        echo '<tr><td colspan="37" class="rpt-time">Thời gian kết xuất: ' . date('d/m/Y H:i:s') . '</td></tr>';
+        echo '<tr>
+                <th class="th-cell">STT</th><th class="th-cell">MSNV</th><th class="th-cell">HR Code</th><th class="th-cell">Full name</th>
+                <th class="th-cell">Họ & tên</th><th class="th-cell">Ngày sinh/ DOB</th><th class="th-cell">Ngày bắt đầu làm việc/ Start date</th>
+                <th class="th-cell">Thời gian làm việc</th><th class="th-cell">Số CCCD/ ID Number</th><th class="th-cell">Ngày cấp/ ID issue date</th>
+                <th class="th-cell">Nơi cấp/ Place of ID Issuance</th><th class="th-cell">Position Title (English)</th><th class="th-cell">Vị trí hiện tại (Vietnamese)</th>
+                <th class="th-cell">Level</th><th class="th-cell">Department/ Bộ phận</th><th class="th-cell">Team</th><th class="th-cell">CODE</th>
+                <th class="th-cell">Working Location/ Nơi làm việc</th><th class="th-cell">Số SBHXH/ Social Insurance book number</th><th class="th-cell">Số thẻ BHYT</th>
+                <th class="th-cell">Thời gian bắt đầu tham gia BHXH tại công ty (mm/yyyy)</th><th class="th-cell">Thời hạn dùng thẻ Bảo Hiểm Bảo Việt</th>
+                <th class="th-cell">Trình độ/ Degree</th><th class="th-cell">Chuyên ngành/ Major</th><th class="th-cell">Số HĐLĐ Hiện tại</th>
+                <th class="th-cell">Loại HĐ/ Contract Type</th><th class="th-cell">Thời hạn Hợp đồng/ Contract Expiry date</th>
+                <th class="th-cell">Hợp Đồng Từ Ngày</th><th class="th-cell">Hợp Đồng Đến Ngày</th><th class="th-cell">Địa chỉ thường trú (trên sổ hộ khẩu)</th>
+                <th class="th-cell">Địa chỉ liên hệ (tạm trú)</th><th class="th-cell">Địa chỉ sau sát nhập TDP từ tháng 07/2026</th>
+                <th class="th-cell">Bằng cấp do công ty đào tạo</th><th class="th-cell">Kỷ luật lao động (nếu có)</th><th class="th-cell">Tai nạn lao động (nếu có)</th>
+                <th class="th-cell">Số điện thoại</th><th class="th-cell">Địa chỉ email</th><th class="th-cell">Số tài khoản Ngân Hàng</th>
+              </tr>';
+
+        $stt = 1;
+        foreach ($rows as $r) {
+            $dob_str = !empty($r['dob']) ? date('d/m/Y', strtotime($r['dob'])) : '—';
+            $s_date = !empty($r['start_date']) ? date('d/m/Y', strtotime($r['start_date'])) : '—';
+            $id_iss = !empty($r['id_issue_date']) ? date('d/m/Y', strtotime($r['id_issue_date'])) : '—';
+            $c_from = !empty($r['contract_from_date']) ? date('d/m/Y', strtotime($r['contract_from_date'])) : '—';
+            $c_to = !empty($r['contract_to_date']) ? date('d/m/Y', strtotime($r['contract_to_date'])) : '—';
+            $work_duration = calculateWorkDuration($r['start_date']);
+
+            echo "<tr>
+                    <td class='td-center td-bold'>{$stt}</td>
+                    <td class='td-center td-bold'>{$r['id']}</td>
+                    <td class='td-center'>" . htmlspecialchars($r['hr_code'] ?? '—') . "</td>
+                    <td class='td-left'>" . htmlspecialchars($r['fullname_en'] ?? '—') . "</td>
+                    <td class='td-left td-bold'>" . htmlspecialchars($r['fullname']) . "</td>
+                    <td class='td-center'>{$dob_str}</td>
+                    <td class='td-center'>{$s_date}</td>
+                    <td class='td-center'>{$work_duration}</td>
+                    <td class='td-center' style='mso-number-format:\"\@\";'>" . htmlspecialchars($r['id_card'] ?? '—') . "</td>
+                    <td class='td-center'>{$id_iss}</td>
+                    <td class='td-left'>" . htmlspecialchars($r['id_issue_place'] ?? '—') . "</td>
+                    <td class='td-left'>" . htmlspecialchars($r['position_en'] ?? '—') . "</td>
+                    <td class='td-left'>" . htmlspecialchars($r['position'] ?? '—') . "</td>
+                    <td class='td-center'>" . htmlspecialchars($r['level'] ?? '—') . "</td>
+                    <td class='td-left'>" . htmlspecialchars($r['department'] ?? '—') . "</td>
+                    <td class='td-left'>" . htmlspecialchars($r['team'] ?? '—') . "</td>
+                    <td class='td-center'>" . htmlspecialchars($r['dept_code'] ?? '—') . "</td>
+                    <td class='td-left'>" . htmlspecialchars($r['working_location'] ?? ($r['branch'] ?: 'Trụ sở chính')) . "</td>
+                    <td class='td-center' style='mso-number-format:\"\@\";'>" . htmlspecialchars($r['social_insurance_no'] ?? '—') . "</td>
+                    <td class='td-center' style='mso-number-format:\"\@\";'>" . htmlspecialchars($r['health_insurance_no'] ?? '—') . "</td>
+                    <td class='td-center'>" . htmlspecialchars($r['si_start_date'] ?? '—') . "</td>
+                    <td class='td-center'>" . htmlspecialchars($r['baoviet_expiry_date'] ?? '—') . "</td>
+                    <td class='td-left'>" . htmlspecialchars($r['degree'] ?? '—') . "</td>
+                    <td class='td-left'>" . htmlspecialchars($r['major'] ?? '—') . "</td>
+                    <td class='td-center'>" . htmlspecialchars($r['current_contract_no'] ?? '—') . "</td>
+                    <td class='td-center'>" . htmlspecialchars($r['contract_type'] ?? '—') . "</td>
+                    <td class='td-center'>" . htmlspecialchars($r['contract_expiry_date'] ?? '—') . "</td>
+                    <td class='td-center'>{$c_from}</td>
+                    <td class='td-center'>{$c_to}</td>
+                    <td class='td-left'>" . htmlspecialchars($r['permanent_address'] ?? '—') . "</td>
+                    <td class='td-left'>" . htmlspecialchars($r['temporary_address'] ?? ($r['address'] ?? '—')) . "</td>
+                    <td class='td-left'>" . htmlspecialchars($r['merged_tdp_address'] ?? '—') . "</td>
+                    <td class='td-left'>" . htmlspecialchars($r['company_training_cert'] ?? '—') . "</td>
+                    <td class='td-left'>" . htmlspecialchars($r['labor_discipline'] ?? '—') . "</td>
+                    <td class='td-left'>" . htmlspecialchars($r['labor_accident'] ?? '—') . "</td>
+                    <td class='td-center' style='mso-number-format:\"\@\";'>" . htmlspecialchars($r['phone'] ?? '—') . "</td>
+                    <td class='td-left'>" . htmlspecialchars($r['email'] ?? '—') . "</td>
+                    <td class='td-center' style='mso-number-format:\"\@\";'>" . htmlspecialchars($r['bank_account'] ?? '—') . "</td>
+                  </tr>";
+            $stt++;
+        }
+        $totalExported = count($rows);
+        echo "<tr><td colspan='2' class='tf-total td-center'>TỔNG CỘNG:</td><td colspan='35' class='tf-total td-left'>{$totalExported} nhân viên</td></tr>";
+        echo '</table></body></html>';
+        exit;
+    }
+
+    // C. Xuất CNV Chi Nhánh Khác
+    if ($export_type === 'branch') {
+        header("Content-Disposition: attachment; filename=Bao_Cao_CNV_Chi_Nhanh_{$date_str}.xls");
+        echo "\xEF\xBB\xBF";
+        $exp_id     = trim($_GET['f2_id'] ?? '');
+        $exp_name   = trim($_GET['f2_name'] ?? '');
+        $exp_dept   = trim($_GET['f2_dept'] ?? '');
+        $exp_pos    = trim($_GET['f2_pos'] ?? '');
+        $exp_status = trim($_GET['f2_status'] ?? '');
+
+        $where = ["(branch != 'Trụ sở chính' AND branch IS NOT NULL AND branch != '')"];
+        $params = [];
+        if ($exp_id !== '')     { $where[] = "id = :id"; $params[':id'] = $exp_id; }
+        if ($exp_name !== '')   { $where[] = "fullname LIKE :name"; $params[':name'] = "%$exp_name%"; }
+        if ($exp_dept !== '')   { $where[] = "department = :dept"; $params[':dept'] = $exp_dept; }
+        if ($exp_pos !== '')    { $where[] = "position LIKE :pos"; $params[':pos'] = "%$exp_pos%"; }
+        if ($exp_status !== '') { $where[] = "status = :status"; $params[':status'] = $exp_status; }
+
+        $stmt = $pdo->prepare("SELECT * FROM employees WHERE " . implode(' AND ', $where) . " ORDER BY id ASC");
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll();
+
+        echo '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8">' . $excel_style . '</head><body>';
+        echo '<table border="1">';
+        echo '<tr><td colspan="9" class="rpt-title">BÁO CÁO DANH SÁCH NHÂN SỰ CHI NHÁNH</td></tr>';
+        echo '<tr>
+                <th class="th-cell">STT</th><th class="th-cell">Mã ID</th><th class="th-cell">Họ và Tên</th><th class="th-cell">Chi Nhánh</th>
+                <th class="th-cell">Phòng Ban</th><th class="th-cell">Vị Trí</th><th class="th-cell">Số ĐT</th><th class="th-cell">Email</th><th class="th-cell">Trạng Thái</th>
+              </tr>';
+        $stt = 1;
+        foreach ($rows as $r) {
+            echo "<tr>
+                    <td class='td-center td-bold'>{$stt}</td><td class='td-center'>{$r['id']}</td>
+                    <td class='td-left td-bold'>" . htmlspecialchars($r['fullname']) . "</td>
+                    <td class='td-center td-bold'>" . htmlspecialchars($r['branch']) . "</td>
+                    <td class='td-left'>" . htmlspecialchars($r['department']) . "</td>
+                    <td class='td-left'>" . htmlspecialchars($r['position']) . "</td>
+                    <td class='td-center' style='mso-number-format:\"\@\";'>" . htmlspecialchars($r['phone']) . "</td>
+                    <td class='td-left'>" . htmlspecialchars($r['email']) . "</td>
+                    <td class='td-center'>" . htmlspecialchars($r['status']) . "</td>
+                  </tr>";
+            $stt++;
+        }
+        $totalExported = count($rows);
+        echo "<tr><td colspan='2' class='tf-total td-center'>TỔNG CỘNG:</td><td colspan='7' class='tf-total td-left'>{$totalExported} nhân viên</td></tr>";
+        echo '</table></body></html>';
+        exit;
+    }
+
+    // D. Xuất Ứng Viên Tuyển Dụng
+    if ($export_type === 'candidates') {
+        header("Content-Disposition: attachment; filename=Bao_Cao_Ung_Vien_{$date_str}.xls");
+        echo "\xEF\xBB\xBF";
+        $exp_id     = trim($_GET['f3_id'] ?? '');
+        $exp_name   = trim($_GET['f3_name'] ?? '');
+        $exp_pos    = trim($_GET['f3_pos'] ?? '');
+        $exp_status = trim($_GET['f3_status'] ?? '');
+
+        $where = ["1=1"];
+        $params = [];
+        if ($exp_id !== '')     { $where[] = "id = :id"; $params[':id'] = $exp_id; }
+        if ($exp_name !== '')   { $where[] = "fullname LIKE :name"; $params[':name'] = "%$exp_name%"; }
+        if ($exp_pos !== '')    { $where[] = "applied_position LIKE :pos"; $params[':pos'] = "%$exp_pos%"; }
+        if ($exp_status !== '') { $where[] = "(interview_status = :status OR candidate_status = :status)"; $params[':status'] = $exp_status; }
+
+        $stmt = $pdo->prepare("SELECT * FROM candidates WHERE " . implode(' AND ', $where) . " ORDER BY hired ASC, id ASC");
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll();
+
+        echo '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8">' . $excel_style . '</head><body>';
+        echo '<table border="1">';
+        echo '<tr><td colspan="16" class="rpt-title">BÁO CÁO DANH SÁCH ỨNG VIÊN TUYỂN DỤNG</td></tr>';
+        echo '<tr>
+                <th class="th-cell">STT</th><th class="th-cell">Mã ID</th><th class="th-cell">Họ và tên</th><th class="th-cell">Giới tính</th>
+                <th class="th-cell">Năm sinh</th><th class="th-cell">Số CCCD</th><th class="th-cell">Địa chỉ</th><th class="th-cell">Số đt Liên hệ</th>
+                <th class="th-cell">Ghi chú trình độ tay nghề</th><th class="th-cell">Vị trí ứng tuyển</th><th class="th-cell">Lịch hẹn PV</th>
+                <th class="th-cell">Tình trạng</th><th class="th-cell">Kết quả PV</th><th class="th-cell">Hồ sơ cần bổ sung</th>
+                <th class="th-cell">Thời gian tuyển dụng</th><th class="th-cell">Ghi chú</th>
+              </tr>';
+        $stt = 1;
+        foreach ($rows as $r) {
+            $lich_pv = !empty($r['interview_time']) ? $r['interview_time'] : ((!empty($r['interview_date']) && $r['interview_date'] !== '0000-00-00') ? date('d/m/Y', strtotime($r['interview_date'])) : '');
+            $tg_tuyen = !empty($r['hire_date']) ? $r['hire_date'] : ($r['hired'] ? 'Đã tuyển' : '');
+            echo "<tr>
+                    <td class='td-center td-bold'>{$stt}</td><td class='td-center'>{$r['id']}</td>
+                    <td class='td-left td-bold'>" . htmlspecialchars($r['fullname']) . "</td>
+                    <td class='td-center'>" . htmlspecialchars($r['gender'] ?? '') . "</td>
+                    <td class='td-center'>" . htmlspecialchars($r['birth_year'] ?? '') . "</td>
+                    <td class='td-center' style='mso-number-format:\"\@\";'>" . htmlspecialchars($r['id_card'] ?? '') . "</td>
+                    <td class='td-left'>" . htmlspecialchars($r['address'] ?? '') . "</td>
+                    <td class='td-center' style='mso-number-format:\"\@\";'>" . htmlspecialchars($r['phone']) . "</td>
+                    <td class='td-left'>" . htmlspecialchars($r['skills_note'] ?? '') . "</td>
+                    <td class='td-left'>" . htmlspecialchars($r['applied_position']) . "</td>
+                    <td class='td-center'>" . htmlspecialchars($lich_pv) . "</td>
+                    <td class='td-center'>" . htmlspecialchars($r['candidate_status'] ?? ($r['hired'] ? 'Đã tuyển dụng' : 'Chờ phỏng vấn')) . "</td>
+                    <td class='td-center'>" . htmlspecialchars($r['interview_status']) . "</td>
+                    <td class='td-left'>" . htmlspecialchars($r['docs_needed'] ?? '') . "</td>
+                    <td class='td-center'>" . htmlspecialchars($tg_tuyen) . "</td>
+                    <td class='td-left'>" . htmlspecialchars($r['notes'] ?? '') . "</td>
+                  </tr>";
+            $stt++;
+        }
+        $totalExported = count($rows);
+        echo "<tr><td colspan='2' class='tf-total td-center'>TỔNG CỘNG:</td><td colspan='14' class='tf-total td-left'>{$totalExported} hồ sơ ứng viên</td></tr>";
+        echo '</table></body></html>';
+        exit;
+    }
+}
+
+// ==================== 3. HÀM ĐỌC FILE EXCEL/CSV & CLEAN KEY ====================
+function parseExcelOrCsvFile($filePath) {
+    $rows = [];
+    if (class_exists('ZipArchive')) {
+        $zip = new ZipArchive();
+        if ($zip->open($filePath) === TRUE) {
+            $strings = [];
+            $sharedStringsXML = $zip->getFromName('xl/sharedStrings.xml');
+            if ($sharedStringsXML) {
+                $xml = simplexml_load_string($sharedStringsXML);
+                foreach ($xml->si as $val) {
+                    $strings[] = (string)($val->t ?? ($val->r ? $val->r->t : ''));
+                }
+            }
+            $sheetXML = $zip->getFromName('xl/worksheets/sheet1.xml');
+            if ($sheetXML) {
+                $xml = simplexml_load_string($sheetXML);
+                foreach ($xml->sheetData->row as $row) {
+                    $rowCols = [];
+                    foreach ($row->c as $c) {
+                        $attrType = (string)$c['t'];
+                        $val = (string)$c->v;
+                        $rowCols[] = ($attrType === 's') ? ($strings[$val] ?? '') : $val;
+                    }
+                    if (!empty($rowCols)) $rows[] = $rowCols;
+                }
+            }
+            $zip->close();
+            if (!empty($rows)) return $rows;
+        }
+    }
+
+    $content = file_get_contents($filePath);
+    if (stripos($content, '<table') !== false) {
+        preg_match_all('/<tr[^>]*>(.*?)<\/tr>/is', $content, $trMatches);
+        if (!empty($trMatches[1])) {
+            foreach ($trMatches[1] as $tr) {
+                preg_match_all('/<(td|th)[^>]*>(.*?)<\/(td|th)>/is', $tr, $tdMatches);
+                if (!empty($tdMatches[2])) {
+                    $rowCols = array_map(function($td) {
+                        return trim(html_entity_decode(strip_tags($td), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+                    }, $tdMatches[2]);
+                    $rows[] = $rowCols;
+                }
+            }
+        }
+        if (!empty($rows)) return $rows;
+    }
+
+    $handle = fopen($filePath, "r");
+    if ($handle !== FALSE) {
+        $firstLine = fgets($handle);
+        rewind($handle);
+        $delimiter = (substr_count($firstLine, ';') > substr_count($firstLine, ',')) ? ';' : ',';
+        while (($data = fgetcsv($handle, 3000, $delimiter)) !== FALSE) {
+            if (!empty($data)) $rows[] = array_map('trim', $data);
+        }
+        fclose($handle);
+    }
+    return $rows;
+}
+
+function cleanVietnameseKey($str) {
+    $str = mb_strtolower(trim($str), 'UTF-8');
+    $str = preg_replace('/(à|á|ạ|ả|ã|â|ầ|ấ|ậ|ẩ|ẫ|ă|ằ|ắ|ặ|ẳ|ẵ)/u', 'a', $str);
+    $str = preg_replace('/(è|é|ẹ|ẻ|ẽ|ê|ề|ế|ệ|ể|ễ)/u', 'e', $str);
+    $str = preg_replace('/(ì|í|ị|ỉ|ĩ)/u', 'i', $str);
+    $str = preg_replace('/(ò|ó|ọ|ỏ|õ|ô|ồ|ố|ộ|ổ|ỗ|ơ|ờ|ớ|ợ|ở|ỡ)/u', 'o', $str);
+    $str = preg_replace('/(ù|ú|ụ|ủ|ũ|ư|ừ|ứ|ự|ử|ữ)/u', 'u', $str);
+    $str = preg_replace('/(ỳ|ý|ỵ|ỷ|ỹ)/u', 'y', $str);
+    $str = preg_replace('/(đ)/u', 'd', $str);
+    $str = preg_replace('/[^a-z0-9]/', '', $str);
+    return $str;
+}
+
+// ==================== 4. XỬ LÝ POST / ACTION CRUD ====================
+$message = '';
+$error = '';
+$active_tab = $_POST['active_tab'] ?? ($_GET['tab'] ?? 'employees-tab');
+
+// 4.1 AJAX Preview Excel Ứng viên
+if (isset($_POST['action']) && $_POST['action'] === 'preview_candidate_excel') {
+    header('Content-Type: application/json; charset=UTF-8');
+    if (!isset($_FILES['excel_file']) || $_FILES['excel_file']['error'] !== UPLOAD_ERR_OK) {
+        echo json_encode(['success' => false, 'message' => 'Vui lòng chọn file Excel hợp lệ!']);
+        exit;
+    }
+    $fileTmp = $_FILES['excel_file']['tmp_name'];
+    $parsedRows = parseExcelOrCsvFile($fileTmp);
+    if (empty($parsedRows)) {
+        echo json_encode(['success' => false, 'message' => 'Không tìm thấy nội dung trong tệp!']);
+        exit;
+    }
+
+    $fieldMaps = [
+        'id'                => ['maid', 'id', 'maungvien', 'code'],
+        'fullname'          => ['hovaten', 'hoten', 'ungvien', 'ten'],
+        'gender'            => ['gioitinh', 'phai', 'namnu'],
+        'birth_year'        => ['namsinh', 'ns', 'ngaysinh', 'nam'],
+        'id_card'           => ['socccd', 'cccd', 'cmnd', 'socmnd'],
+        'address'           => ['diachi', 'thuongtru', 'tamtru', 'quequan'],
+        'phone'             => ['sodtlienhe', 'sodt', 'dienthoai', 'sodienthoai', 'phone'],
+        'skills_note'       => ['ghichutrinhdotaynghe', 'trinhdotaynghe', 'taynghe', 'kinhnghiem', 'chuyenmon'],
+        'applied_position'  => ['vitriungtuyen', 'vitri', 'chucdanh', 'ungtuyen'],
+        'interview_time'    => ['lichhenpv', 'lichhen', 'lichpv', 'ngaypv', 'giohen'],
+        'candidate_status'  => ['tinhtrang', 'trangthai', 'trangthaiungvien'],
+        'interview_status'  => ['ketquapv', 'ketqua', 'danhgia'],
+        'docs_needed'       => ['hosocanbosung', 'hosobosung', 'bosunghoso', 'giayto'],
+        'hire_date'         => ['thoigiantuyendung', 'ngaytuyen', 'ngaynhanviec', 'tuyendung'],
+        'notes'             => ['ghichu', 'note', 'luuy']
+    ];
+
+    $headerIndex = -1;
+    $colMap = [];
+    foreach ($parsedRows as $rIdx => $row) {
+        $matches = 0;
+        $tempColMap = [];
+        foreach ($row as $cIdx => $cellVal) {
+            $cClean = cleanVietnameseKey($cellVal);
+            if (empty($cClean)) continue;
+            foreach ($fieldMaps as $field => $keywords) {
+                if (isset($tempColMap[$field])) continue;
+                foreach ($keywords as $kw) {
+                    if (strpos($cClean, $kw) !== false) {
+                        $tempColMap[$field] = $cIdx;
+                        $matches++;
+                        break;
+                    }
+                }
+            }
+        }
+        if ($matches >= 2 && isset($tempColMap['fullname'])) {
+            $headerIndex = $rIdx;
+            $colMap = $tempColMap;
+            break;
+        }
+    }
+
+    if ($headerIndex === -1) {
+        $headerIndex = 0;
+        $colMap = [
+            'id' => 1, 'fullname' => 2, 'gender' => 3, 'birth_year' => 4, 'id_card' => 5,
+            'address' => 6, 'phone' => 7, 'skills_note' => 8, 'applied_position' => 9,
+            'interview_time' => 10, 'candidate_status' => 11, 'interview_status' => 12,
+            'docs_needed' => 13, 'hire_date' => 14, 'notes' => 15
+        ];
+    }
+
+    $validData = [];
+    for ($i = $headerIndex + 1; $i < count($parsedRows); $i++) {
+        $r = $parsedRows[$i];
+        if (empty($r)) continue;
+        $fullname = trim($r[$colMap['fullname'] ?? 2] ?? '');
+        if (empty($fullname) || stripos($fullname, 'Họ và tên') !== false || stripos($fullname, 'TỔNG CỘNG') !== false) continue;
+        $rawId = trim($r[$colMap['id'] ?? -1] ?? '');
+        $cleanId = preg_replace('/[^0-9]/', '', $rawId);
+
+        $validData[] = [
+            'id'                => !empty($cleanId) ? intval($cleanId) : '',
+            'fullname'          => $fullname,
+            'gender'            => trim($r[$colMap['gender'] ?? -1] ?? ''),
+            'birth_year'        => trim($r[$colMap['birth_year'] ?? -1] ?? ''),
+            'id_card'           => trim($r[$colMap['id_card'] ?? -1] ?? ''),
+            'address'           => trim($r[$colMap['address'] ?? -1] ?? ''),
+            'phone'             => trim($r[$colMap['phone'] ?? -1] ?? ''),
+            'skills_note'       => trim($r[$colMap['skills_note'] ?? -1] ?? ''),
+            'applied_position'  => trim($r[$colMap['applied_position'] ?? -1] ?? 'Chưa xác định'),
+            'interview_time'    => trim($r[$colMap['interview_time'] ?? -1] ?? ''),
+            'candidate_status'  => trim($r[$colMap['candidate_status'] ?? -1] ?? 'Chờ phỏng vấn'),
+            'interview_status'  => trim($r[$colMap['interview_status'] ?? -1] ?? 'Chờ phỏng vấn'),
+            'docs_needed'       => trim($r[$colMap['docs_needed'] ?? -1] ?? ''),
+            'hire_date'         => trim($r[$colMap['hire_date'] ?? -1] ?? ''),
+            'notes'             => trim($r[$colMap['notes'] ?? -1] ?? '')
+        ];
+    }
+
+    if (empty($validData)) {
+        echo json_encode(['success' => false, 'message' => 'Không tìm thấy dòng dữ liệu ứng viên hợp lệ!']);
+    } else {
+        echo json_encode(['success' => true, 'data' => $validData]);
+    }
+    exit;
+}
+
+// 4.2 Lưu danh sách ứng viên từ preview
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'confirm_import_candidates') {
+    $rowsJson = $_POST['import_data_json'] ?? '';
+    $candidatesList = json_decode($rowsJson, true);
+    if (!empty($candidatesList) && is_array($candidatesList)) {
+        try {
+            $pdo->beginTransaction();
+            $stmtWithId = $pdo->prepare("INSERT INTO candidates (id, fullname, gender, birth_year, id_card, address, phone, email, skills_note, applied_position, interview_time, interview_date, candidate_status, interview_status, docs_needed, hire_date, notes, hired) VALUES (:id, :fullname, :gender, :birth_year, :id_card, :address, :phone, :email, :skills_note, :applied_position, :interview_time, :interview_date, :candidate_status, :interview_status, :docs_needed, :hire_date, :notes, 0) ON DUPLICATE KEY UPDATE fullname=VALUES(fullname), gender=VALUES(gender), birth_year=VALUES(birth_year), id_card=VALUES(id_card), address=VALUES(address), phone=VALUES(phone), skills_note=VALUES(skills_note), applied_position=VALUES(applied_position), interview_time=VALUES(interview_time), interview_date=VALUES(interview_date), candidate_status=VALUES(candidate_status), interview_status=VALUES(interview_status), docs_needed=VALUES(docs_needed), hire_date=VALUES(hire_date), notes=VALUES(notes)");
+            $stmtNoId = $pdo->prepare("INSERT INTO candidates (fullname, gender, birth_year, id_card, address, phone, email, skills_note, applied_position, interview_time, interview_date, candidate_status, interview_status, docs_needed, hire_date, notes, hired) VALUES (:fullname, :gender, :birth_year, :id_card, :address, :phone, :email, :skills_note, :applied_position, :interview_time, :interview_date, :candidate_status, :interview_status, :docs_needed, :hire_date, :notes, 0)");
+
+            $importedCount = 0;
+            foreach ($candidatesList as $item) {
+                $fn = trim($item['fullname'] ?? '');
+                if (empty($fn)) continue;
+                $rawTime = trim($item['interview_time'] ?? '');
+                $intDate = null;
+                if (!empty($rawTime)) {
+                    $ts = strtotime(str_replace('/', '-', $rawTime));
+                    if ($ts !== false) $intDate = date('Y-m-d', $ts);
+                }
+                $params = [
+                    ':fullname' => $fn, ':gender' => trim($item['gender'] ?? ''), ':birth_year' => trim($item['birth_year'] ?? ''),
+                    ':id_card' => trim($item['id_card'] ?? ''), ':address' => trim($item['address'] ?? ''), ':phone' => trim($item['phone'] ?? ''),
+                    ':email' => trim($item['email'] ?? ''), ':skills_note' => trim($item['skills_note'] ?? ''), ':applied_position' => trim($item['applied_position'] ?? 'Chưa xác định'),
+                    ':interview_time' => $rawTime, ':interview_date' => $intDate, ':candidate_status' => trim($item['candidate_status'] ?? 'Chờ phỏng vấn') ?: 'Chờ phỏng vấn',
+                    ':interview_status' => trim($item['interview_status'] ?? 'Chờ phỏng vấn') ?: 'Chờ phỏng vấn', ':docs_needed' => trim($item['docs_needed'] ?? ''),
+                    ':hire_date' => trim($item['hire_date'] ?? ''), ':notes' => trim($item['notes'] ?? '')
+                ];
+                if (!empty($item['id']) && is_numeric($item['id'])) {
+                    $params[':id'] = intval($item['id']);
+                    $stmtWithId->execute($params);
+                } else {
+                    $stmtNoId->execute($params);
+                }
+                $importedCount++;
+            }
+            $pdo->commit();
+            $message = "Đã nhập thành công {$importedCount} hồ sơ ứng viên!";
+        } catch (PDOException $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            $error = "Lỗi khi lưu dữ liệu ứng viên: " . $e->getMessage();
+        }
+    }
+}
+
+// 4.3 Thêm / Cập nhật Nhân Viên (Hỗ trợ toàn diện 37 trường thông tin)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && in_array($_POST['action'], ['add_employee', 'update_employee'])) {
+    $isAdd                = ($_POST['action'] === 'add_employee');
+    $old_id               = intval($_POST['old_id'] ?? 0);
+    $custom_id            = !empty($_POST['custom_id']) ? intval($_POST['custom_id']) : ($isAdd ? null : $old_id);
+    
+    $hr_code              = trim($_POST['hr_code'] ?? '');
+    $fullname_en          = trim($_POST['fullname_en'] ?? '');
+    $fullname             = trim($_POST['fullname'] ?? '');
+    $dob                  = !empty($_POST['dob']) ? $_POST['dob'] : null;
+    $start_date           = !empty($_POST['start_date']) ? $_POST['start_date'] : null;
+    $id_card              = trim($_POST['id_card'] ?? '');
+    $id_issue_date        = !empty($_POST['id_issue_date']) ? $_POST['id_issue_date'] : null;
+    $id_issue_place       = trim($_POST['id_issue_place'] ?? '');
+    $position_en          = trim($_POST['position_en'] ?? '');
+    $position             = trim($_POST['position'] ?? '');
+    $level                = trim($_POST['level'] ?? '');
+    $department           = trim($_POST['department'] ?? 'Chưa phân bổ');
+    $team                 = trim($_POST['team'] ?? '');
+    $dept_code            = trim($_POST['dept_code'] ?? '');
+    $working_location     = trim($_POST['working_location'] ?? 'Trụ sở chính');
+    $branch               = $working_location;
+    $social_insurance_no  = trim($_POST['social_insurance_no'] ?? '');
+    $health_insurance_no  = trim($_POST['health_insurance_no'] ?? '');
+    $si_start_date        = trim($_POST['si_start_date'] ?? '');
+    $baoviet_expiry_date  = trim($_POST['baoviet_expiry_date'] ?? '');
+    $degree               = trim($_POST['degree'] ?? '');
+    $major                = trim($_POST['major'] ?? '');
+    $current_contract_no  = trim($_POST['current_contract_no'] ?? '');
+    $contract_type        = trim($_POST['contract_type'] ?? '');
+    $contract_expiry_date = trim($_POST['contract_expiry_date'] ?? '');
+    $contract_from_date   = !empty($_POST['contract_from_date']) ? $_POST['contract_from_date'] : null;
+    $contract_to_date     = !empty($_POST['contract_to_date']) ? $_POST['contract_to_date'] : null;
+    $permanent_address    = trim($_POST['permanent_address'] ?? '');
+    $temporary_address    = trim($_POST['temporary_address'] ?? '');
+    $merged_tdp_address   = trim($_POST['merged_tdp_address'] ?? '');
+    $company_training_cert= trim($_POST['company_training_cert'] ?? '');
+    $labor_discipline     = trim($_POST['labor_discipline'] ?? '');
+    $labor_accident       = trim($_POST['labor_accident'] ?? '');
+    $phone                = trim($_POST['phone'] ?? '');
+    $email                = trim($_POST['email'] ?? '');
+    $bank_account         = trim($_POST['bank_account'] ?? '');
+    $status               = trim($_POST['status'] ?? 'Đang làm việc');
+
+    if (!empty($fullname) && !empty($position)) {
+        try {
+            $params = [
+                ':hr_code'              => $hr_code,
+                ':fullname_en'          => $fullname_en,
+                ':fullname'             => $fullname,
+                ':dob'                  => $dob,
+                ':start_date'           => $start_date,
+                ':id_card'              => $id_card,
+                ':id_issue_date'        => $id_issue_date,
+                ':id_issue_place'       => $id_issue_place,
+                ':position_en'          => $position_en,
+                ':position'             => $position,
+                ':level'                => $level,
+                ':department'           => $department ?: 'Chưa phân bổ',
+                ':team'                 => $team,
+                ':dept_code'            => $dept_code,
+                ':working_location'     => $working_location ?: 'Trụ sở chính',
+                ':branch'               => $branch ?: 'Trụ sở chính',
+                ':social_insurance_no'  => $social_insurance_no,
+                ':health_insurance_no'  => $health_insurance_no,
+                ':si_start_date'        => $si_start_date,
+                ':baoviet_expiry_date'  => $baoviet_expiry_date,
+                ':degree'               => $degree,
+                ':major'                => $major,
+                ':current_contract_no'  => $current_contract_no,
+                ':contract_type'        => $contract_type,
+                ':contract_expiry_date' => $contract_expiry_date,
+                ':contract_from_date'   => $contract_from_date,
+                ':contract_to_date'     => $contract_to_date,
+                ':permanent_address'    => $permanent_address,
+                ':temporary_address'    => $temporary_address,
+                ':address'              => $temporary_address ?: $permanent_address,
+                ':merged_tdp_address'   => $merged_tdp_address,
+                ':company_training_cert'=> $company_training_cert,
+                ':labor_discipline'     => $labor_discipline,
+                ':labor_accident'       => $labor_accident,
+                ':phone'                => $phone,
+                ':email'                => $email,
+                ':bank_account'         => $bank_account,
+                ':status'               => $status
+            ];
+
+            if ($isAdd) {
+                if ($custom_id) {
+                    $check = $pdo->prepare("SELECT id FROM employees WHERE id = :id");
+                    $check->execute([':id' => $custom_id]);
+                    if ($check->fetch()) {
+                        $error = "Mã MSNV #$custom_id đã tồn tại! Vui lòng chọn mã khác.";
+                    } else {
+                        $params[':id'] = $custom_id;
+                        $sql = "INSERT INTO employees (id, hr_code, fullname_en, fullname, dob, start_date, id_card, id_issue_date, id_issue_place, position_en, position, level, department, team, dept_code, working_location, branch, social_insurance_no, health_insurance_no, si_start_date, baoviet_expiry_date, degree, major, current_contract_no, contract_type, contract_expiry_date, contract_from_date, contract_to_date, permanent_address, temporary_address, address, merged_tdp_address, company_training_cert, labor_discipline, labor_accident, phone, email, bank_account, status) 
+                                VALUES (:id, :hr_code, :fullname_en, :fullname, :dob, :start_date, :id_card, :id_issue_date, :id_issue_place, :position_en, :position, :level, :department, :team, :dept_code, :working_location, :branch, :social_insurance_no, :health_insurance_no, :si_start_date, :baoviet_expiry_date, :degree, :major, :current_contract_no, :contract_type, :contract_expiry_date, :contract_from_date, :contract_to_date, :permanent_address, :temporary_address, :address, :merged_tdp_address, :company_training_cert, :labor_discipline, :labor_accident, :phone, :email, :bank_account, :status)";
+                        $stmt = $pdo->prepare($sql);
+                        $stmt->execute($params);
+                        $message = "Thêm nhân viên với MSNV #$custom_id thành công!";
+                    }
+                } else {
+                    $sql = "INSERT INTO employees (hr_code, fullname_en, fullname, dob, start_date, id_card, id_issue_date, id_issue_place, position_en, position, level, department, team, dept_code, working_location, branch, social_insurance_no, health_insurance_no, si_start_date, baoviet_expiry_date, degree, major, current_contract_no, contract_type, contract_expiry_date, contract_from_date, contract_to_date, permanent_address, temporary_address, address, merged_tdp_address, company_training_cert, labor_discipline, labor_accident, phone, email, bank_account, status) 
+                            VALUES (:hr_code, :fullname_en, :fullname, :dob, :start_date, :id_card, :id_issue_date, :id_issue_place, :position_en, :position, :level, :department, :team, :dept_code, :working_location, :branch, :social_insurance_no, :health_insurance_no, :si_start_date, :baoviet_expiry_date, :degree, :major, :current_contract_no, :contract_type, :contract_expiry_date, :contract_from_date, :contract_to_date, :permanent_address, :temporary_address, :address, :merged_tdp_address, :company_training_cert, :labor_discipline, :labor_accident, :phone, :email, :bank_account, :status)";
+                    $stmt = $pdo->prepare($sql);
+                    $stmt->execute($params);
+                    $message = "Thêm nhân viên mới thành công!";
+                }
+            } else {
+                if ($custom_id !== $old_id) {
+                    $check = $pdo->prepare("SELECT id FROM employees WHERE id = :id");
+                    $check->execute([':id' => $custom_id]);
+                    if ($check->fetch()) {
+                        $error = "Mã MSNV mới #$custom_id đã bị trùng!";
+                    }
+                }
+                if (empty($error)) {
+                    $pdo->beginTransaction();
+                    $params[':new_id'] = $custom_id;
+                    $params[':old_id'] = $old_id;
+                    $sql = "UPDATE employees SET id = :new_id, hr_code = :hr_code, fullname_en = :fullname_en, fullname = :fullname, dob = :dob, start_date = :start_date, id_card = :id_card, id_issue_date = :id_issue_date, id_issue_place = :id_issue_place, position_en = :position_en, position = :position, level = :level, department = :department, team = :team, dept_code = :dept_code, working_location = :working_location, branch = :branch, social_insurance_no = :social_insurance_no, health_insurance_no = :health_insurance_no, si_start_date = :si_start_date, baoviet_expiry_date = :baoviet_expiry_date, degree = :degree, major = :major, current_contract_no = :current_contract_no, contract_type = :contract_type, contract_expiry_date = :contract_expiry_date, contract_from_date = :contract_from_date, contract_to_date = :contract_to_date, permanent_address = :permanent_address, temporary_address = :temporary_address, address = :address, merged_tdp_address = :merged_tdp_address, company_training_cert = :company_training_cert, labor_discipline = :labor_discipline, labor_accident = :labor_accident, phone = :phone, email = :email, bank_account = :bank_account, status = :status WHERE id = :old_id";
+                    $stmt = $pdo->prepare($sql);
+                    $stmt->execute($params);
+
+                    if ($status === 'Đã nghỉ') {
+                        $stmtTerm = $pdo->prepare("UPDATE contracts SET status = 'Đã chấm dứt', notes = CONCAT(COALESCE(notes, ''), ' [Tự động chấm dứt do nhân viên nghỉ việc ngày $today]') WHERE employee_id = :eid AND status = 'Hiệu lực'");
+                        $stmtTerm->execute([':eid' => $custom_id]);
+                    }
+                    $pdo->commit();
+                    $message = "Cập nhật thông tin nhân viên #$custom_id thành công!";
+                }
+            }
+        } catch (PDOException $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            $error = "Lỗi: " . $e->getMessage();
+        }
+    }
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_employee') {
+    $emp_id = intval($_POST['emp_id']);
+    try {
+        $stmt = $pdo->prepare("DELETE FROM employees WHERE id = :id");
+        $stmt->execute([':id' => $emp_id]);
+        $message = "Đã xoá nhân viên thành công!";
+    } catch (PDOException $e) { $error = "Lỗi: " . $e->getMessage(); }
+}
+
+// 4.4 Thao tác Ứng viên (Xóa)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_candidate') {
+    $cand_id = intval($_POST['cand_id']);
+    try {
+        $stmt = $pdo->prepare("DELETE FROM candidates WHERE id = :id");
+        $stmt->execute([':id' => $cand_id]);
+        $message = "Đã xoá ứng viên!";
+    } catch (PDOException $e) { $error = "Lỗi: " . $e->getMessage(); }
+}
+
+// 4.5 ĐỒNG BỘ TUYỂN DỤNG: ĐỔ DỮ LIỆU TỪ TAB 3 SANG TAB 1 + ĐẶT LẠI MÃ MSNV MỚI
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'hire_candidate') {
+    $candidate_id       = intval($_POST['candidate_id']);
+    $new_msnv           = !empty($_POST['new_msnv']) ? intval($_POST['new_msnv']) : null;
+    $hr_code            = trim($_POST['hr_code'] ?? '');
+    $department         = trim($_POST['department'] ?? 'Chưa phân bổ');
+    $branch             = trim($_POST['branch'] ?? 'Trụ sở chính');
+    $start_date         = !empty($_POST['contract_start_date']) ? $_POST['contract_start_date'] : $today;
+    $contract_months    = intval($_POST['contract_months'] ?? 2);
+    $contract_to_date   = date('Y-m-d', strtotime("+$contract_months months", strtotime($start_date)));
+    $contract_type      = ($contract_months >= 12) ? 'Xác định thời hạn' : 'Thử việc';
+
+    try {
+        $pdo->beginTransaction();
+        $stmt = $pdo->prepare("SELECT * FROM candidates WHERE id = :id AND hired = 0 LIMIT 1");
+        $stmt->execute([':id' => $candidate_id]);
+        $cand = $stmt->fetch();
+
+        if ($cand) {
+            if ($new_msnv) {
+                $checkE = $pdo->prepare("SELECT id FROM employees WHERE id = :id");
+                $checkE->execute([':id' => $new_msnv]);
+                if ($checkE->fetch()) {
+                    throw new Exception("Mã nhân viên chính thức (MSNV) #$new_msnv đã tồn tại trong danh sách!");
+                }
+            }
+
+            // Tách năm sinh nếu có để gán ngày sinh tạm
+            $dob_val = null;
+            if (!empty($cand['birth_year']) && is_numeric($cand['birth_year'])) {
+                $dob_val = $cand['birth_year'] . '-01-01';
+            }
+
+            // 1. Chuyển thông tin từ ứng viên sang nhân sự chính thức
+            $sqlInsert = "
+                INSERT INTO employees (
+                    id, hr_code, fullname, dob, start_date, id_card, 
+                    position, department, branch, working_location,
+                    contract_type, contract_from_date, contract_to_date,
+                    temporary_address, address, degree, phone, email, status
+                ) VALUES (
+                    :id, :hr_code, :fullname, :dob, :start_date, :id_card, 
+                    :position, :department, :branch, :working_location,
+                    :contract_type, :contract_from_date, :contract_to_date,
+                    :temporary_address, :address, :degree, :phone, :email, 'Đang làm việc'
+                )
+            ";
+            
+            $c_num = 'HĐ-' . date('Y') . '/' . sprintf('%03d', $new_msnv ?: rand(100, 999));
+
+            $stmtEmp = $pdo->prepare($new_msnv ? $sqlInsert : str_replace('id, ', '', str_replace(':id, ', '', $sqlInsert)));
+            $empParams = [
+                ':hr_code'              => $hr_code,
+                ':fullname'             => $cand['fullname'],
+                ':dob'                  => $dob_val,
+                ':start_date'           => $start_date,
+                ':id_card'              => $cand['id_card'] ?? '',
+                ':position'             => $cand['applied_position'] ?? 'Nhân viên',
+                ':department'           => $department ?: 'Chưa phân bổ',
+                ':branch'               => $branch ?: 'Trụ sở chính',
+                ':working_location'     => $branch ?: 'Trụ sở chính',
+                ':contract_type'        => $contract_type,
+                ':contract_from_date'   => $start_date,
+                ':contract_to_date'     => $contract_to_date,
+                ':temporary_address'    => $cand['address'] ?? '',
+                ':address'              => $cand['address'] ?? '',
+                ':degree'               => $cand['skills_note'] ?? '',
+                ':phone'                => $cand['phone'] ?? '',
+                ':email'                => $cand['email'] ?? ''
+            ];
+            if ($new_msnv) $empParams[':id'] = $new_msnv;
+
+            $stmtEmp->execute($empParams);
+            $final_emp_id = $new_msnv ?: $pdo->lastInsertId();
+
+            // 2. Tạo hợp đồng lao động
+            try {
+                $stmtContract = $pdo->prepare("
+                    INSERT INTO contracts (employee_id, contract_number, contract_type, start_date, end_date, basic_salary, status, notes) 
+                    VALUES (:eid, :cnum, :ctype, :s_date, :e_date, 0.00, 'Hiệu lực', 'Tự động tạo khi tuyển ứng viên')
+                ");
+                $stmtContract->execute([
+                    ':eid'   => $final_emp_id,
+                    ':cnum'  => $c_num,
+                    ':ctype' => $contract_type,
+                    ':s_date'=> $start_date,
+                    ':e_date'=> $contract_to_date
+                ]);
+            } catch (PDOException $e) {}
+
+            // Cập nhật số HĐ hiện tại vào employee
+            $pdo->prepare("UPDATE employees SET current_contract_no = :cnum WHERE id = :id")->execute([':cnum' => $c_num, ':id' => $final_emp_id]);
+
+            // 3. Cập nhật trạng thái ứng viên
+            $updateCand = $pdo->prepare("UPDATE candidates SET hired = 1, interview_status = 'Trúng tuyển', candidate_status = 'Đã tuyển dụng', hire_date = :hdate WHERE id = :id");
+            $updateCand->execute([':hdate' => date('d/m/Y', strtotime($start_date)), ':id' => $candidate_id]);
+
+            $pdo->commit();
+            $message = "Đã tuyển dụng thành công: " . htmlspecialchars($cand['fullname']) . "! Gán MSNV chính thức: [#{$final_emp_id}] và cập nhật qua Tab 1.";
+        }
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        $error = "Lỗi tuyển dụng: " . $e->getMessage();
+    }
+}
+
+// ==================== 5. BỘ LỌC TÌM KIẾM VÀ PHÂN TRANG (12 DÒNG/TRANG) ====================
+$limit = 12;
+
+$empContracts = [];
+try {
+    $sqlContracts = "
+        SELECT c1.employee_id, c1.contract_number, c1.contract_type, c1.end_date, c1.status,
+               DATEDIFF(c1.end_date, '$today') AS days_left
+        FROM contracts c1
+        INNER JOIN (
+            SELECT employee_id, MAX(id) as max_id FROM contracts GROUP BY employee_id
+        ) c2 ON c1.id = c2.max_id
+    ";
+    $stmtC = $pdo->query($sqlContracts);
+    while ($r = $stmtC->fetch()) {
+        $empContracts[intval($r['employee_id'])] = $r;
+    }
+} catch (PDOException $e) {
+    $empContracts = [];
+}
+
+// TAB 1: NHÂN VIÊN CHÍNH
+$f1_id     = trim($_GET['f1_id'] ?? '');
+$f1_name   = trim($_GET['f1_name'] ?? '');
+$f1_dept   = trim($_GET['f1_dept'] ?? '');
+$f1_pos    = trim($_GET['f1_pos'] ?? '');
+$f1_status = trim($_GET['f1_status'] ?? '');
+$p1        = max(1, intval($_GET['p1'] ?? 1));
+
+$where1 = ["(branch IS NULL OR branch = '' OR branch = 'Trụ sở chính')"];
+$params1 = [];
+if ($f1_id !== '')     { $where1[] = "id = :id"; $params1[':id'] = $f1_id; }
+if ($f1_name !== '')   { $where1[] = "fullname LIKE :name"; $params1[':name'] = "%$f1_name%"; }
+if ($f1_dept !== '')   { $where1[] = "department = :dept"; $params1[':dept'] = $f1_dept; }
+if ($f1_pos !== '')    { $where1[] = "position LIKE :pos"; $params1[':pos'] = "%$f1_pos%"; }
+if ($f1_status !== '') { $where1[] = "status = :status"; $params1[':status'] = $f1_status; }
+
+$stmt1 = $pdo->prepare("SELECT COUNT(*) FROM employees WHERE " . implode(' AND ', $where1));
+$stmt1->execute($params1);
+$total1 = $stmt1->fetchColumn();
+$pages1 = ceil($total1 / $limit) ?: 1;
+$offset1 = ($p1 - 1) * $limit;
+
+$stmt1 = $pdo->prepare("SELECT * FROM employees WHERE " . implode(' AND ', $where1) . " ORDER BY id ASC LIMIT $limit OFFSET $offset1");
+$stmt1->execute($params1);
+$main_employees = $stmt1->fetchAll();
+
+// TAB 2: CHI NHÁNH KHÁC
+$f2_id     = trim($_GET['f2_id'] ?? '');
+$f2_name   = trim($_GET['f2_name'] ?? '');
+$f2_dept   = trim($_GET['f2_dept'] ?? '');
+$f2_pos    = trim($_GET['f2_pos'] ?? '');
+$f2_status = trim($_GET['f2_status'] ?? '');
+$p2        = max(1, intval($_GET['p2'] ?? 1));
+
+$where2 = ["(branch != 'Trụ sở chính' AND branch IS NOT NULL AND branch != '')"];
+$params2 = [];
+if ($f2_id !== '')     { $where2[] = "id = :id"; $params2[':id'] = $f2_id; }
+if ($f2_name !== '')   { $where2[] = "fullname LIKE :name"; $params2[':name'] = "%$f2_name%"; }
+if ($f2_dept !== '')   { $where2[] = "department = :dept"; $params2[':dept'] = $f2_dept; }
+if ($f2_pos !== '')    { $where2[] = "position LIKE :pos"; $params2[':pos'] = "%$f2_pos%"; }
+if ($f2_status !== '') { $where2[] = "status = :status"; $params2[':status'] = $f2_status; }
+
+$stmt2 = $pdo->prepare("SELECT COUNT(*) FROM employees WHERE " . implode(' AND ', $where2));
+$stmt2->execute($params2);
+$total2 = $stmt2->fetchColumn();
+$pages2 = ceil($total2 / $limit) ?: 1;
+$offset2 = ($p2 - 1) * $limit;
+
+$stmt2 = $pdo->prepare("SELECT * FROM employees WHERE " . implode(' AND ', $where2) . " ORDER BY id ASC LIMIT $limit OFFSET $offset2");
+$stmt2->execute($params2);
+$branch_employees = $stmt2->fetchAll();
+
+// TAB 3: ỨNG VIÊN
+$f3_id     = trim($_GET['f3_id'] ?? '');
+$f3_name   = trim($_GET['f3_name'] ?? '');
+$f3_pos    = trim($_GET['f3_pos'] ?? '');
+$f3_status = trim($_GET['f3_status'] ?? '');
+$p3        = max(1, intval($_GET['p3'] ?? 1));
+
+$where3 = ["1=1"];
+$params3 = [];
+if ($f3_id !== '')     { $where3[] = "id = :id"; $params3[':id'] = $f3_id; }
+if ($f3_name !== '')   { $where3[] = "fullname LIKE :name"; $params3[':name'] = "%$f3_name%"; }
+if ($f3_pos !== '')    { $where3[] = "applied_position LIKE :pos"; $params3[':pos'] = "%$f3_pos%"; }
+if ($f3_status !== '') { $where3[] = "(interview_status = :status OR candidate_status = :status)"; $params3[':status'] = $f3_status; }
+
+$stmt3 = $pdo->prepare("SELECT COUNT(*) FROM candidates WHERE " . implode(' AND ', $where3));
+$stmt3->execute($params3);
+$total3 = $stmt3->fetchColumn();
+$pages3 = ceil($total3 / $limit) ?: 1;
+$offset3 = ($p3 - 1) * $limit;
+
+$stmt3 = $pdo->prepare("SELECT * FROM candidates WHERE " . implode(' AND ', $where3) . " ORDER BY hired ASC, id ASC LIMIT $limit OFFSET $offset3");
+$stmt3->execute($params3);
+$candidates = $stmt3->fetchAll();
+
+include 'header.php';
+?>
+
+<style>
+    .hr-wrapper { max-width: 99%; margin: 20px auto; padding: 0 12px; }
+    .hr-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 20px; }
+    .hr-title { font-size: 1.45rem; font-weight: 700; color: #0f172a; }
+    .hr-tabs { display: flex; gap: 10px; margin-bottom: 18px; border-bottom: 2px solid #e2e8f0; overflow-x: auto; }
+    .tab-btn { background: none; border: none; outline: none; padding: 10px 18px; font-size: 0.95rem; font-weight: 600; color: #64748b; cursor: pointer; border-bottom: 3px solid transparent; transition: all 0.2s; white-space: nowrap; }
+    .tab-btn.active { color: #0284c7; border-bottom-color: #0284c7; }
+
+    .filter-panel { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+    .filter-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    .filter-row input, .filter-row select { padding: 8px 11px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.88rem; outline: none; box-sizing: border-box; }
+    .filter-row input:focus, .filter-row select:focus { border-color: #0284c7; }
+    .btn-filter { background-color: #0284c7; color: #ffffff; border: none; padding: 8px 16px; border-radius: 6px; font-size: 0.88rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; }
+    .btn-filter:hover { background-color: #0369a1; }
+    .btn-reset { background-color: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; padding: 8px 12px; border-radius: 6px; font-size: 0.88rem; text-decoration: none; }
+    .btn-reset:hover { background-color: #e2e8f0; }
+
+    .section-toolbar { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+    .btn-create { background-color: #0284c7; color: #ffffff; border: none; padding: 9px 15px; border-radius: 6px; font-size: 0.88rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+    .btn-create:hover { background-color: #0369a1; }
+    .btn-excel { background-color: #10b981; color: #ffffff; border: none; padding: 9px 15px; border-radius: 6px; font-size: 0.88rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+    .btn-excel:hover { background-color: #059669; }
+    .btn-import { background-color: #8b5cf6; color: #ffffff; border: none; padding: 9px 15px; border-radius: 6px; font-size: 0.88rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+    .btn-import:hover { background-color: #7c3aed; }
+    .btn-template { background-color: #f8fafc; color: #0284c7; border: 1px dashed #0284c7; padding: 6px 12px; border-radius: 6px; font-size: 0.84rem; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; }
+
+    .dropdown-container { position: relative; display: inline-block; }
+    .dropdown-menu { display: none; position: absolute; right: 0; top: 105%; background: #ffffff; min-width: 210px; box-shadow: 0 10px 25px rgba(0,0,0,0.12); border: 1px solid #e2e8f0; border-radius: 8px; z-index: 100; overflow: hidden; padding: 4px 0; }
+    .dropdown-menu.show { display: block; }
+    .dropdown-item { display: flex; align-items: center; gap: 8px; padding: 10px 14px; font-size: 0.88rem; color: #334155; text-decoration: none; cursor: pointer; border: none; background: none; width: 100%; text-align: left; transition: background 0.15s; }
+    .dropdown-item:hover { background: #f8fafc; color: #0284c7; }
+
+    .data-card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); overflow-x: auto; max-width: 100%; }
+    .hr-table { width: 100%; border-collapse: collapse; text-align: left; }
+    .hr-table th, .hr-table td { padding: 9px 10px; border-bottom: 1px solid #f1f5f9; font-size: 0.84rem; vertical-align: middle; }
+    .hr-table th { background-color: #f8fafc; color: #475569; font-weight: 600; }
+    .hr-table tfoot td { background-color: #f8fafc; font-weight: 700; color: #0f172a; border-top: 2px solid #cbd5e1; padding: 12px 14px; }
+
+    /* Bảng Nhân sự chuẩn theo mẫu 37 cột trong ảnh */
+    .table-employee-full { min-width: 4400px; table-layout: fixed; }
+    .table-employee-full thead th {
+        background-color: #fde8dc !important;
+        color: #1e293b !important;
+        font-weight: 700;
+        text-align: center;
+        border: 1px solid #fed7aa;
+        white-space: normal;
+        word-wrap: break-word;
+        line-height: 1.35;
+        padding: 10px 6px;
+    }
+    .table-employee-full td {
+        border-right: 1px solid #f1f5f9;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        line-height: 1.4;
+    }
+
+    .table-candidate { min-width: 1750px; table-layout: fixed; }
+    .table-candidate thead th {
+        background-color: #fde8dc !important;
+        color: #1e293b !important;
+        font-weight: 700;
+        text-align: center;
+        border: 1px solid #fed7aa;
+        white-space: nowrap;
+    }
+    .table-candidate td {
+        border-right: 1px solid #f1f5f9;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+    }
+
+    .action-group { display: flex; gap: 5px; align-items: center; justify-content: center; }
+    .btn-edit { background-color: #f1f5f9; color: #0284c7; border: 1px solid #cbd5e1; padding: 4px 8px; border-radius: 4px; font-size: 0.78rem; font-weight: 600; cursor: pointer; }
+    .btn-edit:hover { background-color: #e2e8f0; }
+    .btn-delete { background-color: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; padding: 4px 8px; border-radius: 4px; font-size: 0.78rem; font-weight: 600; cursor: pointer; }
+    .btn-delete:hover { background-color: #fca5a5; }
+    .btn-hire { background-color: #10b981; color: #ffffff; border: none; padding: 4px 8px; border-radius: 4px; font-size: 0.78rem; font-weight: 600; cursor: pointer; }
+    .btn-hire:hover { background-color: #059669; }
+
+    .id-tag { background-color: #f1f5f9; color: #475569; font-weight: 700; padding: 2px 6px; border-radius: 4px; border: 1px solid #e2e8f0; font-size: 0.82rem; display: inline-block; }
+    .badge-hired { background-color: #e2e8f0; color: #475569; padding: 3px 6px; border-radius: 4px; font-size: 0.75rem; white-space: nowrap; }
+    .badge-status { padding: 3px 7px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; display: inline-block; white-space: nowrap; }
+    .status-pass { background: #dcfce7; color: #166534; }
+    .status-pending { background: #fef9c3; color: #854d0e; }
+    .status-fail { background: #fee2e2; color: #991b1b; }
+
+    .pagination-wrapper { display: flex; justify-content: center; align-items: center; gap: 6px; margin-top: 18px; }
+    .page-link { display: inline-flex; align-items: center; justify-content: center; min-width: 36px; height: 36px; padding: 0 10px; border: 1px solid #cbd5e1; border-radius: 6px; background: #ffffff; color: #334155; font-size: 0.9rem; font-weight: 600; text-decoration: none; }
+    .page-link:hover:not(.disabled):not(.active) { background-color: #f1f5f9; border-color: #94a3b8; }
+    .page-link.active { background-color: #0284c7; color: #ffffff; border-color: #0284c7; }
+    .page-link.disabled { color: #cbd5e1; border-color: #e2e8f0; cursor: not-allowed; background: #f8fafc; }
+
+    .alert-box { padding: 12px 16px; border-radius: 6px; font-size: 0.9rem; margin-bottom: 18px; }
+    .alert-success { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+    .alert-danger { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.55); z-index: 1000; align-items: center; justify-content: center; padding: 15px; }
+    .modal-box { background: #ffffff; width: 100%; max-width: 600px; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); overflow: hidden; max-height: 92vh; display: flex; flex-direction: column; }
+    .modal-box-large { max-width: 1250px; width: 98%; }
+    .modal-header { padding: 14px 20px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
+    .modal-title { font-size: 1.1rem; font-weight: 700; color: #0f172a; }
+    .btn-close-modal { background: none; border: none; font-size: 1.3rem; cursor: pointer; color: #64748b; }
+    .modal-body { padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 13px; }
+    .form-group label { display: block; font-size: 0.84rem; font-weight: 600; margin-bottom: 4px; color: #334155; }
+    .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.88rem; box-sizing: border-box; outline: none; }
+    .form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+    .modal-footer { padding: 12px 20px; background: #f8fafc; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 10px; }
+    .btn-cancel { background: #e2e8f0; color: #475569; border: none; padding: 8px 14px; border-radius: 4px; cursor: pointer; }
+    .btn-save { background: #0284c7; color: #fff; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: 600; }
+</style>
+
+<div class="hr-wrapper">
+    <div class="hr-header">
+        <h1 class="hr-title">Quản Trị Nhân Sự & Tuyển Dụng</h1>
+    </div>
+
+    <?php if (!empty($message)): ?>
+        <div class="alert-box alert-success"><?= htmlspecialchars($message) ?></div>
+    <?php endif; ?>
+    <?php if (!empty($error)): ?>
+        <div class="alert-box alert-danger"><?= htmlspecialchars($error) ?></div>
+    <?php endif; ?>
+
+    <div class="hr-tabs">
+        <button id="btn-employees-tab" class="tab-btn" onclick="switchTab('employees-tab')">
+            👥 Danh Sách Nhân Viên (<?= $total1 ?>)
+        </button>
+        <button id="btn-branch-tab" class="tab-btn" onclick="switchTab('branch-tab')">
+            🏢 CNV Chi Nhánh Khác (<?= $total2 ?>)
+        </button>
+        <button id="btn-candidates-tab" class="tab-btn" onclick="switchTab('candidates-tab')">
+            📝 Ứng Viên Tuyển Dụng (<?= $total3 ?>)
+        </button>
+    </div>
+
+    <!-- TAB 1: DANH SÁCH NHÂN VIÊN (KHỚP 100% CỘT THEO ẢNH ĐÍNH KÈM) -->
+    <div id="employees-tab" class="tab-content">
+        <form method="GET" action="quan-tri-nhan-su.php" class="filter-panel" id="form-filter-1">
+            <input type="hidden" name="tab" value="employees-tab">
+            <div class="filter-row">
+                <input type="number" name="f1_id" value="<?= htmlspecialchars($f1_id) ?>" placeholder="MSNV..." style="width: 100px;">
+                <input type="text" name="f1_name" value="<?= htmlspecialchars($f1_name) ?>" placeholder="Họ và tên..." style="flex: 1; min-width: 140px;">
+                
+                <select name="f1_dept" style="width: 180px;">
+                    <option value="">-- Tất cả phòng ban --</option>
+                    <?php foreach ($DEFAULT_DEPARTMENTS as $d): ?>
+                        <option value="<?= htmlspecialchars($d) ?>" <?= $f1_dept === $d ? 'selected' : '' ?>><?= htmlspecialchars($d) ?></option>
+                    <?php endforeach; ?>
+                </select>
+
+                <input type="text" name="f1_pos" value="<?= htmlspecialchars($f1_pos) ?>" placeholder="Vị trí / chức vụ..." style="width: 150px;">
+                <select name="f1_status" style="width: 150px;">
+                    <option value="">-- Tất cả trạng thái --</option>
+                    <option value="Đang làm việc" <?= $f1_status === 'Đang làm việc' ? 'selected' : '' ?>>Đang làm việc</option>
+                    <option value="Nghỉ phép" <?= $f1_status === 'Nghỉ phép' ? 'selected' : '' ?>>Nghỉ phép</option>
+                    <option value="Đã nghỉ" <?= $f1_status === 'Đã nghỉ' ? 'selected' : '' ?>>Đã nghỉ</option>
+                </select>
+                <button type="submit" class="btn-filter">🔍 Lọc</button>
+                <a href="quan-tri-nhan-su.php?tab=employees-tab" class="btn-reset">Đặt lại</a>
+            </div>
+        </form>
+
+        <div class="section-toolbar">
+            <button type="submit" form="form-filter-1" name="export" value="employees" class="btn-excel">📊 Xuất Excel Báo Cáo</button>
+            <button class="btn-create" onclick="openAddEmp('Trụ sở chính', 'employees-tab')">+ Thêm Nhân Viên</button>
+        </div>
+
+        <div class="data-card">
+            <table class="hr-table table-employee-full">
+                <thead>
+                    <tr>
+                        <th style="width: 45px;">STT</th>
+                        <th style="width: 70px;">MSNV</th>
+                        <th style="width: 90px;">HR Code</th>
+                        <th style="width: 140px;">Full name</th>
+                        <th style="width: 160px;">Họ & tên</th>
+                        <th style="width: 100px;">Ngày sinh/ DOB</th>
+                        <th style="width: 110px;">Ngày bắt đầu làm việc/ Start date</th>
+                        <th style="width: 110px;">Thời gian làm việc</th>
+                        <th style="width: 125px;">Số CCCD/ ID Number</th>
+                        <th style="width: 105px;">Ngày cấp/ ID issue date</th>
+                        <th style="width: 130px;">Nơi cấp/ Place of ID Issuance</th>
+                        <th style="width: 140px;">Position Title (English)</th>
+                        <th style="width: 150px;">Vị trí hiện tại (Vietnamese)</th>
+                        <th style="width: 80px;">Level</th>
+                        <th style="width: 150px;">Department/ Bộ phận</th>
+                        <th style="width: 100px;">Team</th>
+                        <th style="width: 80px;">CODE</th>
+                        <th style="width: 130px;">Working Location/ Nơi làm việc</th>
+                        <th style="width: 125px;">Số SBHXH/ Social Insurance book number</th>
+                        <th style="width: 120px;">Số thẻ BHYT</th>
+                        <th style="width: 130px;">Thời gian bắt đầu tham gia BHXH tại công ty (mm/yyyy)</th>
+                        <th style="width: 125px;">Thời hạn dùng thẻ Bảo Hiểm Bảo Việt</th>
+                        <th style="width: 110px;">Trình độ/ Degree</th>
+                        <th style="width: 130px;">Chuyên ngành/ Major</th>
+                        <th style="width: 120px;">Số HĐLĐ Hiện tại</th>
+                        <th style="width: 130px;">Loại HĐ/ Contract Type</th>
+                        <th style="width: 125px;">Thời hạn Hợp đồng/ Contract Expiry date</th>
+                        <th style="width: 105px;">Hợp Đồng Từ Ngày</th>
+                        <th style="width: 105px;">Hợp Đồng Đến Ngày</th>
+                        <th style="width: 200px;">Địa chỉ thường trú (trên sổ hộ khẩu)</th>
+                        <th style="width: 200px;">Địa chỉ liên hệ (tạm trú)</th>
+                        <th style="width: 190px;">Địa chỉ sau sát nhập TDP từ tháng 07/2026</th>
+                        <th style="width: 160px;">Bằng cấp do công ty đào tạo</th>
+                        <th style="width: 140px;">Kỷ luật lao động (nếu có)</th>
+                        <th style="width: 140px;">Tai nạn lao động (nếu có)</th>
+                        <th style="width: 110px;">Số điện thoại</th>
+                        <th style="width: 160px;">Địa chỉ email</th>
+                        <th style="width: 130px;">Số tài khoản Ngân Hàng</th>
+                        <th style="width: 140px;">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (!empty($main_employees)): ?>
+                        <?php 
+                        $stt_main = $offset1 + 1; 
+                        foreach ($main_employees as $emp): 
+                            $dob_str = !empty($emp['dob']) ? date('d/m/Y', strtotime($emp['dob'])) : '—';
+                            $start_d = !empty($emp['start_date']) ? date('d/m/Y', strtotime($emp['start_date'])) : '—';
+                            $id_iss  = !empty($emp['id_issue_date']) ? date('d/m/Y', strtotime($emp['id_issue_date'])) : '—';
+                            $c_from  = !empty($emp['contract_from_date']) ? date('d/m/Y', strtotime($emp['contract_from_date'])) : '—';
+                            $c_to    = !empty($emp['contract_to_date']) ? date('d/m/Y', strtotime($emp['contract_to_date'])) : '—';
+                            $work_dur = calculateWorkDuration($emp['start_date']);
+                        ?>
+                            <tr>
+                                <td style="text-align: center;"><strong><?= $stt_main++ ?></strong></td>
+                                <td style="text-align: center;"><span class="id-tag">#<?= $emp['id'] ?></span></td>
+                                <td style="text-align: center;"><?= htmlspecialchars($emp['hr_code'] ?? '—') ?></td>
+                                <td><?= htmlspecialchars($emp['fullname_en'] ?? '—') ?></td>
+                                <td><strong><?= htmlspecialchars($emp['fullname']) ?></strong></td>
+                                <td style="text-align: center;"><?= $dob_str ?></td>
+                                <td style="text-align: center;"><?= $start_d ?></td>
+                                <td style="text-align: center;"><?= $work_dur ?></td>
+                                <td style="text-align: center;"><?= htmlspecialchars($emp['id_card'] ?? '—') ?></td>
+                                <td style="text-align: center;"><?= $id_iss ?></td>
+                                <td><?= htmlspecialchars($emp['id_issue_place'] ?? '—') ?></td>
+                                <td><?= htmlspecialchars($emp['position_en'] ?? '—') ?></td>
+                                <td><strong><?= htmlspecialchars($emp['position']) ?></strong></td>
+                                <td style="text-align: center;"><?= htmlspecialchars($emp['level'] ?? '—') ?></td>
+                                <td><?= ($emp['department'] === 'Chưa phân bổ') ? '<span style="color:#ea580c; font-style:italic;">Chưa phân bổ</span>' : htmlspecialchars($emp['department']) ?></td>
+                                <td><?= htmlspecialchars($emp['team'] ?? '—') ?></td>
+                                <td style="text-align: center;"><?= htmlspecialchars($emp['dept_code'] ?? '—') ?></td>
+                                <td><?= htmlspecialchars($emp['working_location'] ?? ($emp['branch'] ?: 'Trụ sở chính')) ?></td>
+                                <td style="text-align: center;"><?= htmlspecialchars($emp['social_insurance_no'] ?? '—') ?></td>
+                                <td style="text-align: center;"><?= htmlspecialchars($emp['health_insurance_no'] ?? '—') ?></td>
+                                <td style="text-align: center;"><?= htmlspecialchars($emp['si_start_date'] ?? '—') ?></td>
+                                <td style="text-align: center;"><?= htmlspecialchars($emp['baoviet_expiry_date'] ?? '—') ?></td>
+                                <td><?= htmlspecialchars($emp['degree'] ?? '—') ?></td>
+                                <td><?= htmlspecialchars($emp['major'] ?? '—') ?></td>
+                                <td style="text-align: center;"><?= htmlspecialchars($emp['current_contract_no'] ?? '—') ?></td>
+                                <td><?= htmlspecialchars($emp['contract_type'] ?? '—') ?></td>
+                                <td style="text-align: center;"><?= htmlspecialchars($emp['contract_expiry_date'] ?? '—') ?></td>
+                                <td style="text-align: center;"><?= $c_from ?></td>
+                                <td style="text-align: center;"><?= $c_to ?></td>
+                                <td><?= htmlspecialchars($emp['permanent_address'] ?? '—') ?></td>
+                                <td><?= htmlspecialchars($emp['temporary_address'] ?? ($emp['address'] ?? '—')) ?></td>
+                                <td><?= htmlspecialchars($emp['merged_tdp_address'] ?? '—') ?></td>
+                                <td><?= htmlspecialchars($emp['company_training_cert'] ?? '—') ?></td>
+                                <td><?= htmlspecialchars($emp['labor_discipline'] ?? '—') ?></td>
+                                <td><?= htmlspecialchars($emp['labor_accident'] ?? '—') ?></td>
+                                <td style="text-align: center;"><?= htmlspecialchars($emp['phone'] ?: '—') ?></td>
+                                <td><?= htmlspecialchars($emp['email'] ?: '—') ?></td>
+                                <td style="text-align: center;"><?= htmlspecialchars($emp['bank_account'] ?? '—') ?></td>
+                                <td>
+                                    <div class="action-group">
+                                        <button class="btn-edit" onclick='openEditEmp(<?= json_encode($emp, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>, "employees-tab")'>Sửa</button>
+                                        <form method="POST" action="quan-tri-nhan-su.php" onsubmit="return confirm('Bạn có chắc muốn xoá nhân viên này?');" style="margin: 0;">
+                                            <input type="hidden" name="action" value="delete_employee">
+                                            <input type="hidden" name="emp_id" value="<?= $emp['id'] ?>">
+                                            <input type="hidden" name="active_tab" value="employees-tab">
+                                            <button type="submit" class="btn-delete">Xoá</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <tr><td colspan="39" style="text-align:center; padding: 25px;">Không tìm thấy nhân viên nào phù hợp.</td></tr>
+                    <?php endif; ?>
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="2" style="text-align: center;">TỔNG CỘNG:</td>
+                        <td colspan="37" style="color: #0284c7; font-weight: 700;"><?= number_format($total1) ?> nhân sự</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        <?php renderPagination($p1, $pages1, 'p1', 'employees-tab'); ?>
+    </div>
+
+    <!-- TAB 2: CNV CHI NHÁNH KHÁC -->
+    <div id="branch-tab" class="tab-content">
+        <form method="GET" action="quan-tri-nhan-su.php" class="filter-panel" id="form-filter-2">
+            <input type="hidden" name="tab" value="branch-tab">
+            <div class="filter-row">
+                <input type="number" name="f2_id" value="<?= htmlspecialchars($f2_id) ?>" placeholder="Mã ID..." style="width: 100px;">
+                <input type="text" name="f2_name" value="<?= htmlspecialchars($f2_name) ?>" placeholder="Họ và tên..." style="flex: 1; min-width: 140px;">
+                
+                <select name="f2_dept" style="width: 180px;">
+                    <option value="">-- Tất cả phòng ban --</option>
+                    <?php foreach ($DEFAULT_DEPARTMENTS as $d): ?>
+                        <option value="<?= htmlspecialchars($d) ?>" <?= $f2_dept === $d ? 'selected' : '' ?>><?= htmlspecialchars($d) ?></option>
+                    <?php endforeach; ?>
+                </select>
+
+                <input type="text" name="f2_pos" value="<?= htmlspecialchars($f2_pos) ?>" placeholder="Vị trí / chức vụ..." style="width: 150px;">
+                <select name="f2_status" style="width: 150px;">
+                    <option value="">-- Tất cả trạng thái --</option>
+                    <option value="Đang làm việc" <?= $f2_status === 'Đang làm việc' ? 'selected' : '' ?>>Đang làm việc</option>
+                    <option value="Nghỉ phép" <?= $f2_status === 'Nghỉ phép' ? 'selected' : '' ?>>Nghỉ phép</option>
+                    <option value="Đã nghỉ" <?= $f2_status === 'Đã nghỉ' ? 'selected' : '' ?>>Đã nghỉ</option>
+                </select>
+                <button type="submit" class="btn-filter">🔍 Lọc</button>
+                <a href="quan-tri-nhan-su.php?tab=branch-tab" class="btn-reset">Đặt lại</a>
+            </div>
+        </form>
+
+        <div class="section-toolbar">
+            <button type="submit" form="form-filter-2" name="export" value="branch" class="btn-excel">📊 Xuất Excel Báo Cáo</button>
+            <button class="btn-create" onclick="openAddEmp('Chi nhánh khác', 'branch-tab')">+ Thêm CNV Chi Nhánh</button>
+        </div>
+
+        <div class="data-card">
+            <table class="hr-table">
+                <thead>
+                    <tr>
+                        <th style="width: 45px;">STT</th>
+                        <th style="width: 65px;">Mã ID</th>
+                        <th>Họ và Tên</th>
+                        <th>Chi nhánh</th>
+                        <th>Phòng ban</th>
+                        <th>Vị trí</th>
+                        <th>Số ĐT</th>
+                        <th>Email</th>
+                        <th>Trạng thái</th>
+                        <th style="width: 150px;">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (!empty($branch_employees)): ?>
+                        <?php 
+                        $stt_branch = $offset2 + 1; 
+                        foreach ($branch_employees as $emp): 
+                        ?>
+                            <tr>
+                                <td><strong><?= $stt_branch++ ?></strong></td>
+                                <td><span class="id-tag">#<?= $emp['id'] ?></span></td>
+                                <td><strong><?= htmlspecialchars($emp['fullname']) ?></strong></td>
+                                <td><span class="badge-branch"><?= htmlspecialchars($emp['branch']) ?></span></td>
+                                <td><?= htmlspecialchars($emp['department']) ?></td>
+                                <td><?= htmlspecialchars($emp['position']) ?></td>
+                                <td><?= htmlspecialchars($emp['phone'] ?: '—') ?></td>
+                                <td><?= htmlspecialchars($emp['email'] ?: '—') ?></td>
+                                <td><?= htmlspecialchars($emp['status']) ?></td>
+                                <td>
+                                    <div class="action-group">
+                                        <button class="btn-edit" onclick='openEditEmp(<?= json_encode($emp, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>, "branch-tab")'>Sửa</button>
+                                        <form method="POST" action="quan-tri-nhan-su.php" onsubmit="return confirm('Bạn có chắc muốn xoá nhân viên này?');" style="margin: 0;">
+                                            <input type="hidden" name="action" value="delete_employee">
+                                            <input type="hidden" name="emp_id" value="<?= $emp['id'] ?>">
+                                            <input type="hidden" name="active_tab" value="branch-tab">
+                                            <button type="submit" class="btn-delete">Xoá</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <tr><td colspan="10" style="text-align:center; padding: 20px;">Không tìm thấy nhân viên chi nhánh phù hợp.</td></tr>
+                    <?php endif; ?>
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="2">TỔNG CỘNG:</td>
+                        <td colspan="8" style="color: #0284c7;"><?= number_format($total2) ?> nhân viên</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        <?php renderPagination($p2, $pages2, 'p2', 'branch-tab'); ?>
+    </div>
+
+    <!-- TAB 3: ỨNG VIÊN TUYỂN DỤNG -->
+    <div id="candidates-tab" class="tab-content">
+        <form method="GET" action="quan-tri-nhan-su.php" class="filter-panel" id="form-filter-3">
+            <input type="hidden" name="tab" value="candidates-tab">
+            <div class="filter-row">
+                <input type="number" name="f3_id" value="<?= htmlspecialchars($f3_id) ?>" placeholder="Mã ID..." style="width: 100px;">
+                <input type="text" name="f3_name" value="<?= htmlspecialchars($f3_name) ?>" placeholder="Họ tên ứng viên..." style="flex: 1; min-width: 140px;">
+                <input type="text" name="f3_pos" value="<?= htmlspecialchars($f3_pos) ?>" placeholder="Vị trí ứng tuyển..." style="width: 160px;">
+                <select name="f3_status" style="width: 160px;">
+                    <option value="">-- Tất cả kết quả --</option>
+                    <option value="Chờ phỏng vấn" <?= $f3_status === 'Chờ phỏng vấn' ? 'selected' : '' ?>>Chờ phỏng vấn</option>
+                    <option value="Đã phỏng vấn" <?= $f3_status === 'Đã phỏng vấn' ? 'selected' : '' ?>>Đã phỏng vấn</option>
+                    <option value="Trúng tuyển" <?= $f3_status === 'Trúng tuyển' ? 'selected' : '' ?>>Trúng tuyển</option>
+                    <option value="Không đạt" <?= $f3_status === 'Không đạt' ? 'selected' : '' ?>>Không đạt</option>
+                </select>
+                <button type="submit" class="btn-filter">🔍 Lọc</button>
+                <a href="quan-tri-nhan-su.php?tab=candidates-tab" class="btn-reset">Đặt lại</a>
+            </div>
+        </form>
+
+        <div class="section-toolbar">
+            <button type="submit" form="form-filter-3" name="export" value="candidates" class="btn-excel">📊 Xuất Excel Báo Cáo</button>
+            <div class="dropdown-container">
+                <button class="btn-create" type="button" onclick="toggleDropdownCandidate(event)">
+                    + Thêm Ứng Viên &#9662;
+                </button>
+                <div id="candidate-dropdown-menu" class="dropdown-menu">
+                    <button type="button" class="dropdown-item" onclick="openSmartCandidateImport()">📥 Nhập từ File Excel</button>
+                    <button type="button" class="dropdown-item" onclick="openAddCand('candidates-tab')">✏️ Thêm thủ công</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="data-card">
+            <table class="hr-table table-candidate">
+                <thead>
+                    <tr>
+                        <th style="width: 45px;">STT</th>
+                        <th style="width: 65px;">Mã ID</th>
+                        <th style="width: 175px;">Họ và tên</th>
+                        <th style="width: 75px;">Giới tính</th>
+                        <th style="width: 75px;">Năm sinh</th>
+                        <th style="width: 125px;">Số CCCD</th>
+                        <th style="width: 170px;">Địa chỉ</th>
+                        <th style="width: 110px;">Số đt Liên hệ</th>
+                        <th style="width: 170px;">Ghi chú tay nghề</th>
+                        <th style="width: 150px;">Vị trí ứng tuyển</th>
+                        <th style="width: 125px;">Lịch hẹn PV</th>
+                        <th style="width: 120px;">Tình trạng</th>
+                        <th style="width: 120px;">Kết quả PV</th>
+                        <th style="width: 150px;">Hồ sơ bổ sung</th>
+                        <th style="width: 125px;">Thời gian tuyển</th>
+                        <th style="width: 140px;">Ghi chú</th>
+                        <th style="width: 165px;">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (!empty($candidates)): ?>
+                        <?php 
+                        $stt_cand = $offset3 + 1; 
+                        foreach ($candidates as $cand): 
+                            $lich_pv = !empty($cand['interview_time']) ? $cand['interview_time'] : ((!empty($cand['interview_date']) && $cand['interview_date'] !== '0000-00-00') ? date('d/m/Y', strtotime($cand['interview_date'])) : '—');
+                            $tg_tuyen = !empty($cand['hire_date']) ? $cand['hire_date'] : ($cand['hired'] ? 'Đã tuyển dụng' : '—');
+                            $t_trang = !empty($cand['candidate_status']) ? $cand['candidate_status'] : ($cand['hired'] ? 'Đã tuyển dụng' : 'Chờ phỏng vấn');
+                        ?>
+                            <tr>
+                                <td style="text-align: center;"><strong><?= $stt_cand++ ?></strong></td>
+                                <td style="text-align: center;"><span class="id-tag">#<?= $cand['id'] ?></span></td>
+                                <td><strong><?= htmlspecialchars($cand['fullname']) ?></strong></td>
+                                <td style="text-align: center;"><?= htmlspecialchars($cand['gender'] ?? '—') ?></td>
+                                <td style="text-align: center;"><?= htmlspecialchars($cand['birth_year'] ?? '—') ?></td>
+                                <td style="text-align: center;"><?= htmlspecialchars($cand['id_card'] ?? '—') ?></td>
+                                <td><?= htmlspecialchars($cand['address'] ?? '—') ?></td>
+                                <td style="text-align: center;"><?= htmlspecialchars($cand['phone'] ?: '—') ?></td>
+                                <td><?= htmlspecialchars($cand['skills_note'] ?? '—') ?></td>
+                                <td><strong><?= htmlspecialchars($cand['applied_position']) ?></strong></td>
+                                <td style="text-align: center;"><?= htmlspecialchars($lich_pv) ?></td>
+                                <td style="text-align: center;"><?= htmlspecialchars($t_trang) ?></td>
+                                <td style="text-align: center;">
+                                    <?php
+                                        $cls = 'status-pending';
+                                        if ($cand['interview_status'] === 'Trúng tuyển') $cls = 'status-pass';
+                                        if ($cand['interview_status'] === 'Không đạt') $cls = 'status-fail';
+                                    ?>
+                                    <span class="badge-status <?= $cls ?>"><?= htmlspecialchars($cand['interview_status']) ?></span>
+                                </td>
+                                <td><?= htmlspecialchars($cand['docs_needed'] ?? '—') ?></td>
+                                <td style="text-align: center;"><?= htmlspecialchars($tg_tuyen) ?></td>
+                                <td><?= htmlspecialchars($cand['notes'] ?? '—') ?></td>
+                                <td>
+                                    <div class="action-group">
+                                        <?php if ($cand['hired']): ?>
+                                            <span class="badge-hired">✓ Đã vào Tab 1</span>
+                                        <?php else: ?>
+                                            <button type="button" class="btn-hire" onclick='openHireModal(<?= json_encode($cand, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>)'>+ Tuyển</button>
+                                        <?php endif; ?>
+                                        <form method="POST" action="quan-tri-nhan-su.php" onsubmit="return confirm('Bạn có chắc muốn xoá ứng viên này?');" style="margin: 0;">
+                                            <input type="hidden" name="action" value="delete_candidate">
+                                            <input type="hidden" name="cand_id" value="<?= $cand['id'] ?>">
+                                            <input type="hidden" name="active_tab" value="candidates-tab">
+                                            <button type="submit" class="btn-delete">Xoá</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <tr><td colspan="17" style="text-align:center; padding: 20px;">Không tìm thấy ứng viên phù hợp.</td></tr>
+                    <?php endif; ?>
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="2" style="text-align: center;">TỔNG CỘNG:</td>
+                        <td colspan="15" style="color: #0284c7; font-weight: 700;"><?= number_format($total3) ?> hồ sơ ứng viên</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        <?php renderPagination($p3, $pages3, 'p3', 'candidates-tab'); ?>
+    </div>
+</div>
+
+<!-- ==================== MODALS ==================== -->
+
+<!-- 1. MODAL NHẬP THÔNG MINH CHO ỨNG VIÊN -->
+<div id="modal-smart-candidate" class="modal-overlay">
+    <div class="modal-box modal-box-large">
+        <div class="modal-header">
+            <span class="modal-title">📥 Nhập Danh Sách Ứng Viên Tuyển Dụng Từ File Excel</span>
+            <button type="button" class="btn-close-modal" onclick="closeModal('modal-smart-candidate')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div id="cand-import-step-upload">
+                <div style="display: flex; justify-content: space-between; align-items: center; background: #f8fafc; padding: 12px 14px; border-radius: 6px; border: 1px dashed #cbd5e1; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+                    <div style="font-size: 0.86rem; color: #475569; line-height: 1.5; flex: 1; min-width: 250px;">
+                        💡 Tự động nhận diện linh hoạt các cột theo mẫu chuẩn (Mã ID, Họ tên, Giới tính, Năm sinh, CCCD, Địa chỉ, Số đt, Tay nghề, Vị trí...).
+                    </div>
+                    <div>
+                        <a href="quan-tri-nhan-su.php?export=template_candidates" class="btn-template">📥 Tải File Excel Mẫu Chuẩn</a>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Chọn tệp tin Excel của bạn (.xlsx, .xls, .csv) *</label>
+                    <input type="file" id="cand_excel_file" accept=".xlsx,.xls,.csv" style="padding: 7px; border: 1px solid #cbd5e1;">
+                </div>
+                <div id="cand_upload_loading" style="display: none; font-size: 0.88rem; color: #0284c7; margin-top: 10px;">
+                    ⏳ Đang phân tích file Excel thông minh, vui lòng đợi trong giây lát...
+                </div>
+            </div>
+
+            <div id="cand-import-step-preview" style="display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <span style="font-size: 0.9rem; font-weight: 700; color: #166534;" id="preview_count_info"></span>
+                    <button type="button" class="btn-cancel" onclick="backToCandidateUpload()" style="font-size: 0.8rem; padding: 5px 10px;">↺ Chọn lại file khác</button>
+                </div>
+                <div style="max-height: 440px; overflow: auto; border: 1px solid #cbd5e1; border-radius: 6px;">
+                    <table class="hr-table table-candidate" style="font-size: 0.82rem;">
+                        <thead>
+                            <tr>
+                                <th>STT</th><th>Mã ID</th><th>Họ và tên</th><th>Giới tính</th><th>Năm sinh</th><th>Số CCCD</th>
+                                <th>Địa chỉ</th><th>Số ĐT</th><th>Tay nghề</th><th>Vị trí ứng tuyển</th><th>Lịch hẹn PV</th>
+                                <th>Tình trạng</th><th>Kết quả</th><th>Hồ sơ bổ sung</th><th>Thời gian tuyển</th><th>Ghi chú</th>
+                            </tr>
+                        </thead>
+                        <tbody id="preview_table_body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn-cancel" onclick="closeModal('modal-smart-candidate')">Đóng</button>
+            <button type="button" id="btn_process_cand_excel" class="btn-save" onclick="uploadAndPreviewCandidateExcel()">Tiếp Tục & Xem Trước</button>
+            <form method="POST" action="quan-tri-nhan-su.php" id="form_confirm_candidates" style="display: none; margin: 0;">
+                <input type="hidden" name="action" value="confirm_import_candidates">
+                <input type="hidden" name="active_tab" value="candidates-tab">
+                <input type="hidden" name="import_data_json" id="import_data_json_input">
+                <button type="submit" class="btn-save" style="background: #10b981;">Đồng Ý & Lưu Vào Hệ Thống</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 2. MODAL THÊM / SỬA NHÂN VIÊN (37 TRƯỜNG THÔNG TIN TOÀN DIỆN) -->
+<div id="modal-emp" class="modal-overlay">
+    <div class="modal-box modal-box-large">
+        <form method="POST" action="quan-tri-nhan-su.php">
+            <input type="hidden" name="action" id="emp_action_type" value="add_employee">
+            <input type="hidden" name="old_id" id="emp_old_id">
+            <input type="hidden" name="active_tab" id="emp_active_tab" value="employees-tab">
+            
+            <div class="modal-header">
+                <span class="modal-title" id="emp_modal_title">Thông Tin Hồ Sơ Nhân Sự Chi Tiết</span>
+                <button type="button" class="btn-close-modal" onclick="closeModal('modal-emp')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-row-3">
+                    <div class="form-group">
+                        <label>MSNV (Mã nhân viên) *</label>
+                        <input type="number" name="custom_id" id="emp_custom_id" placeholder="VD: 101, 102...">
+                    </div>
+                    <div class="form-group">
+                        <label>HR Code</label>
+                        <input type="text" name="hr_code" id="emp_hr_code" placeholder="VD: HR-001">
+                    </div>
+                    <div class="form-group">
+                        <label>Họ & tên (Tiếng Việt) *</label>
+                        <input type="text" name="fullname" id="emp_fullname" required placeholder="Nguyễn Văn A">
+                    </div>
+                </div>
+
+                <div class="form-row-3">
+                    <div class="form-group">
+                        <label>Full name (English / Không dấu)</label>
+                        <input type="text" name="fullname_en" id="emp_fullname_en" placeholder="NGUYEN VAN A">
+                    </div>
+                    <div class="form-group">
+                        <label>Ngày sinh/ DOB</label>
+                        <input type="date" name="dob" id="emp_dob">
+                    </div>
+                    <div class="form-group">
+                        <label>Ngày bắt đầu làm việc/ Start date</label>
+                        <input type="date" name="start_date" id="emp_start_date">
+                    </div>
+                </div>
+
+                <div class="form-row-3">
+                    <div class="form-group">
+                        <label>Số CCCD/ ID Number</label>
+                        <input type="text" name="id_card" id="emp_id_card" placeholder="03809xxxxxxx">
+                    </div>
+                    <div class="form-group">
+                        <label>Ngày cấp/ ID issue date</label>
+                        <input type="date" name="id_issue_date" id="emp_id_issue_date">
+                    </div>
+                    <div class="form-group">
+                        <label>Nơi cấp/ Place of ID Issuance</label>
+                        <input type="text" name="id_issue_place" id="emp_id_issue_place" placeholder="Cục CS QLHC về TTXH">
+                    </div>
+                </div>
+
+                <div class="form-row-3">
+                    <div class="form-group">
+                        <label>Vị trí hiện tại (Vietnamese) *</label>
+                        <input type="text" name="position" id="emp_pos" required placeholder="VD: Kỹ sư">
+                    </div>
+                    <div class="form-group">
+                        <label>Position Title (English)</label>
+                        <input type="text" name="position_en" id="emp_position_en" placeholder="VD: Engineer">
+                    </div>
+                    <div class="form-group">
+                        <label>Level</label>
+                        <input type="text" name="level" id="emp_level" placeholder="VD: Senior, Junior, Leader...">
+                    </div>
+                </div>
+
+                <div class="form-row-3">
+                    <div class="form-group">
+                        <label>Department/ Bộ phận *</label>
+                        <select name="department" id="emp_dept" required>
+                            <option value="">-- Chọn phòng ban --</option>
+                            <?php foreach ($DEFAULT_DEPARTMENTS as $d): ?>
+                                <option value="<?= htmlspecialchars($d) ?>"><?= htmlspecialchars($d) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Team</label>
+                        <input type="text" name="team" id="emp_team" placeholder="Tên nhóm / tổ">
+                    </div>
+                    <div class="form-group">
+                        <label>CODE</label>
+                        <input type="text" name="dept_code" id="emp_dept_code" placeholder="Mã bộ phận">
+                    </div>
+                </div>
+
+                <div class="form-row-3">
+                    <div class="form-group">
+                        <label>Working Location/ Nơi làm việc</label>
+                        <input type="text" name="working_location" id="emp_working_location" value="Trụ sở chính">
+                    </div>
+                    <div class="form-group">
+                        <label>Số điện thoại</label>
+                        <input type="text" name="phone" id="emp_phone" placeholder="09xxxxxxx">
+                    </div>
+                    <div class="form-group">
+                        <label>Địa chỉ email</label>
+                        <input type="email" name="email" id="emp_email" placeholder="example@email.com">
+                    </div>
+                </div>
+
+                <div class="form-row-3">
+                    <div class="form-group">
+                        <label>Số SBHXH</label>
+                        <input type="text" name="social_insurance_no" id="emp_social_insurance_no">
+                    </div>
+                    <div class="form-group">
+                        <label>Số thẻ BHYT</label>
+                        <input type="text" name="health_insurance_no" id="emp_health_insurance_no">
+                    </div>
+                    <div class="form-group">
+                        <label>Thời gian tham gia BHXH (mm/yyyy)</label>
+                        <input type="text" name="si_start_date" id="emp_si_start_date" placeholder="VD: 05/2024">
+                    </div>
+                </div>
+
+                <div class="form-row-3">
+                    <div class="form-group">
+                        <label>Thời hạn thẻ BH Bảo Việt</label>
+                        <input type="text" name="baoviet_expiry_date" id="emp_baoviet_expiry_date">
+                    </div>
+                    <div class="form-group">
+                        <label>Trình độ/ Degree</label>
+                        <input type="text" name="degree" id="emp_degree" placeholder="Đại học, Cao đẳng...">
+                    </div>
+                    <div class="form-group">
+                        <label>Chuyên ngành/ Major</label>
+                        <input type="text" name="major" id="emp_major">
+                    </div>
+                </div>
+
+                <div class="form-row-3">
+                    <div class="form-group">
+                        <label>Số HĐLĐ Hiện tại</label>
+                        <input type="text" name="current_contract_no" id="emp_current_contract_no">
+                    </div>
+                    <div class="form-group">
+                        <label>Loại HĐ/ Contract Type</label>
+                        <input type="text" name="contract_type" id="emp_contract_type" placeholder="Thử việc, 1 năm, Vô thời hạn...">
+                    </div>
+                    <div class="form-group">
+                        <label>Thời hạn HĐ/ Contract Expiry date</label>
+                        <input type="text" name="contract_expiry_date" id="emp_contract_expiry_date">
+                    </div>
+                </div>
+
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label>Hợp Đồng Từ Ngày</label>
+                        <input type="date" name="contract_from_date" id="emp_contract_from_date">
+                    </div>
+                    <div class="form-group">
+                        <label>Hợp Đồng Đến Ngày</label>
+                        <input type="date" name="contract_to_date" id="emp_contract_to_date">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Địa chỉ thường trú (trên sổ hộ khẩu)</label>
+                    <input type="text" name="permanent_address" id="emp_permanent_address">
+                </div>
+
+                <div class="form-group">
+                    <label>Địa chỉ liên hệ (tạm trú)</label>
+                    <input type="text" name="temporary_address" id="emp_temporary_address">
+                </div>
+
+                <div class="form-group">
+                    <label>Địa chỉ sau sát nhập TDP từ tháng 07/2026</label>
+                    <input type="text" name="merged_tdp_address" id="emp_merged_tdp_address">
+                </div>
+
+                <div class="form-row-3">
+                    <div class="form-group">
+                        <label>Bằng cấp do công ty đào tạo</label>
+                        <input type="text" name="company_training_cert" id="emp_company_training_cert">
+                    </div>
+                    <div class="form-group">
+                        <label>Kỷ luật lao động (nếu có)</label>
+                        <input type="text" name="labor_discipline" id="emp_labor_discipline">
+                    </div>
+                    <div class="form-group">
+                        <label>Tai nạn lao động (nếu có)</label>
+                        <input type="text" name="labor_accident" id="emp_labor_accident">
+                    </div>
+                </div>
+
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label>Số tài khoản Ngân Hàng</label>
+                        <input type="text" name="bank_account" id="emp_bank_account">
+                    </div>
+                    <div class="form-group">
+                        <label>Trạng thái</label>
+                        <select name="status" id="emp_status">
+                            <option value="Đang làm việc">Đang làm việc</option>
+                            <option value="Nghỉ phép">Nghỉ phép</option>
+                            <option value="Đã nghỉ">Đã nghỉ (Tự động chấm dứt HĐ)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-cancel" onclick="closeModal('modal-emp')">Hủy</button>
+                <button type="submit" class="btn-save">Lưu Hồ Sơ Nhân Viên</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 3. MODAL TUYỂN DỤNG ỨNG VIÊN: ĐỔ DỮ LIỆU QUA TAB 1 & ĐẶT MÃ MSNV MỚI -->
+<div id="modal-hire" class="modal-overlay">
+    <div class="modal-box modal-box-large">
+        <form method="POST" action="quan-tri-nhan-su.php">
+            <input type="hidden" name="action" value="hire_candidate">
+            <input type="hidden" name="candidate_id" id="hire_candidate_id">
+            <input type="hidden" name="active_tab" value="candidates-tab">
+
+            <div class="modal-header">
+                <span class="modal-title">🎉 Xác Nhận Tuyển Dụng & Đưa Vào Danh Sách Nhân Sự</span>
+                <button type="button" class="btn-close-modal" onclick="closeModal('modal-hire')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 12px; border-radius: 6px; font-size: 0.88rem; color: #166534;">
+                    📌 <strong>Lưu ý quan trọng:</strong> Mã ID tại tab ứng viên chỉ là tạm thời. Hãy <strong>đặt lại Mã Số Nhân Viên (MSNV) chính thức</strong> dưới đây. Toàn bộ thông tin hồ sơ của ứng viên sẽ được chuyển qua <strong>Danh Sách Nhân Viên (Tab 1)</strong>.
+                </div>
+
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label style="color: #0284c7; font-weight: 700;">MSNV (Mã Nhân Viên Mới) *</label>
+                        <input type="number" name="new_msnv" id="hire_new_msnv" required placeholder="Nhập mã nhân sự mới (VD: 101, 102...)">
+                    </div>
+                    <div class="form-group">
+                        <label>HR Code</label>
+                        <input type="text" name="hr_code" id="hire_hr_code" placeholder="VD: HR-001">
+                    </div>
+                </div>
+
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label>Họ và Tên</label>
+                        <input type="text" id="hire_cand_fullname" readonly style="background: #f1f5f9; font-weight: 700;">
+                    </div>
+                    <div class="form-group">
+                        <label>Vị trí tuyển dụng</label>
+                        <input type="text" id="hire_cand_position" readonly style="background: #f1f5f9;">
+                    </div>
+                </div>
+
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label>Phòng ban tiếp nhận *</label>
+                        <select name="department" id="hire_department" required>
+                            <option value="">-- Chọn phòng ban --</option>
+                            <?php foreach ($DEFAULT_DEPARTMENTS as $d): ?>
+                                <option value="<?= htmlspecialchars($d) ?>"><?= htmlspecialchars($d) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Nơi làm việc / Chi nhánh *</label>
+                        <input type="text" name="branch" value="Trụ sở chính" required>
+                    </div>
+                </div>
+
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label>Thời hạn hợp đồng *</label>
+                        <select name="contract_months" id="hire_months" onchange="updateContractDates()" required>
+                            <option value="1">1 Tháng (Thử việc)</option>
+                            <option value="2" selected>2 Tháng (Thử việc)</option>
+                            <option value="3">3 Tháng (Thử việc)</option>
+                            <option value="6">6 Tháng (Chính thức)</option>
+                            <option value="12">12 Tháng (1 Năm)</option>
+                            <option value="24">24 Tháng (2 Năm)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Ngày bắt đầu vào làm (Hiệu lực HĐ) *</label>
+                        <input type="date" name="contract_start_date" id="hire_start_date" value="<?= $today ?>" onchange="updateContractDates()" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Ngày hết hạn hợp đồng *</label>
+                    <input type="date" name="contract_end_date" id="hire_end_date" required>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-cancel" onclick="closeModal('modal-hire')">Hủy</button>
+                <button type="submit" class="btn-save" style="background: #10b981;">Xác Nhận & Tạo Hồ Sơ Tab 1</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function switchTab(tabId) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    
+    let targetTab = document.getElementById(tabId);
+    let targetBtn = document.getElementById('btn-' + tabId);
+    
+    if (targetTab && targetBtn) {
+        targetTab.classList.add('active');
+        targetBtn.classList.add('active');
+        localStorage.setItem('hr_current_tab', tabId);
+    }
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+    let urlParams = new URLSearchParams(window.location.search);
+    let urlTab = urlParams.get('tab');
+    let serverActiveTab = "<?= htmlspecialchars($active_tab) ?>";
+    let savedTab = urlTab || serverActiveTab || localStorage.getItem('hr_current_tab') || 'employees-tab';
+    switchTab(savedTab);
+});
+
+function closeModal(modalId) {
+    document.getElementById(modalId).style.display = 'none';
+}
+
+function toggleDropdownCandidate(event) {
+    event.stopPropagation();
+    let menu = document.getElementById('candidate-dropdown-menu');
+    menu.classList.toggle('show');
+}
+
+document.addEventListener('click', function(e) {
+    let menu = document.getElementById('candidate-dropdown-menu');
+    if (menu && menu.classList.contains('show')) {
+        menu.classList.remove('show');
+    }
+});
+
+function openSmartCandidateImport() {
+    let menu = document.getElementById('candidate-dropdown-menu');
+    if (menu) menu.classList.remove('show');
+    backToCandidateUpload();
+    document.getElementById('modal-smart-candidate').style.display = 'flex';
+}
+
+function backToCandidateUpload() {
+    document.getElementById('cand-import-step-upload').style.display = 'block';
+    document.getElementById('cand-import-step-preview').style.display = 'none';
+    document.getElementById('btn_process_cand_excel').style.display = 'inline-block';
+    document.getElementById('form_confirm_candidates').style.display = 'none';
+    document.getElementById('cand_upload_loading').style.display = 'none';
+}
+
+function uploadAndPreviewCandidateExcel() {
+    let fileInput = document.getElementById('cand_excel_file');
+    if (!fileInput.files || fileInput.files.length === 0) {
+        alert('Vui lòng chọn file Excel!');
+        return;
+    }
+
+    let formData = new FormData();
+    formData.append('action', 'preview_candidate_excel');
+    formData.append('excel_file', fileInput.files[0]);
+
+    document.getElementById('cand_upload_loading').style.display = 'block';
+
+    fetch('quan-tri-nhan-su.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+        document.getElementById('cand_upload_loading').style.display = 'none';
+        if (data.success) {
+            renderCandidatePreviewTable(data.data);
+        } else {
+            alert(data.message || 'Lỗi khi đọc file Excel!');
+        }
+    })
+    .catch(err => {
+        document.getElementById('cand_upload_loading').style.display = 'none';
+        alert('Đã xảy ra lỗi khi gửi yêu cầu tới máy chủ!');
+    });
+}
+
+function renderCandidatePreviewTable(rows) {
+    let tbody = document.getElementById('preview_table_body');
+    tbody.innerHTML = '';
+
+    rows.forEach((r, idx) => {
+        let tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td style="text-align:center;">${idx + 1}</td>
+            <td style="text-align:center;">${r.id ? '<span class="id-tag">#' + escapeHtml(String(r.id)) + '</span>' : '—'}</td>
+            <td><strong>${escapeHtml(r.fullname)}</strong></td>
+            <td style="text-align:center;">${escapeHtml(r.gender || '')}</td>
+            <td style="text-align:center;">${escapeHtml(r.birth_year || '')}</td>
+            <td style="text-align:center;">${escapeHtml(r.id_card || '')}</td>
+            <td>${escapeHtml(r.address || '')}</td>
+            <td style="text-align:center;">${escapeHtml(r.phone || '')}</td>
+            <td>${escapeHtml(r.skills_note || '')}</td>
+            <td>${escapeHtml(r.applied_position || '')}</td>
+            <td style="text-align:center;">${escapeHtml(r.interview_time || '')}</td>
+            <td style="text-align:center;">${escapeHtml(r.candidate_status || '')}</td>
+            <td style="text-align:center;">${escapeHtml(r.interview_status || '')}</td>
+            <td>${escapeHtml(r.docs_needed || '')}</td>
+            <td style="text-align:center;">${escapeHtml(r.hire_date || '')}</td>
+            <td>${escapeHtml(r.notes || '')}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    document.getElementById('preview_count_info').innerText = `✓ Đã nhận diện được ${rows.length} hồ sơ ứng viên hợp lệ:`;
+    document.getElementById('import_data_json_input').value = JSON.stringify(rows);
+    document.getElementById('cand-import-step-upload').style.display = 'none';
+    document.getElementById('cand-import-step-preview').style.display = 'block';
+    document.getElementById('btn_process_cand_excel').style.display = 'none';
+    document.getElementById('form_confirm_candidates').style.display = 'inline-block';
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+}
+
+function openAddEmp(defaultBranch = 'Trụ sở chính', tabName = 'employees-tab') {
+    document.getElementById('emp_action_type').value = 'add_employee';
+    document.getElementById('emp_active_tab').value = tabName;
+    document.getElementById('emp_modal_title').innerText = 'Thêm Mới Hồ Sơ Nhân Sự';
+    document.getElementById('emp_old_id').value = '';
+    document.getElementById('emp_custom_id').value = '';
+    document.getElementById('emp_hr_code').value = '';
+    document.getElementById('emp_fullname').value = '';
+    document.getElementById('emp_fullname_en').value = '';
+    document.getElementById('emp_dob').value = '';
+    document.getElementById('emp_start_date').value = '<?= $today ?>';
+    document.getElementById('emp_id_card').value = '';
+    document.getElementById('emp_id_issue_date').value = '';
+    document.getElementById('emp_id_issue_place').value = '';
+    document.getElementById('emp_position_en').value = '';
+    document.getElementById('emp_pos').value = '';
+    document.getElementById('emp_level').value = '';
+    document.getElementById('emp_dept').value = '';
+    document.getElementById('emp_team').value = '';
+    document.getElementById('emp_dept_code').value = '';
+    document.getElementById('emp_working_location').value = defaultBranch;
+    document.getElementById('emp_social_insurance_no').value = '';
+    document.getElementById('emp_health_insurance_no').value = '';
+    document.getElementById('emp_si_start_date').value = '';
+    document.getElementById('emp_baoviet_expiry_date').value = '';
+    document.getElementById('emp_degree').value = '';
+    document.getElementById('emp_major').value = '';
+    document.getElementById('emp_current_contract_no').value = '';
+    document.getElementById('emp_contract_type').value = '';
+    document.getElementById('emp_contract_expiry_date').value = '';
+    document.getElementById('emp_contract_from_date').value = '';
+    document.getElementById('emp_contract_to_date').value = '';
+    document.getElementById('emp_permanent_address').value = '';
+    document.getElementById('emp_temporary_address').value = '';
+    document.getElementById('emp_merged_tdp_address').value = '';
+    document.getElementById('emp_company_training_cert').value = '';
+    document.getElementById('emp_labor_discipline').value = '';
+    document.getElementById('emp_labor_accident').value = '';
+    document.getElementById('emp_phone').value = '';
+    document.getElementById('emp_email').value = '';
+    document.getElementById('emp_bank_account').value = '';
+    document.getElementById('emp_status').value = 'Đang làm việc';
+    document.getElementById('modal-emp').style.display = 'flex';
+}
+
+function openEditEmp(emp, tabName = 'employees-tab') {
+    document.getElementById('emp_action_type').value = 'update_employee';
+    document.getElementById('emp_active_tab').value = tabName;
+    document.getElementById('emp_modal_title').innerText = 'Cập Nhật Hồ Sơ Nhân Sự: ' + emp.fullname;
+    document.getElementById('emp_old_id').value = emp.id;
+    document.getElementById('emp_custom_id').value = emp.id;
+    document.getElementById('emp_hr_code').value = emp.hr_code || '';
+    document.getElementById('emp_fullname').value = emp.fullname || '';
+    document.getElementById('emp_fullname_en').value = emp.fullname_en || '';
+    document.getElementById('emp_dob').value = emp.dob || '';
+    document.getElementById('emp_start_date').value = emp.start_date || '';
+    document.getElementById('emp_id_card').value = emp.id_card || '';
+    document.getElementById('emp_id_issue_date').value = emp.id_issue_date || '';
+    document.getElementById('emp_id_issue_place').value = emp.id_issue_place || '';
+    document.getElementById('emp_position_en').value = emp.position_en || '';
+    document.getElementById('emp_pos').value = emp.position || '';
+    document.getElementById('emp_level').value = emp.level || '';
+    document.getElementById('emp_dept').value = emp.department || '';
+    document.getElementById('emp_team').value = emp.team || '';
+    document.getElementById('emp_dept_code').value = emp.dept_code || '';
+    document.getElementById('emp_working_location').value = emp.working_location || emp.branch || 'Trụ sở chính';
+    document.getElementById('emp_social_insurance_no').value = emp.social_insurance_no || '';
+    document.getElementById('emp_health_insurance_no').value = emp.health_insurance_no || '';
+    document.getElementById('emp_si_start_date').value = emp.si_start_date || '';
+    document.getElementById('emp_baoviet_expiry_date').value = emp.baoviet_expiry_date || '';
+    document.getElementById('emp_degree').value = emp.degree || '';
+    document.getElementById('emp_major').value = emp.major || '';
+    document.getElementById('emp_current_contract_no').value = emp.current_contract_no || '';
+    document.getElementById('emp_contract_type').value = emp.contract_type || '';
+    document.getElementById('emp_contract_expiry_date').value = emp.contract_expiry_date || '';
+    document.getElementById('emp_contract_from_date').value = emp.contract_from_date || '';
+    document.getElementById('emp_contract_to_date').value = emp.contract_to_date || '';
+    document.getElementById('emp_permanent_address').value = emp.permanent_address || '';
+    document.getElementById('emp_temporary_address').value = emp.temporary_address || emp.address || '';
+    document.getElementById('emp_merged_tdp_address').value = emp.merged_tdp_address || '';
+    document.getElementById('emp_company_training_cert').value = emp.company_training_cert || '';
+    document.getElementById('emp_labor_discipline').value = emp.labor_discipline || '';
+    document.getElementById('emp_labor_accident').value = emp.labor_accident || '';
+    document.getElementById('emp_phone').value = emp.phone || '';
+    document.getElementById('emp_email').value = emp.email || '';
+    document.getElementById('emp_bank_account').value = emp.bank_account || '';
+    document.getElementById('emp_status').value = emp.status || 'Đang làm việc';
+    document.getElementById('modal-emp').style.display = 'flex';
+}
+
+function openHireModal(cand) {
+    document.getElementById('hire_candidate_id').value = cand.id;
+    document.getElementById('hire_cand_fullname').value = cand.fullname;
+    document.getElementById('hire_cand_position').value = cand.applied_position || 'Nhân viên';
+    document.getElementById('hire_new_msnv').value = '';
+    document.getElementById('hire_hr_code').value = '';
+    updateContractDates();
+    document.getElementById('modal-hire').style.display = 'flex';
+}
+
+function updateContractDates() {
+    let startDateStr = document.getElementById('hire_start_date').value;
+    let months = parseInt(document.getElementById('hire_months').value) || 2;
+    if (startDateStr) {
+        let startDate = new Date(startDateStr);
+        startDate.setMonth(startDate.getMonth() + months);
+        let endDateStr = startDate.toISOString().split('T')[0];
+        document.getElementById('hire_end_date').value = endDateStr;
+    }
+}
+
+window.onclick = function(event) {
+    if (event.target.classList.contains('modal-overlay')) {
+        event.target.style.display = 'none';
+    }
+}
+</script>
+
+<?php include 'footer.php'; ?>

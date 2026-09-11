@@ -17,7 +17,7 @@ $currentUserFullName = $_SESSION['fullname'] ?? $_SESSION['name'] ?? $_SESSION['
 $today = date('Y-m-d');
 $limit = 15;
 
-// ==================== KHỞI TẠO BẢNG DATABASE CHUẨN CÁC CỘT ====================
+// ==================== KHỞI TẠO BẢNG DATABASE ====================
 try {
     $pdo->exec("
         CREATE TABLE IF NOT EXISTS `meal_attendance` (
@@ -37,7 +37,6 @@ try {
             `cancel_reason` VARCHAR(255) DEFAULT '',
             `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            UNIQUE KEY `uniq_emp_record` (`record_date`, `emp_no`),
             INDEX (`record_date`),
             INDEX (`department`),
             INDEX (`first_name`),
@@ -46,7 +45,17 @@ try {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     ");
 
-    // Tự động kiểm tra và thêm các cột nếu bảng đã tạo trước đó
+    // Xóa khóa Unique cũ nếu có để tránh lỗi crash
+    $indices = $pdo->query("SHOW INDEX FROM `meal_attendance`")->fetchAll(PDO::FETCH_ASSOC);
+    $idxNames = array_column($indices, 'Key_name');
+    if (in_array('uniq_emp_date', $idxNames)) {
+        $pdo->exec("ALTER TABLE `meal_attendance` DROP INDEX `uniq_emp_date`");
+    }
+    if (!in_array('uniq_emp_record', $idxNames)) {
+        $pdo->exec("ALTER TABLE `meal_attendance` ADD UNIQUE KEY `uniq_emp_record` (`record_date`, `emp_no`)");
+    }
+
+    // Tự động kiểm tra bổ sung cột
     $cols = $pdo->query("SHOW COLUMNS FROM `meal_attendance`")->fetchAll(PDO::FETCH_COLUMN);
     if (!in_array('first_name', $cols))  $pdo->exec("ALTER TABLE `meal_attendance` ADD COLUMN `first_name` VARCHAR(50) DEFAULT '' AFTER `full_name`");
     if (!in_array('last_name', $cols))   $pdo->exec("ALTER TABLE `meal_attendance` ADD COLUMN `last_name` VARCHAR(100) DEFAULT '' AFTER `first_name`");
@@ -57,7 +66,7 @@ try {
     if (!in_array('operation', $cols))   $pdo->exec("ALTER TABLE `meal_attendance` ADD COLUMN `operation` VARCHAR(100) DEFAULT '' AFTER `exception`");
 } catch (PDOException $e) {}
 
-// ==================== XỬ LÝ AJAX CẮT CƠM ====================
+// ==================== AJAX CẮT CƠM ====================
 if (isset($_POST['ajax_action']) && $_POST['ajax_action'] === 'toggle_cancel') {
     header('Content-Type: application/json; charset=utf-8');
     $id = intval($_POST['id'] ?? 0);
@@ -177,14 +186,14 @@ if (isset($_GET['export_report'])) {
     exit;
 }
 
-// ==================== XỬ LÝ POST (LƯU DỮ LIỆU TỪ EXCEL, SỬA, XÓA) ====================
+// ==================== XỬ LÝ POST (LƯU EXCEL, SỬA, XÓA) ====================
 $message = '';
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
-    // 1. Lưu danh sách sau khi Xem trước (Preview)
+    // 1. Lưu danh sách sau khi xem trước (Gộp 1 ID nhiều lần quẹt thành 1 người)
     if ($action === 'confirm_import_excel') {
         $importDate = $_POST['import_date'] ?? $today;
         $jsonData = $_POST['excel_rows_json'] ?? '';
@@ -192,38 +201,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (!empty($rows) && is_array($rows)) {
             try {
-                $stmtExisting = $pdo->prepare("SELECT id, emp_no FROM meal_attendance WHERE record_date = :d");
-                $stmtExisting->execute([':d' => $importDate]);
-                $existingRows = $stmtExisting->fetchAll(PDO::FETCH_ASSOC);
-                $stmtExisting->closeCursor();
+                // Gom nhóm theo emp_no (ID): Quẹt nhiều lần trong ngày chỉ lấy 1 người
+                $dedupRows = [];
+                foreach ($rows as $r) {
+                    $no = trim((string)($r['no'] ?? ''));
+                    if ($no === '') continue;
 
-                $existingMap = [];
-                foreach ($existingRows as $ex) {
-                    $existingMap[trim((string)$ex['emp_no'])] = $ex['id'];
+                    if (!isset($dedupRows[$no])) {
+                        $dedupRows[$no] = $r;
+                    } else {
+                        // Nếu dòng sau có giờ quẹt sớm hơn thì cập nhật giờ sớm nhất
+                        if (!empty($r['time']) && (empty($dedupRows[$no]['time']) || $r['time'] < $dedupRows[$no]['time'])) {
+                            $dedupRows[$no]['time'] = $r['time'];
+                        }
+                    }
                 }
 
                 $pdo->beginTransaction();
 
-                $stmtInsert = $pdo->prepare("
+                // Dùng ON DUPLICATE KEY UPDATE để không bao giờ bị lỗi trùng khóa 1062
+                $stmtUpsert = $pdo->prepare("
                     INSERT INTO meal_attendance 
                     (record_date, department, full_name, first_name, last_name, emp_no, check_time, state, new_state, exception, operation, is_canceled, cancel_reason)
                     VALUES 
                     (:d, :dept, :fn, :fname, :lname, :no, :t, :st, :nst, :exp, :op, 0, '')
+                    ON DUPLICATE KEY UPDATE
+                        department = VALUES(department),
+                        full_name = VALUES(full_name),
+                        first_name = VALUES(first_name),
+                        last_name = VALUES(last_name),
+                        check_time = VALUES(check_time),
+                        state = VALUES(state),
+                        new_state = VALUES(new_state),
+                        exception = VALUES(exception),
+                        operation = VALUES(operation)
                 ");
 
-                $stmtUpdate = $pdo->prepare("
-                    UPDATE meal_attendance 
-                    SET department = :dept, full_name = :fn, first_name = :fname, last_name = :lname, check_time = :t, state = :st, new_state = :nst, exception = :exp, operation = :op
-                    WHERE id = :id
-                ");
+                $countProcessed = 0;
 
-                $countInserted = 0;
-                $countUpdated = 0;
-
-                foreach ($rows as $r) {
+                foreach ($dedupRows as $no => $r) {
                     $dept  = trim((string)($r['department'] ?? ''));
                     $fn    = trim((string)($r['name'] ?? ''));
-                    $no    = trim((string)($r['no'] ?? ''));
                     $t     = trim((string)($r['time'] ?? ''));
                     $st    = trim((string)($r['state'] ?? ''));
                     $nst   = trim((string)($r['new_state'] ?? ''));
@@ -232,52 +250,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     if (empty($no) || empty($fn)) continue;
 
-                    // Tách họ tên: First Name (tên gọi), Last Name (họ & đệm)
+                    // Tách tên
                     $parts = preg_split('/\s+/', $fn);
                     $fname = count($parts) > 0 ? end($parts) : $fn;
                     $lname = count($parts) > 1 ? implode(' ', array_slice($parts, 0, -1)) : '';
 
-                    if (isset($existingMap[$no])) {
-                        $targetId = $existingMap[$no];
-                        $stmtUpdate->execute([
-                            ':dept'  => $dept,
-                            ':fn'    => $fn,
-                            ':fname' => $fname,
-                            ':lname' => $lname,
-                            ':t'     => $t,
-                            ':st'    => $st,
-                            ':nst'   => $nst,
-                            ':exp'   => $exp,
-                            ':op'    => $op,
-                            ':id'    => $targetId
-                        ]);
-                        $stmtUpdate->closeCursor();
-                        $countUpdated++;
-                    } else {
-                        $stmtInsert->execute([
-                            ':d'     => $importDate,
-                            ':dept'  => $dept,
-                            ':fn'    => $fn,
-                            ':fname' => $fname,
-                            ':lname' => $lname,
-                            ':no'    => $no,
-                            ':t'     => $t,
-                            ':st'    => $st,
-                            ':nst'   => $nst,
-                            ':exp'   => $exp,
-                            ':op'    => $op
-                        ]);
-                        $newId = $pdo->lastInsertId();
-                        $stmtInsert->closeCursor();
-                        $existingMap[$no] = $newId;
-                        $countInserted++;
-                    }
+                    $stmtUpsert->execute([
+                        ':d'     => $importDate,
+                        ':dept'  => $dept,
+                        ':fn'    => $fn,
+                        ':fname' => $fname,
+                        ':lname' => $lname,
+                        ':no'    => $no,
+                        ':t'     => $t,
+                        ':st'    => $st,
+                        ':nst'   => $nst,
+                        ':exp'   => $exp,
+                        ':op'    => $op
+                    ]);
+                    $stmtUpsert->closeCursor();
+                    $countProcessed++;
                 }
 
                 $pdo->commit();
-                $message = "Đã nhập thành công dữ liệu ngày [{$importDate}]: Thêm mới {$countInserted} người, cập nhật {$countUpdated} người đi làm!";
+                $message = "Đã nhập thành công dữ liệu ngày [{$importDate}]: Ghi nhận chính xác {$countProcessed} nhân viên đi làm (các lượt quẹt trùng lặp đã tự động gộp thành 1)!";
             } catch (Exception $e) {
-                if ($pdo->inTransaction()) $pdo->rollBack();
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
                 $error = "Lỗi khi lưu dữ liệu: " . $e->getMessage();
             }
         } else {
@@ -502,7 +502,7 @@ include 'header.php';
     <?php if ($message): ?><div class="alert-box alert-success"><?= $message ?></div><?php endif; ?>
     <?php if ($error): ?><div class="alert-box alert-danger"><?= $error ?></div><?php endif; ?>
 
-    <!-- KHỐI 1: DANH SÁCH CHI TIẾT (CHUẨN TỪNG TÊN CỘT) -->
+    <!-- KHỐI 1: DANH SÁCH CHI TIẾT -->
     <div class="card-box">
         <div class="card-title">
             <span>
@@ -515,7 +515,7 @@ include 'header.php';
             </span>
         </div>
 
-        <!-- Bộ lọc cập nhật tìm theo First Name, Last Name, No., Department -->
+        <!-- Bộ lọc tìm kiếm theo First Name, Last Name, No., Department -->
         <form method="GET" action="suat-an-ngoai.php" class="filter-bar">
             <label style="font-size:0.83rem; font-weight:700; color:#334155;">Ngày:</label>
             <input type="date" name="f_date" value="<?= htmlspecialchars($f_date) ?>" onchange="this.form.submit()">
@@ -739,16 +739,16 @@ include 'header.php';
             <input type="hidden" name="excel_rows_json" id="preview_json_val">
 
             <div class="modal-header">
-                <span style="color:#0369a1;">🔍 Xem Trước Dữ Liệu Chấm Công Suất Ăn (Chuẩn Khung Máy Chấm Công)</span>
+                <span style="color:#0369a1;">🔍 Xem Trước Dữ Liệu Chấm Công Suất Ăn</span>
                 <span style="cursor:pointer;" onclick="closeModal('modal-preview-excel')">&times;</span>
             </div>
 
             <div class="modal-body">
                 <div style="background:#f0f9ff; border:1px solid #bae6fd; padding:12px; border-radius:6px; font-size:0.88rem; color:#0369a1; margin-bottom:14px; line-height:1.5;">
-                    💡 <strong>Điều kiện lọc:</strong> Chỉ lấy nhân viên có <strong>Time (Giờ chấm công)</strong> khác rỗng.
+                    💡 <strong>Quy tắc lọc & gộp:</strong> Hệ thống tìm theo từng <strong>ID (No.)</strong>. Nếu 1 ID quẹt thẻ nhiều lần trong ngày, hệ thống sẽ <strong>tự động gộp lại và chỉ tính 1 người duy nhất</strong> (giữ lại lượt quẹt sớm nhất).
                     <div style="margin-top:6px; font-size:0.92rem;">
                         Ngày nhận diện: <strong id="preview_date_text" style="color:#0f172a;"></strong> | 
-                        Số người đi làm: <strong id="preview_count_text" style="color:#15803d; font-size:1.05rem;">0</strong> người
+                        Tổng số người đi làm thực tế: <strong id="preview_count_text" style="color:#15803d; font-size:1.05rem;">0</strong> người
                     </div>
                 </div>
 
@@ -759,9 +759,9 @@ include 'header.php';
                                 <th style="width:35px; text-align:center;">STT</th>
                                 <th>Department</th>
                                 <th>Name</th>
-                                <th>No.</th>
+                                <th>No. (ID)</th>
                                 <th style="text-align:center;">Date</th>
-                                <th style="text-align:center;">Time</th>
+                                <th style="text-align:center;">Time (Sớm nhất)</th>
                                 <th style="text-align:center;">State</th>
                                 <th style="text-align:center;">New State</th>
                                 <th style="text-align:center;">Exception</th>
@@ -872,7 +872,7 @@ window.addEventListener('click', () => {
     document.querySelectorAll('.action-menu').forEach(el => el.classList.remove('show'));
 });
 
-// Xử lý đọc file Excel theo đúng thứ tự cột của máy chấm công
+// Xử lý file Excel: Tìm theo ID (No.), 1 người quẹt nhiều lần chỉ tính 1 người
 function handleExcelUpload(input) {
     const file = input.files[0];
     if (!file) return;
@@ -895,14 +895,14 @@ function handleExcelUpload(input) {
             let colDept = -1, colName = -1, colNo = -1, colDate = -1, colTime = -1;
             let colState = -1, colNewState = -1, colException = -1, colOperation = -1;
 
-            // Tìm hàng header
+            // Quét tìm vị trí các cột
             for (let r = 0; r < Math.min(15, jsonSheet.length); r++) {
                 const row = jsonSheet[r];
                 for (let c = 0; c < row.length; c++) {
                     const val = String(row[c]).toLowerCase().trim();
                     if (val === 'department' || val.includes('phòng')) colDept = c;
                     else if (val === 'name' || val.includes('tên') || val.includes('họ tên')) colName = c;
-                    else if (val === 'no.' || val === 'no' || val.includes('mã nv') || val.includes('ac-no') || val.includes('user id')) colNo = c;
+                    else if (val === 'no.' || val === 'no' || val.includes('mã nv') || val.includes('user id') || val.includes('id')) colNo = c;
                     else if (val === 'date' || val.includes('ngày')) colDate = c;
                     else if (val === 'time' || val.includes('giờ')) colTime = c;
                     else if (val === 'state') colState = c;
@@ -916,7 +916,7 @@ function handleExcelUpload(input) {
                 }
             }
 
-            // Fallback theo đúng thứ tự ảnh: Department (0), Name (1), No. (2), Date (3), Time (4), State (5), New State (6), Exception (7), Operation (8)
+            // Thứ tự cột fallback
             if (colDept === -1)      colDept = 0;
             if (colName === -1)      colName = 1;
             if (colNo === -1)        colNo = 2;
@@ -927,7 +927,8 @@ function handleExcelUpload(input) {
             if (colException === -1) colException = 7;
             if (colOperation === -1) colOperation = 8;
 
-            const validRows = [];
+            // Dùng Map theo No. để 1 người quẹt nhiều lần chỉ tính là 1 người
+            const uniqueIdMap = {};
             let detectedDate = '<?= $f_date ?>';
 
             for (let r = headerRowIndex + 1; r < jsonSheet.length; r++) {
@@ -944,19 +945,28 @@ function handleExcelUpload(input) {
                 const exception = String(row[colException] || '').trim();
                 const operation = String(row[colOperation] || '').trim();
 
-                // ĐIỀU KIỆN: Cột Time có giờ thì mới tính người đó đi làm
-                if (timeVal !== '' && name !== '') {
-                    validRows.push({
-                        department: dept,
-                        name: name,
-                        no: no,
-                        date: dateVal,
-                        time: timeVal,
-                        state: state,
-                        new_state: newState,
-                        exception: exception,
-                        operation: operation
-                    });
+                // Điều kiện: Có giờ quẹt (Time khác rỗng) và có No. (ID)
+                if (timeVal !== '' && name !== '' && no !== '') {
+                    if (!uniqueIdMap[no]) {
+                        // Thêm mới nếu chưa có ID này
+                        uniqueIdMap[no] = {
+                            department: dept,
+                            name: name,
+                            no: no,
+                            date: dateVal,
+                            time: timeVal,
+                            state: state,
+                            new_state: newState,
+                            exception: exception,
+                            operation: operation
+                        };
+                    } else {
+                        // Nếu ID đã có: So sánh và giữ lại giờ quẹt sớm nhất trong ngày
+                        if (timeVal < uniqueIdMap[no].time) {
+                            uniqueIdMap[no].time = timeVal;
+                            uniqueIdMap[no].state = state;
+                        }
+                    }
 
                     if (dateVal && dateVal.includes('-') && dateVal.length >= 8) {
                         detectedDate = dateVal;
@@ -964,8 +974,10 @@ function handleExcelUpload(input) {
                 }
             }
 
+            const validRows = Object.values(uniqueIdMap);
+
             if (validRows.length === 0) {
-                alert('Không tìm thấy dòng nào có giờ chấm công (Cột Time có dữ liệu)!');
+                alert('Không tìm thấy dòng nào có giờ chấm công hợp lệ!');
                 input.value = '';
                 return;
             }

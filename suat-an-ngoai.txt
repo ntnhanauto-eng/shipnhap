@@ -1,0 +1,952 @@
+<?php
+// suat-an-ngoai.php
+require_once 'db_connect.php';
+
+if (!isset($_SESSION['user_id'])) {
+    header('Location: login.php');
+    exit;
+}
+
+$currentUserFullName = $_SESSION['fullname'] ?? $_SESSION['name'] ?? $_SESSION['username'] ?? 'Bộ phận Hành chính';
+$today = date('Y-m-d');
+$limit = 15;
+
+// ==================== TỰ ĐỘNG KHỞI TẠO BẢNG DATABASE ====================
+try {
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS `meal_attendance` (
+            `id` INT AUTO_INCREMENT PRIMARY KEY,
+            `record_date` DATE NOT NULL,
+            `employee_code` VARCHAR(50) NOT NULL,
+            `full_name` VARCHAR(150) NOT NULL,
+            `department` VARCHAR(100) NOT NULL DEFAULT 'Khác',
+            `check_time` VARCHAR(20) DEFAULT '',
+            `is_canceled` TINYINT(1) DEFAULT 0,
+            `cancel_reason` VARCHAR(255) DEFAULT '',
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY `uniq_emp_date` (`record_date`, `employee_code`),
+            INDEX (`record_date`),
+            INDEX (`department`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    ");
+} catch (PDOException $e) {}
+
+// ==================== XỬ LÝ AJAX CẮT CƠM ====================
+if (isset($_POST['ajax_action']) && $_POST['ajax_action'] === 'toggle_cancel') {
+    header('Content-Type: application/json; charset=utf-8');
+    $id = intval($_POST['id'] ?? 0);
+    $status = intval($_POST['status'] ?? 0);
+    $reason = trim($_POST['reason'] ?? '');
+
+    if ($id > 0) {
+        $stmt = $pdo->prepare("UPDATE meal_attendance SET is_canceled = :st, cancel_reason = :rs WHERE id = :id");
+        $stmt->execute([':st' => $status, ':rs' => $reason, ':id' => $id]);
+        echo json_encode(['success' => true, 'is_canceled' => $status]);
+    } else {
+        echo json_encode(['success' => false, 'message' => 'ID không hợp lệ']);
+    }
+    exit;
+}
+
+// ==================== XỬ LÝ XUẤT EXCEL BÁO CÁO KÝ DUYỆT ====================
+if (isset($_GET['export_report'])) {
+    $exp_date = $_GET['f_date'] ?? $today;
+    $show_cancel = isset($_GET['show_cancel']) && $_GET['show_cancel'] == '1';
+
+    $stmtStat = $pdo->prepare("
+        SELECT 
+            department,
+            COUNT(*) AS total_working,
+            SUM(CASE WHEN is_canceled = 1 THEN 1 ELSE 0 END) AS total_canceled,
+            SUM(CASE WHEN is_canceled = 0 THEN 1 ELSE 0 END) AS total_meals
+        FROM meal_attendance
+        WHERE record_date = :d
+        GROUP BY department
+        ORDER BY department ASC
+    ");
+    $stmtStat->execute([':d' => $exp_date]);
+    $deptStats = $stmtStat->fetchAll(PDO::FETCH_ASSOC);
+
+    $date_formatted = date('d-m-Y', strtotime($exp_date));
+    header("Content-Type: application/vnd.ms-excel; charset=UTF-8");
+    header("Content-Disposition: attachment; filename=Bao_Cao_Suat_An_Ngoai_{$date_formatted}.xls");
+    header("Pragma: no-cache");
+    header("Expires: 0");
+    echo "\xEF\xBB\xBF";
+    ?>
+    <html xmlns:x="urn:schemas-microsoft-com:office:excel">
+    <head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"></head>
+    <body>
+    <table border="0" style="font-family: 'Times New Roman', serif; font-size: 13pt;">
+        <tr>
+            <td colspan="<?= $show_cancel ? '5' : '4' ?>" style="font-size: 15pt; font-weight: bold; text-align: center; color: #0f172a;">
+                BẢNG TỔNG HỢP SUẤT ĂN ĐẶT NGOÀI HÀNG NGÀY
+            </td>
+        </tr>
+        <tr>
+            <td colspan="<?= $show_cancel ? '5' : '4' ?>" style="font-size: 12pt; font-style: italic; text-align: center; color: #475569;">
+                Ngày áp dụng: <?= date('d/m/Y', strtotime($exp_date)) ?>
+            </td>
+        </tr>
+        <tr><td colspan="<?= $show_cancel ? '5' : '4' ?>"></td></tr>
+    </table>
+
+    <table border="1" style="font-family: 'Times New Roman', serif; font-size: 12pt; border-collapse: collapse;">
+        <thead>
+            <tr style="background-color: #0284c7; color: #ffffff; font-weight: bold; text-align: center; height: 35px;">
+                <th style="width: 50px;">STT</th>
+                <th style="width: 250px;">Phòng Ban / Bộ Phận</th>
+                <th style="width: 120px;">Số Người Đi Làm</th>
+                <?php if ($show_cancel): ?>
+                    <th style="width: 120px;">Cắt Cơm</th>
+                <?php endif; ?>
+                <th style="width: 150px;">Số Suất Cơm Đặt</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php 
+            $stt = 1; 
+            $sumWork = 0; $sumCancel = 0; $sumMeal = 0;
+            foreach ($deptStats as $row): 
+                $sumWork += $row['total_working'];
+                $sumCancel += $row['total_canceled'];
+                $sumMeal += $row['total_meals'];
+            ?>
+            <tr style="height: 28px;">
+                <td style="text-align: center;"><?= $stt++ ?></td>
+                <td style="text-align: left; padding-left: 8px;"><b><?= htmlspecialchars($row['department']) ?></b></td>
+                <td style="text-align: center;"><?= $row['total_working'] ?></td>
+                <?php if ($show_cancel): ?>
+                    <td style="text-align: center; color: #dc2626;"><?= $row['total_canceled'] ?></td>
+                <?php endif; ?>
+                <td style="text-align: center; font-weight: bold; color: #0284c7;"><?= $row['total_meals'] ?></td>
+            </tr>
+            <?php endforeach; ?>
+        </tbody>
+        <tfoot>
+            <tr style="background-color: #f1f5f9; font-weight: bold; height: 32px;">
+                <td colspan="2" style="text-align: center; font-size: 12pt;">TỔNG CỘNG TOÀN CÔNG TY</td>
+                <td style="text-align: center;"><?= $sumWork ?></td>
+                <?php if ($show_cancel): ?>
+                    <td style="text-align: center; color: #dc2626;"><?= $sumCancel ?></td>
+                <?php endif; ?>
+                <td style="text-align: center; font-size: 13pt; color: #b91c1c;"><?= $sumMeal ?> suất</td>
+            </tr>
+        </tfoot>
+    </table>
+
+    <br><br>
+    <table border="0" style="font-family: 'Times New Roman', serif; font-size: 12pt; text-align: center;">
+        <tr>
+            <td colspan="2" style="width: 35%;"><b>NGƯỜI LẬP BIỂU</b><br><i>(Ký và ghi rõ họ tên)</i><br><br><br><br><br><b><?= htmlspecialchars($currentUserFullName) ?></b></td>
+            <td colspan="<?= $show_cancel ? '2' : '1' ?>" style="width: 35%;"><b>TRƯỞNG BỘ PHẬN HC-NS</b><br><i>(Ký và ghi rõ họ tên)</i><br><br><br><br><br></td>
+            <td style="width: 30%;"><b>BAN GIÁM ĐỐC</b><br><i>(Phê duyệt)</i><br><br><br><br><br></td>
+        </tr>
+    </table>
+    </body>
+    </html>
+    <?php
+    exit;
+}
+
+// ==================== XỬ LÝ POST (LƯU EXCEL, SỬA, XÓA) ====================
+$message = '';
+$error = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action = $_POST['action'] ?? '';
+
+    // 1. Nhập danh sách từ Excel sau khi duyệt Preview
+    if ($action === 'confirm_import_excel') {
+        $importDate = $_POST['import_date'] ?? $today;
+        $jsonData = $_POST['excel_rows_json'] ?? '';
+        $rows = json_decode($jsonData, true);
+
+        if (!empty($rows) && is_array($rows)) {
+            try {
+                $pdo->beginTransaction();
+                $stmtCheck = $pdo->prepare("SELECT id, is_canceled, cancel_reason FROM meal_attendance WHERE record_date = :d AND employee_code = :c");
+                $stmtInsert = $pdo->prepare("
+                    INSERT INTO meal_attendance (record_date, employee_code, full_name, department, check_time, is_canceled, cancel_reason)
+                    VALUES (:d, :c, :n, :dept, :t, :ic, :cr)
+                ");
+                $stmtUpdate = $pdo->prepare("
+                    UPDATE meal_attendance 
+                    SET full_name = :n, department = :dept, check_time = :t 
+                    WHERE id = :id
+                ");
+
+                $countInserted = 0;
+                $countUpdated = 0;
+
+                foreach ($rows as $r) {
+                    $code = trim($r['code'] ?? '');
+                    $name = trim($r['name'] ?? '');
+                    $dept = trim($r['dept'] ?? 'Khác') ?: 'Khác';
+                    $time = trim($r['time'] ?? '');
+
+                    if (empty($code) || empty($name)) continue;
+
+                    $stmtCheck->execute([':d' => $importDate, ':c' => $code]);
+                    $exists = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+
+                    if ($exists) {
+                        $stmtUpdate->execute([
+                            ':n' => $name,
+                            ':dept' => $dept,
+                            ':t' => $time,
+                            ':id' => $exists['id']
+                        ]);
+                        $countUpdated++;
+                    } else {
+                        $stmtInsert->execute([
+                            ':d' => $importDate,
+                            ':c' => $code,
+                            ':n' => $name,
+                            ':dept' => $dept,
+                            ':t' => $time,
+                            ':ic' => 0,
+                            ':cr' => ''
+                        ]);
+                        $countInserted++;
+                    }
+                }
+                $pdo->commit();
+                $message = "Đã nhập thành công dữ liệu ngày [{$importDate}]: Thêm mới {$countInserted} người, cập nhật {$countUpdated} người có đi làm!";
+            } catch (Exception $e) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                $error = "Lỗi khi lưu dữ liệu: " . $e->getMessage();
+            }
+        } else {
+            $error = "Không có dữ liệu hợp lệ để nhập!";
+        }
+    }
+
+    // 2. Cập nhật thủ công 1 nhân viên
+    if ($action === 'update_row') {
+        $id = intval($_POST['id'] ?? 0);
+        $name = trim($_POST['full_name'] ?? '');
+        $code = trim($_POST['employee_code'] ?? '');
+        $dept = trim($_POST['department'] ?? 'Khác');
+        $time = trim($_POST['check_time'] ?? '');
+        $is_cancel = isset($_POST['is_canceled']) ? 1 : 0;
+        $reason = trim($_POST['cancel_reason'] ?? '');
+
+        if ($id > 0 && !empty($name)) {
+            $stmt = $pdo->prepare("
+                UPDATE meal_attendance 
+                SET employee_code = :c, full_name = :n, department = :dept, check_time = :t, is_canceled = :ic, cancel_reason = :cr
+                WHERE id = :id
+            ");
+            $stmt->execute([':c' => $code, ':n' => $name, ':dept' => $dept, ':t' => $time, ':ic' => $is_cancel, ':cr' => $reason, ':id' => $id]);
+            $message = "Đã cập nhật thông tin nhân viên [{$name}] thành công!";
+        }
+    }
+
+    // 3. Xóa nhân viên khỏi danh sách
+    if ($action === 'delete_row') {
+        $id = intval($_POST['id'] ?? 0);
+        if ($id > 0) {
+            $stmt = $pdo->prepare("DELETE FROM meal_attendance WHERE id = :id");
+            $stmt->execute([':id' => $id]);
+            $message = "Đã xóa bản ghi chấm công suất ăn!";
+        }
+    }
+}
+
+// ==================== BỘ LỌC & TRUY VẤN DỮ LIỆU KHỐI 1 ====================
+$f_date   = trim($_GET['f_date'] ?? $today);
+$f_search = trim($_GET['f_search'] ?? '');
+$f_dept   = trim($_GET['f_dept'] ?? '');
+$p_meal   = max(1, intval($_GET['p_meal'] ?? 1));
+
+$where = ["record_date = :fdate"];
+$params = [':fdate' => $f_date];
+
+if (!empty($f_search)) {
+    $where[] = "(employee_code LIKE :s1 OR full_name LIKE :s2)";
+    $params[':s1'] = "%{$f_search}%";
+    $params[':s2'] = "%{$f_search}%";
+}
+if (!empty($f_dept)) {
+    $where[] = "department = :dept";
+    $params[':dept'] = $f_dept;
+}
+
+$whereSql = implode(' AND ', $where);
+
+// 1. Tính tổng theo toàn bộ bộ lọc
+$stmtFilterSum = $pdo->prepare("
+    SELECT 
+        COUNT(*) AS total_count,
+        SUM(CASE WHEN is_canceled = 1 THEN 1 ELSE 0 END) AS total_canceled,
+        SUM(CASE WHEN is_canceled = 0 THEN 1 ELSE 0 END) AS total_active
+    FROM meal_attendance 
+    WHERE {$whereSql}
+");
+$stmtFilterSum->execute($params);
+$filterSumData = $stmtFilterSum->fetch(PDO::FETCH_ASSOC);
+
+$total_records   = intval($filterSumData['total_count'] ?? 0);
+$total_canceled  = intval($filterSumData['total_canceled'] ?? 0);
+$total_active    = intval($filterSumData['total_active'] ?? 0);
+
+$totalPages = ceil($total_records / $limit) ?: 1;
+if ($p_meal > $totalPages) $p_meal = $totalPages;
+$offset = ($p_meal - 1) * $limit;
+
+// 2. Lấy dữ liệu 15 dòng của trang hiện tại
+$stmtList = $pdo->prepare("
+    SELECT * FROM meal_attendance 
+    WHERE {$whereSql}
+    ORDER BY department ASC, employee_code ASC
+    LIMIT {$limit} OFFSET {$offset}
+");
+$stmtList->execute($params);
+$attendanceList = $stmtList->fetchAll(PDO::FETCH_ASSOC);
+
+// Lấy danh sách các phòng ban có trong ngày để đưa vào Dropdown lọc
+$stmtDepts = $pdo->prepare("SELECT DISTINCT department FROM meal_attendance WHERE record_date = :d ORDER BY department ASC");
+$stmtDepts->execute([':d' => $f_date]);
+$departmentList = $stmtDepts->fetchAll(PDO::FETCH_COLUMN);
+
+// ==================== TRUY VẤN DỮ LIỆU KHỐI 2 (THỐNG KÊ PHÒNG BAN) ====================
+$stmtStat = $pdo->prepare("
+    SELECT 
+        department,
+        COUNT(*) AS total_working,
+        SUM(CASE WHEN is_canceled = 1 THEN 1 ELSE 0 END) AS total_canceled,
+        SUM(CASE WHEN is_canceled = 0 THEN 1 ELSE 0 END) AS total_meals
+    FROM meal_attendance
+    WHERE record_date = :d
+    GROUP BY department
+    ORDER BY department ASC
+");
+$stmtStat->execute([':d' => $f_date]);
+$statsByDept = $stmtStat->fetchAll(PDO::FETCH_ASSOC);
+
+$allDeptWorking = 0;
+$allDeptCanceled = 0;
+$allDeptMeals = 0;
+foreach ($statsByDept as $sb) {
+    $allDeptWorking += $sb['total_working'];
+    $allDeptCanceled += $sb['total_canceled'];
+    $allDeptMeals += $sb['total_meals'];
+}
+
+include 'header.php';
+?>
+
+<!-- Thư viện SheetJS để đọc file Excel ngay trên trình duyệt -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+<style>
+    .meal-container { max-width: 1400px; margin: 25px auto; padding: 0 16px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    .page-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 20px; }
+    .page-title { font-size: 1.55rem; font-weight: 800; color: #0f172a; margin: 0; }
+    
+    .card-box { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px 20px; margin-bottom: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.04); }
+    .card-title { font-size: 1.15rem; font-weight: 800; color: #0369a1; display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; flex-wrap: wrap; gap: 10px; }
+    
+    .filter-bar { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+    .filter-bar input, .filter-bar select { padding: 7px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.88rem; outline: none; background: #fff; }
+
+    .table-custom { width: 100%; border-collapse: collapse; font-size: 0.9rem; min-width: 1000px; }
+    .table-custom th, .table-custom td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
+    .table-custom th { background: #f0f9ff; color: #0369a1; font-weight: 700; }
+    
+    .row-canceled { background-color: #fff1f2 !important; }
+    .row-canceled td.emp-name { text-decoration: line-through; color: #94a3b8; }
+    
+    /* Cột thao tác cây bút */
+    .action-dropdown { position: relative; display: inline-block; }
+    .btn-pencil { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; width: 32px; height: 32px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; font-size: 0.95rem; }
+    .btn-pencil:hover { background: #dbeafe; }
+    .action-menu { display: none; position: absolute; right: 0; top: 110%; background: #ffffff; min-width: 130px; box-shadow: 0 8px 20px rgba(0,0,0,0.15); border: 1px solid #e2e8f0; border-radius: 8px; padding: 5px 0; z-index: 100; }
+    .action-menu.show { display: block; }
+    .action-item { width: 100%; background: none; border: none; text-align: left; padding: 8px 12px; font-size: 0.84rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+    .action-item:hover { background: #f8fafc; }
+
+    /* Checkbox cắt cơm lớn */
+    .meal-checkbox { width: 20px; height: 20px; cursor: pointer; accent-color: #dc2626; vertical-align: middle; }
+
+    .btn-action { background: #0284c7; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; font-size: 0.88rem; }
+    .btn-action:hover { background: #0369a1; }
+    .btn-success { background: #10b981; }
+    .btn-success:hover { background: #059669; }
+
+    /* Phân trang */
+    .pagination-wrapper { display: flex; justify-content: center; align-items: center; gap: 6px; margin: 15px 0 5px; }
+    .page-link { display: inline-flex; align-items: center; justify-content: center; min-width: 34px; height: 34px; padding: 0 8px; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; color: #334155; font-size: 0.88rem; font-weight: 600; text-decoration: none; }
+    .page-link.active { background-color: #0284c7; color: #fff; border-color: #0284c7; }
+    .page-link.disabled { color: #cbd5e1; border-color: #e2e8f0; cursor: not-allowed; }
+
+    /* Modal */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.6); z-index: 999; align-items: center; justify-content: center; padding: 15px; }
+    .modal-box { background: #fff; width: 100%; max-width: 900px; border-radius: 10px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.2); max-height: 90vh; display: flex; flex-direction: column; }
+    .modal-header { padding: 14px 20px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-weight: 700; display: flex; justify-content: space-between; align-items: center; font-size: 1.05rem; }
+    .modal-body { padding: 20px; overflow-y: auto; flex: 1; }
+    .modal-footer { padding: 12px 20px; background: #f8fafc; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 10px; }
+
+    .alert-box { padding: 12px 16px; border-radius: 8px; font-size: 0.9rem; margin-bottom: 18px; }
+    .alert-success { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+    .alert-danger { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+
+    .badge-status { padding: 3px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 700; }
+    .badge-eat { background: #dcfce7; color: #15803d; }
+    .badge-cancel { background: #fee2e2; color: #b91c1c; }
+</style>
+
+<div class="meal-container">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Quản Lý & Đặt Suất Ăn Ngoài</h1>
+            <p style="font-size: 0.88rem; color: #64748b; margin-top: 4px;">
+                Tải lên bảng chấm công buổi sáng, lọc người đi làm thực tế và quản lý cắt cơm hàng ngày.
+            </p>
+        </div>
+        <div>
+            <!-- Nút mở modal tải file Excel -->
+            <button type="button" class="btn-action btn-success" onclick="document.getElementById('excel_file_input').click()">
+                📤 Tải File Chấm Công Sáng
+            </button>
+            <input type="file" id="excel_file_input" accept=".xlsx, .xls, .csv" style="display:none;" onchange="handleExcelUpload(this)">
+        </div>
+    </div>
+
+    <?php if ($message): ?><div class="alert-box alert-success"><?= $message ?></div><?php endif; ?>
+    <?php if ($error): ?><div class="alert-box alert-danger"><?= $error ?></div><?php endif; ?>
+
+    <!-- KHỐI 1: DANH SÁCH CHI TIẾT NHÂN VIÊN & CẮT CƠM -->
+    <div class="card-box">
+        <div class="card-title">
+            <span>
+                📋 DANH SÁCH ĐI LÀM & SUẤT ĂN NGÀY <?= date('d/m/Y', strtotime($f_date)) ?>
+                <span style="font-size: 0.9rem; color: #64748b; font-weight: normal; margin-left: 8px;">
+                    (Tổng đi làm: <strong style="color:#0284c7;"><?= $total_records ?></strong> | 
+                    Cắt cơm: <strong style="color:#dc2626;"><?= $total_canceled ?></strong> | 
+                    Đặt cơm: <strong style="color:#15803d;"><?= $total_active ?></strong>)
+                </span>
+            </span>
+        </div>
+
+        <!-- Bộ lọc trên bảng -->
+        <form method="GET" action="suat-an-ngoai.php" class="filter-bar">
+            <label style="font-size:0.85rem; font-weight:700; color:#334155;">Ngày:</label>
+            <input type="date" name="f_date" value="<?= htmlspecialchars($f_date) ?>" onchange="this.form.submit()">
+
+            <input type="text" name="f_search" value="<?= htmlspecialchars($f_search) ?>" placeholder="🔍 Tìm theo Tên hoặc Mã NV..." style="width: 240px;">
+
+            <label style="font-size:0.85rem; font-weight:700; color:#334155;">Phòng ban:</label>
+            <select name="f_dept">
+                <option value="">-- Tất cả phòng ban --</option>
+                <?php foreach ($departmentList as $d): ?>
+                    <option value="<?= htmlspecialchars($d) ?>" <?= $f_dept === $d ? 'selected' : '' ?>><?= htmlspecialchars($d) ?></option>
+                <?php endforeach; ?>
+            </select>
+
+            <button type="submit" class="btn-action" style="padding: 7px 14px;">Lọc Dữ Liệu</button>
+            <?php if ($f_search || $f_dept || $f_date !== $today): ?>
+                <a href="suat-an-ngoai.php?f_date=<?= $today ?>" style="font-size:0.85rem; color:#64748b; text-decoration:none;">Xóa lọc</a>
+            <?php endif; ?>
+        </form>
+
+        <div style="overflow-x:auto;">
+            <table class="table-custom">
+                <thead>
+                    <tr>
+                        <th style="width: 45px; text-align: center;">STT</th>
+                        <th style="width: 120px;">Mã NV</th>
+                        <th>Họ Và Tên</th>
+                        <th style="min-width: 170px;">Phòng Ban</th>
+                        <th style="width: 110px; text-align: center;">Giờ Chấm Công</th>
+                        <th style="width: 110px; text-align: center;">Trạng Thái</th>
+                        <th style="width: 130px; text-align: center; color: #dc2626;">TICK CẮT CƠM</th>
+                        <th style="min-width: 150px;">Lý Do Cắt</th>
+                        <th style="width: 70px; text-align: center;">Thao Tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (!empty($attendanceList)): ?>
+                        <?php 
+                        $stt = $offset + 1;
+                        $pageWorking = count($attendanceList);
+                        $pageCanceled = 0;
+                        $pageMeals = 0;
+
+                        foreach ($attendanceList as $row): 
+                            $isCanc = ($row['is_canceled'] == 1);
+                            if ($isCanc) $pageCanceled++; else $pageMeals++;
+                        ?>
+                            <tr id="row_<?= $row['id'] ?>" class="<?= $isCanc ? 'row-canceled' : '' ?>">
+                                <td style="text-align: center; font-weight: bold; color: #64748b;"><?= $stt++ ?></td>
+                                <td><b><?= htmlspecialchars($row['employee_code']) ?></b></td>
+                                <td class="emp-name" id="name_<?= $row['id'] ?>"><strong><?= htmlspecialchars($row['full_name']) ?></strong></td>
+                                <td><?= htmlspecialchars($row['department']) ?></td>
+                                <td style="text-align: center; color: #0284c7; font-weight: 600;"><?= htmlspecialchars($row['check_time'] ?: '—') ?></td>
+                                <td style="text-align: center;" id="status_badge_<?= $row['id'] ?>">
+                                    <?php if ($isCanc): ?>
+                                        <span class="badge-status badge-cancel">Cắt Cơm</span>
+                                    <?php else: ?>
+                                        <span class="badge-status badge-eat">Có Ăn Cơm</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td style="text-align: center;">
+                                    <input type="checkbox" class="meal-checkbox" title="Tick để Cắt Cơm hoặc Bỏ tick để Ăn Cơm"
+                                           <?= $isCanc ? 'checked' : '' ?> 
+                                           onchange="toggleCancelMeal(<?= $row['id'] ?>, this)">
+                                </td>
+                                <td>
+                                    <span id="reason_text_<?= $row['id'] ?>" style="font-size:0.83rem; color:#64748b;">
+                                        <?= htmlspecialchars($row['cancel_reason'] ?: '') ?>
+                                    </span>
+                                </td>
+                                <td style="text-align: center;">
+                                    <div class="action-dropdown">
+                                        <button type="button" class="btn-pencil" onclick="toggleActionMenu(event, <?= $row['id'] ?>)">✏️</button>
+                                        <div class="action-menu" id="action_menu_<?= $row['id'] ?>">
+                                            <button type="button" class="action-item" style="color:#0284c7;" onclick='openEditModal(<?= json_encode($row) ?>)'>✏️ Sửa</button>
+                                            <form method="POST" action="suat-an-ngoai.php?f_date=<?= $f_date ?>" onsubmit="return confirm('Xóa nhân viên này khỏi danh sách ngày hôm nay?');" style="margin:0;">
+                                                <input type="hidden" name="action" value="delete_row">
+                                                <input type="hidden" name="id" value="<?= $row['id'] ?>">
+                                                <button type="submit" class="action-item" style="color:#dc2626;">🗑️ Xóa</button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <tr><td colspan="9" style="text-align:center; padding: 25px; color:#64748b;">Chưa có dữ liệu chấm công suất ăn cho ngày này. Hãy bấm "Tải File Chấm Công Sáng" để nạp dữ liệu.</td></tr>
+                    <?php endif; ?>
+                </tbody>
+                <?php if (!empty($attendanceList)): ?>
+                    <tfoot>
+                        <!-- Dòng tổng theo bộ lọc -->
+                        <tr style="background:#f1f5f9; font-weight:bold; border-top:2px solid #cbd5e1;">
+                            <td colspan="4" style="text-align:right; color:#1e293b;">
+                                🎯 <strong>TỔNG THEO BỘ LỌC HIỆN TẠI (<?= $total_records ?> người đi làm):</strong>
+                            </td>
+                            <td style="text-align:center; color:#0284c7;">—</td>
+                            <td style="text-align:center; color:#15803d;"><?= $total_active ?> suất ăn</td>
+                            <td style="text-align:center; color:#dc2626;"><?= $total_canceled ?> cắt</td>
+                            <td colspan="2" style="font-size:0.8rem; color:#64748b;">(Số liệu tổng của toàn bộ kết quả lọc)</td>
+                        </tr>
+                        <!-- Dòng tổng trên trang này -->
+                        <tr style="background:#ffffff; font-weight:bold; border-top:1px solid #e2e8f0;">
+                            <td colspan="4" style="text-align:right; color:#64748b;">
+                                📄 <strong>TỔNG TRÊN TRANG NÀY (Trang <?= $p_meal ?>/<?= $totalPages ?>):</strong>
+                            </td>
+                            <td style="text-align:center; color:#0284c7;"><?= $pageWorking ?> người</td>
+                            <td style="text-align:center; color:#166534;"><?= $pageMeals ?> suất ăn</td>
+                            <td style="text-align:center; color:#dc2626;"><?= $pageCanceled ?> cắt</td>
+                            <td colspan="2" style="font-size:0.8rem; color:#94a3b8;">(15 dòng/trang)</td>
+                        </tr>
+                    </tfoot>
+                <?php endif; ?>
+            </table>
+        </div>
+
+        <!-- Phân trang 15 dòng -->
+        <?php if ($totalPages > 1): ?>
+            <div class="pagination-wrapper">
+                <?php 
+                $queryParams = $_GET;
+                if ($p_meal > 1): 
+                    $queryParams['p_meal'] = $p_meal - 1;
+                ?>
+                    <a href="?<?= http_build_query($queryParams) ?>" class="page-link">&laquo;</a>
+                <?php else: ?>
+                    <span class="page-link disabled">&laquo;</span>
+                <?php endif; ?>
+
+                <?php 
+                $start = max(1, $p_meal - 2);
+                $end = min($totalPages, $p_meal + 2);
+                for ($i = $start; $i <= $end; $i++): 
+                    $queryParams['p_meal'] = $i;
+                ?>
+                    <a href="?<?= http_build_query($queryParams) ?>" class="page-link <?= $i == $p_meal ? 'active' : '' ?>"><?= $i ?></a>
+                <?php endfor; ?>
+
+                <?php if ($p_meal < $totalPages): 
+                    $queryParams['p_meal'] = $p_meal + 1;
+                ?>
+                    <a href="?<?= http_build_query($queryParams) ?>" class="page-link">&raquo;</a>
+                <?php else: ?>
+                    <span class="page-link disabled">&raquo;</span>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
+    </div>
+
+    <!-- KHỐI 2: BẢNG THỐNG KÊ THEO PHÒNG BAN & XUẤT BÁO CÁO KÝ DUYỆT -->
+    <div class="card-box">
+        <div class="card-title">
+            <span>📊 THỐNG KÊ SUẤT ĂN NGOÀI THEO PHÒNG BAN</span>
+            <div style="display:flex; gap:10px; align-items:center;">
+                <!-- Nút ẩn hiện cột cắt cơm (Mặc định ẩn) -->
+                <button type="button" class="btn-action" style="background:#64748b; font-size:0.82rem;" onclick="toggleCancelColumn()">
+                    👁️ <span id="btn_toggle_cancel_text">Hiện Cột Cắt Cơm</span>
+                </button>
+
+                <!-- Nút xuất Excel ký duyệt -->
+                <a href="javascript:void(0)" onclick="exportReportExcel()" class="btn-action btn-success" style="font-size:0.82rem;">
+                    📥 Xuất Excel Báo Cáo Ký Duyệt
+                </a>
+            </div>
+        </div>
+
+        <div style="overflow-x:auto;">
+            <table class="table-custom" id="table_dept_stats">
+                <thead>
+                    <tr>
+                        <th style="width: 50px; text-align: center;">STT</th>
+                        <th>Phòng Ban / Bộ Phận</th>
+                        <th style="width: 180px; text-align: center;">Số Người Đi Làm</th>
+                        <th class="col-cancel-stat" style="width: 180px; text-align: center; color: #dc2626; display: none;">Số Người Cắt Cơm</th>
+                        <th style="width: 220px; text-align: center; color: #0284c7;">Số Suất Cơm Đặt Thực Tế</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (!empty($statsByDept)): ?>
+                        <?php $s_stt = 1; foreach ($statsByDept as $st): ?>
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #64748b;"><?= $s_stt++ ?></td>
+                                <td><strong><?= htmlspecialchars($st['department']) ?></strong></td>
+                                <td style="text-align: center; font-weight: 600;"><?= $st['total_working'] ?></td>
+                                <td class="col-cancel-stat" style="text-align: center; font-weight: bold; color: #dc2626; display: none;"><?= $st['total_canceled'] ?></td>
+                                <td style="text-align: center; font-weight: 800; font-size: 1.05rem; color: #0284c7;"><?= $st['total_meals'] ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <tr><td colspan="5" style="text-align:center; padding:20px; color:#64748b;">Chưa có dữ liệu tổng hợp phòng ban ngày hôm nay.</td></tr>
+                    <?php endif; ?>
+                </tbody>
+                <?php if (!empty($statsByDept)): ?>
+                    <tfoot>
+                        <tr style="background:#f8fafc; font-weight:bold; font-size:1.02rem; border-top:2px solid #cbd5e1;">
+                            <td colspan="2" style="text-align:right; color:#0f172a;">TỔNG CỘNG TOÀN CÔNG TY:</td>
+                            <td style="text-align:center; color:#334155;"><?= $allDeptWorking ?> người</td>
+                            <td class="col-cancel-stat" style="text-align:center; color:#dc2626; display: none;"><?= $allDeptCanceled ?> người</td>
+                            <td style="text-align:center; color:#b91c1c; font-size:1.2rem;"><?= $allDeptMeals ?> suất</td>
+                        </tr>
+                    </tfoot>
+                <?php endif; ?>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== MODAL XEM TRƯỚC (PREVIEW) FILE EXCEL ==================== -->
+<div id="modal-preview-excel" class="modal-overlay">
+    <div class="modal-box">
+        <form method="POST" action="suat-an-ngoai.php?f_date=<?= $f_date ?>">
+            <input type="hidden" name="action" value="confirm_import_excel">
+            <input type="hidden" name="import_date" id="preview_import_date_val" value="<?= $f_date ?>">
+            <input type="hidden" name="excel_rows_json" id="preview_json_val">
+
+            <div class="modal-header">
+                <span style="color:#0369a1;">🔍 Xem Trước Dữ Liệu Chấm Công Suất Ăn</span>
+                <span style="cursor:pointer;" onclick="closeModal('modal-preview-excel')">&times;</span>
+            </div>
+
+            <div class="modal-body">
+                <div style="background:#f0f9ff; border:1px solid #bae6fd; padding:12px; border-radius:6px; font-size:0.88rem; color:#0369a1; margin-bottom:14px; line-height:1.5;">
+                    💡 <strong>Quy tắc lọc tự động:</strong> Hệ thống chỉ ghi nhận những nhân viên <strong>CÓ GIỜ CHẤM CÔNG (Cột Time khác rỗng)</strong> để tính suất ăn ngoài. Những người không có giờ chấm công đã được tự động bỏ qua.
+                    <div style="margin-top:6px; font-size:0.92rem;">
+                        Ngày ghi nhận: <strong id="preview_date_text" style="color:#0f172a;"></strong> | 
+                        Số người đi làm hợp lệ: <strong id="preview_count_text" style="color:#15803d; font-size:1.05rem;">0</strong> người
+                    </div>
+                </div>
+
+                <div style="max-height: 52vh; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 6px;">
+                    <table class="table-custom">
+                        <thead>
+                            <tr>
+                                <th style="width:45px; text-align:center;">STT</th>
+                                <th style="width:120px;">Mã NV</th>
+                                <th>Họ Và Tên</th>
+                                <th>Phòng Ban</th>
+                                <th style="width:110px; text-align:center;">Giờ Chấm Công</th>
+                            </tr>
+                        </thead>
+                        <tbody id="preview_tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn-action" style="background:#e2e8f0; color:#475569;" onclick="closeModal('modal-preview-excel')">Hủy Bỏ</button>
+                <button type="submit" class="btn-action btn-success" style="font-weight:bold;">✅ Đồng Ý Nhập Dữ Liệu Lên Hệ Thống</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ==================== MODAL SỬA THÔNG TIN ==================== -->
+<div id="modal-edit-row" class="modal-overlay">
+    <div class="modal-box" style="max-width: 500px;">
+        <form method="POST" action="suat-an-ngoai.php?f_date=<?= $f_date ?>">
+            <input type="hidden" name="action" value="update_row">
+            <input type="hidden" name="id" id="edit_id">
+
+            <div class="modal-header">
+                <span>✏️ Chỉnh Sửa Nhân Viên Chấm Công</span>
+                <span style="cursor:pointer;" onclick="closeModal('modal-edit-row')">&times;</span>
+            </div>
+
+            <div class="modal-body">
+                <div style="margin-bottom:12px;">
+                    <label style="font-size:0.85rem; font-weight:700; color:#334155; display:block; margin-bottom:4px;">Mã NV: *</label>
+                    <input type="text" name="employee_code" id="edit_code" required style="width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px; box-sizing:border-box;">
+                </div>
+                <div style="margin-bottom:12px;">
+                    <label style="font-size:0.85rem; font-weight:700; color:#334155; display:block; margin-bottom:4px;">Họ và tên: *</label>
+                    <input type="text" name="full_name" id="edit_name" required style="width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px; box-sizing:border-box;">
+                </div>
+                <div style="margin-bottom:12px;">
+                    <label style="font-size:0.85rem; font-weight:700; color:#334155; display:block; margin-bottom:4px;">Phòng ban:</label>
+                    <input type="text" name="department" id="edit_dept" style="width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px; box-sizing:border-box;">
+                </div>
+                <div style="margin-bottom:12px;">
+                    <label style="font-size:0.85rem; font-weight:700; color:#334155; display:block; margin-bottom:4px;">Giờ chấm công:</label>
+                    <input type="text" name="check_time" id="edit_time" style="width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px; box-sizing:border-box;">
+                </div>
+                <div style="margin-bottom:12px;">
+                    <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:700; color:#dc2626;">
+                        <input type="checkbox" name="is_canceled" id="edit_is_cancel" value="1" style="width:18px; height:18px;">
+                        Đánh dấu Cắt Cơm
+                    </label>
+                </div>
+                <div style="margin-bottom:12px;">
+                    <label style="font-size:0.85rem; font-weight:700; color:#334155; display:block; margin-bottom:4px;">Lý do cắt cơm:</label>
+                    <input type="text" name="cancel_reason" id="edit_reason" placeholder="Ví dụ: Công tác, nghỉ phép, ăn ngoài tự túc..." style="width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px; box-sizing:border-box;">
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn-action" style="background:#e2e8f0; color:#475569;" onclick="closeModal('modal-edit-row')">Hủy</button>
+                <button type="submit" class="btn-action">Lưu Cập Nhật</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+// Toggle menu cây bút
+function toggleActionMenu(e, id) {
+    e.stopPropagation();
+    const menu = document.getElementById('action_menu_' + id);
+    const isShown = menu.classList.contains('show');
+    document.querySelectorAll('.action-menu').forEach(el => el.classList.remove('show'));
+    if (!isShown) menu.classList.add('show');
+}
+window.addEventListener('click', () => {
+    document.querySelectorAll('.action-menu').forEach(el => el.classList.remove('show'));
+});
+
+// Xử lý đọc file Excel và mở Modal Xem trước
+function handleExcelUpload(input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const firstSheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[firstSheetName];
+            const jsonSheet = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+
+            if (!jsonSheet || jsonSheet.length < 2) {
+                alert('File Excel không có dữ liệu hợp lệ!');
+                return;
+            }
+
+            // Tìm hàng Header và xác định vị trí các cột
+            let headerRowIndex = 0;
+            let colCode = -1, colName = -1, colDept = -1, colDate = -1, colTime = -1;
+
+            for (let r = 0; r < Math.min(10, jsonSheet.length); r++) {
+                const row = jsonSheet[r];
+                for (let c = 0; c < row.length; c++) {
+                    const val = String(row[c]).toLowerCase().trim();
+                    if (val.includes('mã nv') || val.includes('ac-no') || val.includes('user id') || val.includes('id')) {
+                        if (colCode === -1) colCode = c;
+                    }
+                    if (val.includes('tên') || val.includes('name') || val.includes('họ tên')) {
+                        if (colName === -1) colName = c;
+                    }
+                    if (val.includes('phòng') || val.includes('bộ phận') || val.includes('dept') || val.includes('department')) {
+                        if (colDept === -1) colDept = c;
+                    }
+                    if (val.includes('ngày') || val.includes('date')) {
+                        if (colDate === -1) colDate = c;
+                    }
+                    if (val.includes('giờ') || val.includes('time') || val.includes('check')) {
+                        if (colTime === -1) colTime = c;
+                    }
+                }
+                if (colName !== -1 && (colCode !== -1 || colTime !== -1)) {
+                    headerRowIndex = r;
+                    break;
+                }
+            }
+
+            // Mặc định fallback nếu cấu trúc giống hình ảnh mẫu
+            if (colCode === -1) colCode = 2;
+            if (colName === -1) colName = 3;
+            if (colDept === -1) colDept = 4;
+            if (colDate === -1) colDate = 5;
+            if (colTime === -1) colTime = 6;
+
+            const validRows = [];
+            let detectedDate = '<?= $f_date ?>';
+
+            for (let r = headerRowIndex + 1; r < jsonSheet.length; r++) {
+                const row = jsonSheet[r];
+                if (!row || row.length === 0) continue;
+
+                const code = String(row[colCode] || '').trim();
+                const name = String(row[colName] || '').trim();
+                const dept = String(row[colDept] || 'Khác').trim() || 'Khác';
+                const dateVal = String(row[colDate] || '').trim();
+                const timeVal = String(row[colTime] || '').trim();
+
+                // ĐIỀU KIỆN QUAN TRỌNG: Cột Time có giờ thì mới tính người đó đi làm
+                if (timeVal !== '' && name !== '') {
+                    validRows.push({
+                        code: code,
+                        name: name,
+                        dept: dept,
+                        time: timeVal
+                    });
+
+                    // Cố gắng nhận diện ngày từ cột Date nếu có
+                    if (dateVal && dateVal.includes('-')) {
+                        detectedDate = dateVal;
+                    }
+                }
+            }
+
+            if (validRows.length === 0) {
+                alert('Không tìm thấy nhân viên nào có giờ chấm công (Cột Time có dữ liệu)!');
+                input.value = '';
+                return;
+            }
+
+            // Điền dữ liệu vào Modal Xem trước
+            document.getElementById('preview_import_date_val').value = detectedDate;
+            document.getElementById('preview_date_text').innerText = detectedDate;
+            document.getElementById('preview_count_text').innerText = validRows.length;
+            document.getElementById('preview_json_val').value = JSON.stringify(validRows);
+
+            const tbody = document.getElementById('preview_tbody');
+            tbody.innerHTML = '';
+            validRows.forEach((item, index) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="text-align:center; font-weight:bold; color:#64748b;">${index + 1}</td>
+                    <td><b>${item.code}</b></td>
+                    <td><strong>${item.name}</strong></td>
+                    <td>${item.dept}</td>
+                    <td style="text-align:center; color:#0284c7; font-weight:600;">${item.time}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            openModal('modal-preview-excel');
+            input.value = '';
+        } catch (err) {
+            alert('Lỗi khi đọc file Excel: ' + err.message);
+            input.value = '';
+        }
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+// Tick cắt cơm qua AJAX
+function toggleCancelMeal(id, checkbox) {
+    const isChecked = checkbox.checked ? 1 : 0;
+    let reason = '';
+    
+    if (isChecked) {
+        reason = prompt('Nhập lý do cắt cơm (nếu có, có thể để trống):', '') || '';
+    }
+
+    const formData = new FormData();
+    formData.append('ajax_action', 'toggle_cancel');
+    formData.append('id', id);
+    formData.append('status', isChecked);
+    formData.append('reason', reason);
+
+    fetch('suat-an-ngoai.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            const row = document.getElementById('row_' + id);
+            const statusBadge = document.getElementById('status_badge_' + id);
+            const reasonText = document.getElementById('reason_text_' + id);
+
+            if (isChecked) {
+                row.classList.add('row-canceled');
+                statusBadge.innerHTML = '<span class="badge-status badge-cancel">Cắt Cơm</span>';
+                reasonText.innerText = reason;
+            } else {
+                row.classList.remove('row-canceled');
+                statusBadge.innerHTML = '<span class="badge-status badge-eat">Có Ăn Cơm</span>';
+                reasonText.innerText = '';
+            }
+            // Tải lại trang sau 300ms để khối 2 tự động cập nhật số liệu mới nhất
+            setTimeout(() => { location.reload(); }, 350);
+        } else {
+            alert('Có lỗi xảy ra: ' + data.message);
+            checkbox.checked = !isChecked;
+        }
+    })
+    .catch(err => {
+        alert('Lỗi kết nối máy chủ!');
+        checkbox.checked = !isChecked;
+    });
+}
+
+// Ẩn / Hiện cột cắt cơm ở Khối 2
+let isCancelColVisible = false;
+function toggleCancelColumn() {
+    isCancelColVisible = !isCancelColVisible;
+    const cols = document.querySelectorAll('.col-cancel-stat');
+    cols.forEach(col => {
+        col.style.display = isCancelColVisible ? '' : 'none';
+    });
+    document.getElementById('btn_toggle_cancel_text').innerText = isCancelColVisible ? 'Ẩn Cột Cắt Cơm' : 'Hiện Cột Cắt Cơm';
+}
+
+// Xuất file Excel báo cáo ký duyệt
+function exportReportExcel() {
+    const url = 'suat-an-ngoai.php?export_report=1&f_date=<?= $f_date ?>&show_cancel=' + (isCancelColVisible ? '1' : '0');
+    window.location.href = url;
+}
+
+// Mở modal sửa thông tin dòng
+function openEditModal(row) {
+    document.getElementById('edit_id').value = row.id;
+    document.getElementById('edit_code').value = row.employee_code;
+    document.getElementById('edit_name').value = row.full_name;
+    document.getElementById('edit_dept').value = row.department;
+    document.getElementById('edit_time').value = row.check_time || '';
+    document.getElementById('edit_is_cancel').checked = (row.is_canceled == 1);
+    document.getElementById('edit_reason').value = row.cancel_reason || '';
+    openModal('modal-edit-row');
+}
+</script>
+
+<?php include 'footer.php'; ?>

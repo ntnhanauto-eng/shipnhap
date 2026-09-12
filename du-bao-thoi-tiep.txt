@@ -1,0 +1,180 @@
+<?php
+// Tọa độ mặc định: Ninh Hiệp, Ninh Hòa
+$default_lat = 12.6075;
+$default_lon = 109.1235;
+
+$result = null;
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $lat = filter_input(INPUT_POST, 'lat', FILTER_VALIDATE_FLOAT) ?: $default_lat;
+    $lon = filter_input(INPUT_POST, 'lon', FILTER_VALIDATE_FLOAT) ?: $default_lon;
+    $target_datetime = $_POST['target_time'] ?? date('Y-m-d\TH:00');
+
+    // Chuyển mốc giờ về định dạng chuỗi tròn giờ: YYYY-MM-DDTHH:00
+    $target_timestamp = strtotime($target_datetime);
+    $formatted_time = date('Y-m-d\TH:00', $target_timestamp);
+
+    // 1. Gọi API lấy dữ liệu mô hình ECMWF (Châu Âu)
+    $url_ecmwf = "https://api.open-meteo.com/v1/ecmwf?latitude={$lat}&longitude={$lon}&hourly=temperature_2m,precipitation,surface_pressure,wind_speed_10m,wind_direction_10m&timezone=Asia%2FBangkok";
+    
+    // 2. Gọi API lấy dữ liệu mô hình ICON (Đức - DWD)
+    $url_icon = "https://api.open-meteo.com/v1/dwd-icon?latitude={$lat}&longitude={$lon}&hourly=temperature_2m,precipitation,surface_pressure,wind_speed_10m,wind_direction_10m&timezone=Asia%2FBangkok";
+
+    $data_ecmwf = json_decode(@file_get_contents($url_ecmwf), true);
+    $data_icon  = json_decode(@file_get_contents($url_icon), true);
+
+    if ($data_ecmwf && $data_icon) {
+        $idx_ecmwf = array_search($formatted_time, $data_ecmwf['hourly']['time'] ?? []);
+        $idx_icon  = array_search($formatted_time, $data_icon['hourly']['time'] ?? []);
+
+        if ($idx_ecmwf !== false && $idx_icon !== false) {
+            // Trích xuất số liệu
+            $rain_ecmwf = $data_ecmwf['hourly']['precipitation'][$idx_ecmwf];
+            $temp_ecmwf = $data_ecmwf['hourly']['temperature_2m'][$idx_ecmwf];
+            $wind_deg_ecmwf = $data_ecmwf['hourly']['wind_direction_10m'][$idx_ecmwf];
+
+            $rain_icon = $data_icon['hourly']['precipitation'][$idx_icon];
+            $temp_icon = $data_icon['hourly']['temperature_2m'][$idx_icon];
+            $wind_speed_icon = $data_icon['hourly']['wind_speed_10m'][$idx_icon];
+            $wind_deg_icon = $data_icon['hourly']['wind_direction_10m'][$idx_icon];
+            $pressure_icon = $data_icon['hourly']['surface_pressure'][$idx_icon];
+
+            // 3. Áp dụng công thức chuyên gia để phân tích
+            $probability = 0;
+            $status = "Tạnh ráo";
+            $notes = [];
+
+            // Kiểm tra đồng thuận mưa
+            if ($rain_ecmwf >= 1.0 && $rain_icon >= 1.0) {
+                $probability = 85;
+                $status = "Khả năng mưa rất cao";
+                $notes[] = "Cả ECMWF ({$rain_ecmwf} mm) và ICON ({$rain_icon} mm) đều đồng thuận báo mưa.";
+            } elseif ($rain_ecmwf >= 1.5 || $rain_icon >= 1.5) {
+                $probability = 60;
+                $status = "Có thể có mưa";
+                $notes[] = "Chỉ có 1 mô hình báo mưa lớn (ECMWF: {$rain_ecmwf}mm | ICON: {$rain_icon}mm).";
+            } else {
+                $probability = 15;
+                $status = "Tạnh ráo / Không mưa";
+                $notes[] = "Cả 2 mô hình đều không ghi nhận lượng mưa đáng kể.";
+            }
+
+            // Kiểm tra hướng gió (Ninh Hòa: gió Đông/Đông Nam từ 60° - 150° là gió mang ẩm từ biển)
+            $is_sea_breeze = ($wind_deg_icon >= 60 && $wind_deg_icon <= 150);
+            if ($is_sea_breeze) {
+                $probability += 10;
+                $notes[] = "Gió Đông/Đông Nam từ biển đang thốc ẩm vào đất liền ({$wind_speed_icon} km/h), tăng nguy cơ mưa.";
+            } else {
+                $notes[] = "Gió lục địa/núi, không có nguồn ẩm biển mạnh.";
+            }
+
+            // Kiểm tra dông nhiệt buổi chiều (13h - 17h)
+            $hour = (int)date('H', $target_timestamp);
+            if ($hour >= 13 && $hour <= 17 && $temp_icon >= 32 && $is_sea_breeze) {
+                $status .= " (Cảnh báo: Dông sét nhiệt cục bộ)";
+                $notes[] = "Nhiệt độ buổi trưa cao ({$temp_icon}°C) kết hợp gió biển tạo đối lưu mạnh, dễ có dông sét.";
+            }
+
+            $probability = min(98, max(5, $probability)); // Giới hạn từ 5% đến 98%
+
+            $result = [
+                'time' => $formatted_time,
+                'status' => $status,
+                'probability' => $probability,
+                'rain_ecmwf' => $rain_ecmwf,
+                'rain_icon' => $rain_icon,
+                'temp' => $temp_icon,
+                'wind_speed' => $wind_speed_icon,
+                'pressure' => $pressure_icon,
+                'notes' => $notes
+            ];
+        } else {
+            $error = "Mốc thời gian chọn nằm ngoài phạm vi dữ liệu dự báo (tối đa 7 ngày).";
+        }
+    } else {
+        $error = "Không thể kết nối máy chủ dữ liệu khí tượng.";
+    }
+}
+?>
+
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Hệ thống Dự báo Thời tiết Thông minh</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 650px; margin: 30px auto; padding: 20px; background: #f4f6f9; }
+        .card { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        label { font-weight: bold; display: block; margin-top: 10px; }
+        input, select, button { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        button { background: #007bff; color: white; border: none; font-size: 16px; margin-top: 15px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .result-box { background: #eef6ff; border-left: 5px solid #007bff; padding: 15px; border-radius: 4px; }
+        .badge { display: inline-block; padding: 5px 10px; border-radius: 4px; color: white; font-weight: bold; }
+        .high { background: #dc3545; }
+        .medium { background: #ffc107; color: black; }
+        .low { background: #28a745; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>Hệ thống Dự báo Tự động (ECMWF & ICON)</h2>
+    <form method="POST">
+        <label>Chọn vị trí:</label>
+        <select onchange="updateCoords(this)">
+            <option value="12.6075,109.1235">Ninh Hiệp, Ninh Hòa</option>
+            <option value="12.6333,109.1667">Hòa Thắng, Ninh Hòa</option>
+            <option value="12.2388,109.1967">TP. Nha Trang</option>
+        </select>
+
+        <input type="hidden" name="lat" id="lat" value="12.6075">
+        <input type="hidden" name="lon" id="lon" value="109.1235">
+
+        <label>Chọn thời điểm cần kiểm tra:</label>
+        <input type="datetime-local" name="target_time" value="<?= htmlspecialchars($_POST['target_time'] ?? date('Y-m-d\T13:00', strtotime('+1 day'))) ?>" required>
+
+        <button type="submit">Phân tích & Dự báo</button>
+    </form>
+</div>
+
+<?php if (isset($error)): ?>
+    <div class="card" style="color: red;"><?= $error ?></div>
+<?php endif; ?>
+
+<?php if ($result): ?>
+    <div class="card result-box">
+        <h3>Kết luận: <?= htmlspecialchars($result['status']) ?></h3>
+        <p>
+            Xác suất mưa: 
+            <span class="badge <?= $result['probability'] >= 70 ? 'high' : ($result['probability'] >= 40 ? 'medium' : 'low') ?>">
+                <?= $result['probability'] ?>%
+            </span>
+        </p>
+        <hr>
+        <p><strong>Dữ liệu chi tiết:</strong></p>
+        <ul>
+            <li>Lượng mưa ECMWF (9km): <strong><?= $result['rain_ecmwf'] ?> mm</strong></li>
+            <li>Lượng mưa ICON (13km): <strong><?= $result['rain_icon'] ?> mm</strong></li>
+            <li>Nhiệt độ dự kiến: <strong><?= $result['temp'] ?> °C</strong></li>
+            <li>Gió ICON: <strong><?= $result['wind_speed'] ?> km/h</strong> | Khí áp: <strong><?= $result['pressure'] ?> hPa</strong></li>
+        </ul>
+        <p><strong>Phân tích logic:</strong></p>
+        <ul>
+            <?php foreach ($result['notes'] as $note): ?>
+                <li><?= htmlspecialchars($note) ?></li>
+            <?php endforeach; ?>
+        </ul>
+    </div>
+<?php endif; ?>
+
+<script>
+function updateCoords(select) {
+    var coords = select.value.split(',');
+    document.getElementById('lat').value = coords[0];
+    document.getElementById('lon').value = coords[1];
+}
+</script>
+
+</body>
+</html>

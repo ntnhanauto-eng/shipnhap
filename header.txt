@@ -1,0 +1,385 @@
+<?php
+// header.php
+
+// Khởi tạo session riêng biệt an toàn nếu chưa chạy
+if (session_status() === PHP_SESSION_NONE) {
+    session_name('HRM_PORTAL_SESSION');
+    $is_https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443);
+    session_set_cookie_params([
+        'lifetime' => 0,
+        'path'     => '/',
+        'secure'   => $is_https,
+        'httponly' => true,
+        'samesite' => 'Lax'
+    ]);
+    session_start();
+}
+
+// Kiểm tra trạng thái đăng nhập
+$is_logged_in = isset($_SESSION['fullname']) && trim((string)$_SESSION['fullname']) !== '';
+$fullname = $is_logged_in ? $_SESSION['fullname'] : '';
+?>
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hệ Thống Quản Lý Nhân Sự</title>
+    
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f4f6f9;
+            color: #333;
+        }
+        .site-header {
+            background-color: #1e293b;
+            padding: 12px 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            position: relative;
+            z-index: 999;
+        }
+        .header-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .brand-logo {
+            color: #38bdf8;
+            font-size: 1.25rem;
+            font-weight: 700;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+        }
+        .nav-links {
+            display: flex;
+            list-style: none;
+            gap: 6px;
+            align-items: center;
+        }
+        .nav-links > li {
+            position: relative;
+        }
+        .nav-links a,
+        .nav-dropdown-btn {
+            color: #cbd5e1;
+            text-decoration: none;
+            font-size: 0.92rem;
+            padding: 6px 12px;
+            border-radius: 4px;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-family: inherit;
+            white-space: nowrap;
+            transition: background 0.2s, color 0.2s;
+        }
+        .nav-links a:hover,
+        .nav-dropdown-btn:hover,
+        .nav-item-dropdown:hover > .nav-dropdown-btn,
+        .nav-item-dropdown.active > .nav-dropdown-btn {
+            background-color: #334155;
+            color: #fff;
+        }
+
+        .arrow-down {
+            font-size: 0.65rem;
+            color: #94a3b8;
+            transition: transform 0.2s;
+        }
+        .nav-item-dropdown:hover .arrow-down,
+        .nav-item-dropdown.active .arrow-down {
+            transform: rotate(180deg);
+        }
+
+        .nav-dropdown-menu {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            margin-top: 4px;
+            background-color: #ffffff;
+            min-width: 220px;
+            box-shadow: 0 8px 18px rgba(0,0,0,0.15);
+            border-radius: 6px;
+            overflow: hidden;
+            border: 1px solid #e2e8f0;
+            z-index: 1000;
+        }
+        .nav-dropdown-menu a {
+            color: #334155;
+            padding: 10px 14px;
+            display: block;
+            font-size: 0.88rem;
+            border-radius: 0;
+            white-space: nowrap;
+            transition: background-color 0.15s, color 0.15s;
+        }
+        .nav-dropdown-menu a:hover {
+            background-color: #f1f5f9;
+            color: #0284c7;
+        }
+
+        .nav-item-dropdown:hover .nav-dropdown-menu,
+        .nav-item-dropdown.active .nav-dropdown-menu {
+            display: block;
+        }
+
+        .header-user {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 0.9rem;
+        }
+        .guest-notice {
+            color: #94a3b8;
+        }
+        .user-welcome {
+            color: #f1f5f9;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .user-dropdown {
+            position: relative;
+            display: inline-block;
+        }
+        .user-name-highlight {
+            color: #38bdf8;
+            font-weight: 600;
+            cursor: pointer;
+            padding: 4px 6px;
+            border-radius: 4px;
+            background: none;
+            border: none;
+            font-family: inherit;
+            font-size: inherit;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .user-name-highlight:hover,
+        .user-dropdown.active .user-name-highlight {
+            background-color: #334155;
+        }
+        .dropdown-content {
+            display: none;
+            position: absolute;
+            right: 0;
+            top: 100%;
+            margin-top: 6px;
+            background-color: #ffffff;
+            min-width: 170px;
+            box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+            border-radius: 6px;
+            z-index: 1000;
+            overflow: hidden;
+            border: 1px solid #e2e8f0;
+        }
+        .dropdown-content a {
+            color: #334155;
+            padding: 10px 14px;
+            text-decoration: none;
+            display: block;
+            font-size: 0.85rem;
+            transition: background-color 0.15s, color 0.15s;
+        }
+        .dropdown-content a:hover {
+            background-color: #f1f5f9;
+            color: #0284c7;
+        }
+        .user-dropdown:hover .dropdown-content,
+        .user-dropdown.active .dropdown-content {
+            display: block;
+        }
+
+        .btn-auth {
+            text-decoration: none;
+            padding: 6px 14px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: opacity 0.2s, background 0.2s;
+            display: inline-block;
+            white-space: nowrap;
+        }
+        .btn-auth:hover {
+            opacity: 0.9;
+        }
+        .btn-login {
+            background-color: #0284c7;
+            color: #ffffff;
+        }
+        .btn-logout {
+            background-color: #475569;
+            color: #f8fafc;
+        }
+
+        @media (max-width: 768px) {
+            .site-header {
+                padding: 10px 14px;
+            }
+            .header-container,
+            .header-left {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 10px;
+                width: 100%;
+            }
+            .nav-links {
+                display: grid;
+                grid-template-columns: repeat(4, 1fr);
+                width: 100%;
+                gap: 4px;
+            }
+            .nav-links > li {
+                text-align: center;
+            }
+            .nav-links a,
+            .nav-dropdown-btn {
+                width: 100%;
+                justify-content: center;
+                padding: 6px 4px;
+                font-size: 0.82rem;
+            }
+            .nav-dropdown-menu {
+                left: 0;
+                min-width: 190px;
+            }
+            .header-user {
+                width: 100%;
+                justify-content: space-between;
+                padding-top: 8px;
+                border-top: 1px solid #334155;
+            }
+            .dropdown-content {
+                right: auto;
+                left: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <div class="header-container">
+            <div class="header-left">
+                <a href="index.php" class="brand-logo">👥 HRM - NGUYỄN NGỌC TÂM</a>
+                <ul class="nav-links">
+                    <li class="nav-item-dropdown">
+                        <button type="button" class="nav-dropdown-btn">
+                            Nhân sự <span class="arrow-down">▼</span>
+                        </button>
+                        <div class="nav-dropdown-menu">
+                            <a href="quan-tri-nhan-su.php">Danh sách công nhân viên</a>
+                            <a href="quan-ly-hop-dong.php">Gia hạn hợp đồng</a>
+                            <a href="duyet-phep.php">Duyệt phép</a>
+                            <a href="quan-ly-cong-ca.php">Quản lý công, tăng ca</a>
+                            <a href="bang-cong-thang.php">Bảng công tháng</a>
+                            <a href="bien-dong-nhan-su.php">Biến động nhân sự</a>
+                        </div>
+                    </li>
+
+                    <li class="nav-item-dropdown">
+                        <button type="button" class="nav-dropdown-btn">
+                            Bếp ăn <span class="arrow-down">▼</span>
+                        </button>
+                        <div class="nav-dropdown-menu">
+                            <a href="quan-ly-bep.php">Suất ăn tự phục vụ</a>
+                            <a href="suat-an-ngoai.php">Suất ăn ngoài</a>
+                            <a href="cai-thien-suat-an.php">Cải thiện khẩu phần ăn</a>
+                        </div>
+                    </li>
+
+                    <li class="nav-item-dropdown">
+                        <button type="button" class="nav-dropdown-btn">
+                            V.P phẩm <span class="arrow-down">▼</span>
+                        </button>
+                        <div class="nav-dropdown-menu">
+                            <a href="van-phong-pham.php">Cấp phát, theo dõi, thống kê</a>
+                            <a href="de-xuat-van-phong-pham.php">Đề xuất văn phòng phẩm</a>
+                        </div>
+                    </li>
+
+                    <li class="nav-item-dropdown">
+                        <button type="button" class="nav-dropdown-btn">
+                            Cấp nước <span class="arrow-down">▼</span>
+                        </button>
+                        <div class="nav-dropdown-menu">
+                            <a href="cap-phat-nuoc-uong.php">Cấp phát, theo dõi, thống kê</a>
+                            <a href="de-xuat-nuoc-uong.php">Đề xuất cấp nước uống</a>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="header-user">
+                <?php if ($is_logged_in): ?>
+                    <span class="user-welcome">
+                        Chào,
+                        <span class="user-dropdown">
+                            <button type="button" class="user-name-highlight">
+                                <?= htmlspecialchars($fullname, ENT_QUOTES, 'UTF-8') ?> <span class="arrow-down">▼</span>
+                            </button>
+                            <div class="dropdown-content">
+                                <a href="change_password.php">🔑 Đổi mật khẩu</a>
+                                <a href="logout.php">🚪 Đăng xuất</a>
+                            </div>
+                        </span>
+                    </span>
+                    <a href="logout.php" class="btn-auth btn-logout">Đăng xuất</a>
+                <?php else: ?>
+                    <span class="guest-notice">
+                        Chào, khách. Bạn chưa đăng nhập.
+                    </span>
+                    <a href="login.php" class="btn-auth btn-login">Đăng nhập</a>
+                <?php endif; ?>
+            </div>
+        </div>
+    </header>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const dropdownItems = document.querySelectorAll('.nav-item-dropdown, .user-dropdown');
+
+            dropdownItems.forEach(function (item) {
+                const trigger = item.querySelector('.nav-dropdown-btn, .user-name-highlight');
+                if (trigger) {
+                    trigger.addEventListener('click', function (e) {
+                        e.stopPropagation();
+                        dropdownItems.forEach(function (other) {
+                            if (other !== item) other.classList.remove('active');
+                        });
+                        item.classList.toggle('active');
+                    });
+                }
+            });
+
+            document.addEventListener('click', function () {
+                dropdownItems.forEach(function (item) {
+                    item.classList.remove('active');
+                });
+            });
+        });
+    </script>

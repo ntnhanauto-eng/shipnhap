@@ -102,15 +102,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $pdo->beginTransaction();
 
             // Lấy thông tin đợt yêu cầu
-            $stmtProps = $pdo->prepare("
-                p.*, 
-                COALESCE(i.item_name, p.custom_item_name) AS final_item_name,
-                COALESCE(i.specification, p.specification) AS final_spec,
-                COALESCE(i.unit, p.unit) AS final_unit
-                FROM vpp_purchase_proposals p
-                LEFT JOIN vpp_items i ON p.item_id = i.id
-                WHERE p.request_code = :code
-            ");
+           $stmtProps = $pdo->prepare("
+    SELECT p.*, 
+    COALESCE(i.item_name, p.custom_item_name) AS final_item_name,
+    COALESCE(i.specification, p.specification) AS final_spec,
+    COALESCE(i.unit, p.unit) AS final_unit
+    FROM vpp_purchase_proposals p
+    LEFT JOIN vpp_items i ON p.item_id = i.id
+    WHERE p.request_code = :code
+");
             // Sửa cú pháp chuẩn cho câu lệnh query
             $stmtProps = $pdo->prepare("
                 SELECT p.*, 

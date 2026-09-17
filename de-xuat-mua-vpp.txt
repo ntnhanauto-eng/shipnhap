@@ -1,0 +1,275 @@
+<?php
+// de-xuat-mua-vpp.php
+require_once 'db_connect.php';
+
+$message = '';
+$error = '';
+$today = date('Y-m-d');
+
+if (!isset($DEFAULT_DEPARTMENTS) || !is_array($DEFAULT_DEPARTMENTS)) {
+    $DEFAULT_DEPARTMENTS = [
+        'Ban Giám Đốc', 'Phòng Hành Chính - Nhân Sự', 'Phòng Kế Toán - Tài Chính',
+        'Phòng Kỹ Thuật - IT', 'Phòng Kinh Doanh - Marketing', 'Phòng Quản Lý Chất Lượng (QA/QC)',
+        'Bộ Phận Sản Xuất / Kho Vận', 'Bộ Phận Bếp & Dịch Vụ'
+    ];
+}
+
+// Khởi tạo bảng đề xuất mua VPP nếu chưa tồn tại
+try {
+    $pdo->exec("
+    CREATE TABLE IF NOT EXISTS `vpp_purchase_proposals` (
+        `id` INT AUTO_INCREMENT PRIMARY KEY,
+        `request_code` VARCHAR(60) DEFAULT '',
+        `employee_id` INT DEFAULT NULL,
+        `receiver_name` VARCHAR(150) NOT NULL,
+        `department` VARCHAR(100) NOT NULL,
+        `item_id` INT DEFAULT NULL,
+        `custom_item_name` VARCHAR(150) DEFAULT '',
+        `specification` VARCHAR(100) DEFAULT '',
+        `unit` VARCHAR(50) DEFAULT 'Cái',
+        `quantity` INT NOT NULL DEFAULT 1,
+        `pre_approved_quantity` INT DEFAULT NULL,
+        `approved_quantity` INT DEFAULT NULL,
+        `approval_note` VARCHAR(255) DEFAULT '',
+        `status` VARCHAR(50) DEFAULT 'Chờ duyệt',
+        `reject_reason` VARCHAR(255) DEFAULT '',
+        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX (`item_id`),
+        INDEX (`status`),
+        INDEX (`request_code`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    ");
+} catch (PDOException $e) {}
+
+$allItems = $pdo->query("SELECT * FROM vpp_items ORDER BY item_name ASC")->fetchAll();
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'submit_purchase_proposal') {
+    $employee_id = !empty($_POST['employee_id']) ? intval($_POST['employee_id']) : null;
+    $receiver_name = trim($_POST['receiver_name'] ?? '');
+    $department = trim($_POST['department'] ?? '');
+    $items_data = $_POST['items'] ?? [];
+
+    try {
+        if (empty($receiver_name) || empty($department)) {
+            throw new Exception("Vui lòng điền đầy đủ Họ tên người đề xuất và Bộ phận / Phòng ban!");
+        }
+        if (empty($items_data)) {
+            throw new Exception("Vui lòng chọn hoặc điền ít nhất một mặt hàng cần đề xuất mua!");
+        }
+
+        $baseCode = 'MUA-' . date('dmYHis');
+        $pdo->beginTransaction();
+
+        $stmtIns = $pdo->prepare("
+            INSERT INTO vpp_purchase_proposals 
+            (request_code, employee_id, receiver_name, department, item_id, custom_item_name, specification, unit, quantity, status)
+            VALUES (:code, :empid, :rec, :dept, :it_id, :c_name, :spec, :unit, :qty, 'Chờ duyệt')
+        ");
+
+        $insertedCount = 0;
+        foreach ($items_data as $row) {
+            $itemId = intval($row['item_id'] ?? 0);
+            $qty = intval($row['quantity'] ?? 0);
+            if ($qty <= 0) continue;
+
+            $customName = trim($row['custom_item_name'] ?? '');
+            $spec = trim($row['specification'] ?? '');
+            $unit = trim($row['unit'] ?? 'Cái');
+
+            $stmtIns->execute([
+                ':code' => $baseCode,
+                ':empid' => $employee_id,
+                ':rec' => $receiver_name,
+                ':dept' => $department,
+                ':it_id' => ($itemId > 0 ? $itemId : null),
+                ':c_name' => ($itemId > 0 ? '' : $customName),
+                ':spec' => $spec,
+                ':unit' => $unit,
+                ':qty' => $qty
+            ]);
+            $insertedCount++;
+        }
+
+        if ($insertedCount === 0) {
+            throw new Exception("Số lượng đề xuất của các mặt hàng không hợp lệ!");
+        }
+
+        $pdo->commit();
+        $message = "Gửi đề xuất mua văn phòng phẩm thành công! Mã phiếu của bạn là: <strong>{$baseCode}</strong>";
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        $error = "Lỗi gửi đề xuất: " . $e->getMessage();
+    }
+}
+?>
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Đề Xuất Mua Văn Phòng Phẩm</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+body { font-family: 'Inter', sans-serif; background: #f1f5f9; color: #1e293b; margin: 0; padding: 20px; }
+.container { max-width: 900px; margin: 0 auto; background: #fff; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); padding: 30px; }
+h1 { font-size: 1.5rem; color: #0f172a; margin-top: 0; text-align: center; }
+.form-group { margin-bottom: 15px; }
+label { display: block; font-weight: 600; font-size: 0.88rem; margin-bottom: 5px; color: #334155; }
+input, select { width: 100%; padding: 9px 12px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-size: 0.9rem; }
+.alert { padding: 12px 16px; border-radius: 6px; margin-bottom: 20px; font-size: 0.9rem; }
+.alert-success { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+.alert-danger { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+.table-items { width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 15px; }
+.table-items th, .table-items td { padding: 8px 10px; border: 1px solid #e2e8f0; vertical-align: middle; font-size: 0.88rem; }
+.table-items th { background: #f8fafc; color: #475569; font-weight: 600; text-align: left; }
+.btn { background: #0284c7; color: #fff; border: none; padding: 10px 20px; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.95rem; }
+.btn:hover { background: #0369a1; }
+.btn-add { background: #10b981; padding: 6px 12px; font-size: 0.82rem; }
+.btn-add:hover { background: #059669; }
+.btn-del { background: #ef4444; color: #fff; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; }
+</style>
+</head>
+<body>
+<div class="container">
+<h1>Đề Xuất Mua Sắm Văn Phòng Phẩm</h1>
+<p style="text-align: center; color: #64748b; font-size: 0.9rem; margin-bottom: 25px;">Biểu mẫu đăng ký nhu cầu mua sắm bổ sung văn phòng phẩm cho các phòng ban.</p>
+
+<?php if ($message): ?><div class="alert alert-success"><?= $message ?></div><?php endif; ?>
+<?php if ($error): ?><div class="alert alert-danger"><?= $error ?></div><?php endif; ?>
+
+<form method="POST" action="">
+<input type="hidden" name="action" value="submit_purchase_proposal">
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+<div class="form-group">
+<label>Họ và Tên Người Đề Xuất: *</label>
+<input type="text" name="receiver_name" required placeholder="Nhập họ và tên đầy đủ...">
+</div>
+<div class="form-group">
+<label>Mã Nhân Sự (Tùy chọn):</label>
+<input type="number" name="employee_id" placeholder="VD: 10254">
+</div>
+</div>
+
+<div class="form-group">
+<label>Bộ Phận / Phòng Ban: *</label>
+<select name="department" required>
+<option value="">-- Chọn phòng ban của bạn --</option>
+<?php foreach ($DEFAULT_DEPARTMENTS as $d): ?>
+<option value="<?= htmlspecialchars($d) ?>"><?= htmlspecialchars($d) ?></option>
+<?php endforeach; ?>
+</select>
+</div>
+
+<div class="form-group" style="margin-top: 20px;">
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+<label style="margin:0;">Danh Sách Mặt Hàng Cần Mua: *</label>
+<button type="button" class="btn btn-add" onclick="addItemRow()">+ Thêm dòng</button>
+</div>
+
+<table class="table-items" id="items_table">
+<thead>
+<tr>
+<th style="width: 35%;">Chọn mặt hàng có sẵn / Hoặc nhập mới</th>
+<th style="width: 25%;">Quy cách / Tên mô tả</th>
+<th style="width: 15%;">Đơn vị tính</th>
+<th style="width: 15%; text-align: center;">Số lượng</th>
+<th style="width: 10%; text-align: center;">Xóa</th>
+</tr>
+</thead>
+<tbody id="items_tbody">
+<tr>
+<td>
+<select name="items[0][item_id]" onchange="handleItemSelect(this)">
+<option value="0">-- Nhập mặt hàng mới bên ngoài --</option>
+<?php foreach ($allItems as $it): ?>
+<option value="<?= $it['id'] ?>" data-name="<?= htmlspecialchars($it['item_name']) ?>" data-spec="<?= htmlspecialchars($it['specification']) ?>" data-unit="<?= htmlspecialchars($it['unit']) ?>">
+<?= htmlspecialchars($it['item_name']) ?> (Tồn kho: <?= intval($it['stock_qty']) ?> <?= htmlspecialchars($it['unit']) ?>)
+</option>
+<?php endforeach; ?>
+</select>
+<input type="text" name="items[0][custom_item_name]" placeholder="Nhập tên mặt hàng..." style="margin-top: 5px;">
+</td>
+<td><input type="text" name="items[0][specification]" placeholder="VD: Ram 500 tờ..."></td>
+<td><input type="text" name="items[0][unit]" value="Cái" placeholder="ĐVT..."></td>
+<td style="text-align: center;"><input type="number" name="items[0][quantity]" min="1" value="1" required style="text-align: center;"></td>
+<td style="text-align: center;"><button type="button" class="btn-del" onclick="removeRow(this)">✕</button></td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<div style="text-align: center; margin-top: 25px;">
+<button type="submit" class="btn">Gửi Đề Xuất Mua VPP</button>
+</div>
+</form>
+</div>
+
+<script>
+let rowIndex = 0;
+const allItemsData = <?= json_encode($allItems) ?>;
+
+function handleItemSelect(select) {
+const row = select.closest('tr');
+const customInput = row.querySelector('input[name*="[custom_item_name]"]');
+const specInput = row.querySelector('input[name*="[specification]"]');
+const unitInput = row.querySelector('input[name*="[unit]"]');
+
+if (select.value === "0") {
+customInput.style.display = "block";
+customInput.value = "";
+customInput.required = true;
+specInput.value = "";
+unitInput.value = "Cái";
+} else {
+customInput.style.display = "none";
+customInput.required = false;
+const selectedOption = select.options[select.selectedIndex];
+customInput.value = selectedOption.getAttribute('data-name');
+specInput.value = selectedOption.getAttribute('data-spec') || '';
+unitInput.value = selectedOption.getAttribute('data-unit') || 'Cái';
+}
+}
+
+function addItemRow() {
+rowIndex++;
+const tbody = document.getElementById('items_tbody');
+const tr = document.createElement('tr');
+let optionsHtml = '<option value="0">-- Nhập mặt hàng mới bên ngoài --</option>';
+allItemsData.forEach(it => {
+optionsHtml += `<option value="${it.id}" data-name="${it.item_name}" data-spec="${it.specification || ''}" data-unit="${it.unit || 'Cái'}">${it.item_name} (Tồn kho: ${it.stock_qty} ${it.unit})</option>`;
+});
+
+tr.innerHTML = `
+<td>
+<select name="items[${rowIndex}][item_id]" onchange="handleItemSelect(this)">
+${optionsHtml}
+</select>
+<input type="text" name="items[${rowIndex}][custom_item_name]" placeholder="Nhập tên mặt hàng..." style="margin-top: 5px;">
+</td>
+<td><input type="text" name="items[${rowIndex}][specification]" placeholder="VD: Ram 500 tờ..."></td>
+<td><input type="text" name="items[${rowIndex}][unit]" value="Cái" placeholder="ĐVT..."></td>
+<td style="text-align: center;"><input type="number" name="items[${rowIndex}][quantity]" min="1" value="1" required style="text-align: center;"></td>
+<td style="text-align: center;"><button type="button" class="btn-del" onclick="removeRow(this)">✕</button></td>
+`;
+tbody.appendChild(tr);
+handleItemSelect(tr.querySelector('select'));
+}
+
+function removeRow(btn) {
+const tbody = document.getElementById('items_tbody');
+if (tbody.rows.length > 1) {
+btn.closest('tr').remove();
+} else {
+alert("Cần phải có ít nhất một mặt hàng đề xuất!");
+}
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+document.querySelectorAll('#items_tbody tr').forEach(tr => {
+const select = tr.querySelector('select');
+if(select) handleItemSelect(select);
+});
+});
+</script>
+</body>
+</html>

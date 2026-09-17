@@ -72,27 +72,6 @@ if (!isset($DEFAULT_DEPARTMENTS) || !is_array($DEFAULT_DEPARTMENTS)) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $act = $_POST['action'];
 
-    if ($act === 'pre_approve_purchase_group') {
-        $req_code = trim($_POST['request_code'] ?? '');
-        $pre_qtys = $_POST['pre_approved_quantities'] ?? [];
-        $pre_notes = $_POST['pre_item_notes'] ?? [];
-        try {
-            if (empty($req_code)) throw new Exception("Mã yêu cầu không hợp lệ!");
-            $pdo->beginTransaction();
-            foreach ($pre_qtys as $propId => $qty) {
-                $q = max(0, intval($qty));
-                $note = trim($pre_notes[$propId] ?? '');
-                $stmt = $pdo->prepare("UPDATE vpp_purchase_proposals SET status = 'Đã sơ duyệt', pre_approved_quantity = :q, approval_note = :n WHERE id = :id AND request_code = :code");
-                $stmt->execute([':q' => $q, ':n' => $note, ':id' => intval($propId), ':code' => $req_code]);
-            }
-            $pdo->commit();
-            $message = "Đã hoàn tất sơ duyệt cho yêu cầu [{$req_code}] thành công!";
-        } catch (Exception $e) {
-            if ($pdo->inTransaction()) $pdo->rollBack();
-            $error = "Lỗi sơ duyệt: " . $e->getMessage();
-        }
-    }
-
     if ($act === 'approve_and_push_next_period') {
         $req_code = trim($_POST['request_code'] ?? '');
         $appr_qtys = $_POST['approved_quantities'] ?? [];
@@ -115,7 +94,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
             foreach ($rows as $r) {
                 $propId = $r['id'];
-                $apprQty = isset($appr_qtys[$propId]) ? max(0, intval($appr_qtys[$propId])) : max(0, intval($r['pre_approved_quantity'] !== null ? $r['pre_approved_quantity'] : $r['quantity']));
+                $apprQty = isset($appr_qtys[$propId]) ? max(0, intval($appr_qtys[$propId])) : max(0, intval($r['quantity']));
                 $note = trim($appr_notes[$propId] ?? '');
 
                 $stmtUp = $pdo->prepare("UPDATE vpp_purchase_proposals SET status = 'Đã duyệt', approved_quantity = :aq, approval_note = :an WHERE id = :id");
@@ -231,8 +210,7 @@ $sqlProposals = "
         p.request_code, p.employee_id, p.receiver_name, p.department, p.status, p.reject_reason, p.created_at,
         COUNT(p.id) AS item_count,
         SUM(p.quantity) AS total_qty_requested,
-        SUM(COALESCE(p.pre_approved_quantity, p.quantity)) AS total_qty_pre_approved,
-        SUM(COALESCE(p.approved_quantity, p.pre_approved_quantity, p.quantity)) AS total_qty_approved,
+        SUM(COALESCE(p.approved_quantity, p.quantity)) AS total_qty_approved,
         JSON_ARRAYAGG(
             JSON_OBJECT(
                 'proposal_id', p.id,
@@ -240,7 +218,6 @@ $sqlProposals = "
                 'specification', COALESCE(i.specification, p.specification),
                 'unit', COALESCE(i.unit, p.unit),
                 'quantity', p.quantity,
-                'pre_approved_quantity', p.pre_approved_quantity,
                 'approved_quantity', p.approved_quantity,
                 'approval_note', p.approval_note
             )
@@ -296,7 +273,7 @@ include 'header.php';
 <div>
 <h1 class="vpp-title">Quản Lý & Phê Duyệt Đề Xuất Mua Sắm VPP</h1>
 <p style="font-size: 0.88rem; color: #64748b; margin-top: 4px;">
-Tiếp nhận yêu cầu mua VPP từ các phòng ban, sơ duyệt, phê duyệt và tự động tích lũy vào danh sách mua sắm cho kỳ tới.
+Tiếp nhận yêu cầu mua VPP từ các phòng ban, phê duyệt và tự động tích lũy vào danh sách mua sắm cho kỳ tới.
 </p>
 </div>
 <div>
@@ -319,7 +296,6 @@ Tiếp nhận yêu cầu mua VPP từ các phòng ban, sơ duyệt, phê duyệt
 <select name="f_prop_status">
 <option value="">-- Tất cả --</option>
 <option value="Chờ duyệt" <?= $f_prop_status === 'Chờ duyệt' ? 'selected' : '' ?>>Chờ duyệt</option>
-<option value="Đã sơ duyệt" <?= $f_prop_status === 'Đã sơ duyệt' ? 'selected' : '' ?>>Đã sơ duyệt</option>
 <option value="Đã duyệt" <?= $f_prop_status === 'Đã duyệt' ? 'selected' : '' ?>>Đã duyệt</option>
 <option value="Từ chối" <?= $f_prop_status === 'Từ chối' ? 'selected' : '' ?>>Từ chối</option>
 </select>
@@ -346,7 +322,7 @@ Tiếp nhận yêu cầu mua VPP từ các phòng ban, sơ duyệt, phê duyệt
 <th style="text-align:center; width:95px;">S.L yêu cầu</th>
 <th style="text-align:center; width:95px;">S.L Duyệt</th>
 <th style="text-align:center; width:110px;">Trạng Thái</th>
-<th style="width:200px; text-align:center;">Thao Tác</th>
+<th style="width:180px; text-align:center;">Thao Tác</th>
 </tr>
 </thead>
 <tbody>
@@ -354,10 +330,8 @@ Tiếp nhận yêu cầu mua VPP từ các phòng ban, sơ duyệt, phê duyệt
 <?php $stt = $offset_prop + 1; foreach ($proposals as $p): $json = json_encode($p); 
     // Xác định hiển thị S.L Duyệt
     $apprDisplay = '--';
-    if (in_array($p['status'], ['Đã duyệt', 'Đã cấp phát'])) {
+    if ($p['status'] === 'Đã duyệt') {
         $apprDisplay = number_format($p['total_qty_approved']);
-    } elseif ($p['status'] === 'Đã sơ duyệt') {
-        $apprDisplay = number_format($p['total_qty_pre_approved']) . ' (Sơ duyệt)';
     } elseif ($p['status'] === 'Từ chối') {
         $apprDisplay = '0';
     }
@@ -377,17 +351,14 @@ Tiếp nhận yêu cầu mua VPP từ các phòng ban, sơ duyệt, phê duyệt
 <td style="text-align:center; font-weight:bold; color:#15803d;"><?= $apprDisplay ?></td>
 <td style="text-align:center;">
 <?php if ($p['status'] === 'Chờ duyệt'): ?><span style="background:#fef3c7; color:#d97706; padding:3px 8px; border-radius:4px; font-weight:bold; font-size:0.8rem;">Chờ duyệt</span>
-<?php elseif ($p['status'] === 'Đã sơ duyệt'): ?><span style="background:#e0e7ff; color:#4338ca; padding:3px 8px; border-radius:4px; font-weight:bold; font-size:0.8rem;">Sơ duyệt</span>
 <?php elseif ($p['status'] === 'Đã duyệt'): ?><span style="background:#dcfce7; color:#15803d; padding:3px 8px; border-radius:4px; font-weight:bold; font-size:0.8rem;">Đã duyệt</span>
 <?php else: ?><span style="background:#fee2e2; color:#dc2626; padding:3px 8px; border-radius:4px; font-weight:bold; font-size:0.8rem;" title="<?= htmlspecialchars($p['reject_reason']) ?>">Từ chối</span><?php endif; ?>
 </td>
 <td style="text-align:center;">
 <div style="display:flex; gap:6px; justify-content:center;">
 <?php if ($p['status'] === 'Chờ duyệt'): ?>
-<button type="button" class="btn-action" style="background:#6366f1; padding:4px 8px; font-size:0.8rem;" onclick='openPreApproveModal(<?= $json ?>)'>Sơ duyệt</button>
-<button type="button" class="btn-action" style="background:#dc2626; padding:4px 8px; font-size:0.8rem;" onclick='openRejectModal("<?= htmlspecialchars($p['request_code']) ?>")'>Từ chối</button>
-<?php elseif ($p['status'] === 'Đã sơ duyệt'): ?>
 <button type="button" class="btn-action" style="background:#0284c7; padding:4px 8px; font-size:0.8rem;" onclick='openApproveModal(<?= $json ?>)'>Phê duyệt</button>
+<button type="button" class="btn-action" style="background:#dc2626; padding:4px 8px; font-size:0.8rem;" onclick='openRejectModal("<?= htmlspecialchars($p['request_code']) ?>")'>Từ chối</button>
 <?php elseif ($p['status'] === 'Đã duyệt'): ?>
 <span style="font-size:0.78rem; color:#15803d; font-weight:bold;">Đã đẩy sang kỳ tới</span>
 <?php endif; ?>
@@ -502,43 +473,7 @@ Người đề xuất: <strong id="dt_receiver" style="color:#0f172a;"></strong>
 </div>
 </div>
 
-<!-- 2. MODAL SƠ DUYỆT -->
-<div id="modal-pre-approve" class="modal-overlay">
-<div class="modal-box">
-<form method="POST" action="">
-<input type="hidden" name="action" value="pre_approve_purchase_group">
-<input type="hidden" name="request_code" id="pre_code">
-<div class="modal-header">
-<span style="color:#4338ca; font-weight:bold;">🔍 Sơ Duyệt Đề Xuất Mua VPP</span>
-<span style="cursor:pointer; font-size:1.3rem;" onclick="closeModal('modal-pre-approve')">&times;</span>
-</div>
-<div class="modal-body">
-<div style="margin-bottom:12px; font-size:0.88rem; background:#f8fafc; padding:10px; border-radius:6px;">Mã yêu cầu: <strong id="pre_code_text"></strong></div>
-<div class="popup-scroll-container">
-<table class="items-popup-table">
-<thead>
-<tr>
-<th>STT</th>
-<th>Mặt Hàng</th>
-<th>ĐVT</th>
-<th style="text-align:center;">SL Y/C</th>
-<th style="text-align:center;">SL Sơ Duyệt *</th>
-<th>Ghi chú</th>
-</tr>
-</thead>
-<tbody id="pre_tbody"></tbody>
-</table>
-</div>
-</div>
-<div style="padding:12px 20px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end; gap:8px;">
-<button type="button" class="btn-action" style="background:#e2e8f0; color:#475569;" onclick="closeModal('modal-pre-approve')">Hủy</button>
-<button type="submit" class="btn-action" style="background:#4338ca;">Xác Nhận Sơ Duyệt</button>
-</div>
-</form>
-</div>
-</div>
-
-<!-- 3. MODAL PHÊ DUYỆT VÀ ĐẪY SANG KỲ TỚI -->
+<!-- 2. MODAL PHÊ DUYỆT VÀ ĐẪY SANG KỲ TỚI -->
 <div id="modal-approve" class="modal-overlay">
 <div class="modal-box">
 <form method="POST" action="">
@@ -559,7 +494,7 @@ Mã yêu cầu: <strong id="appr_code_text"></strong>.<br>Sau khi bấm phê duy
 <th>STT</th>
 <th>Mặt Hàng</th>
 <th>ĐVT</th>
-<th style="text-align:center;">SL Sơ Duyệt</th>
+<th style="text-align:center;">SL Y/C</th>
 <th style="text-align:center;">SL Phê Duyệt *</th>
 <th>Ghi chú</th>
 </tr>
@@ -576,7 +511,7 @@ Mã yêu cầu: <strong id="appr_code_text"></strong>.<br>Sau khi bấm phê duy
 </div>
 </div>
 
-<!-- 4. MODAL TỪ CHỐI -->
+<!-- 3. MODAL TỪ CHỐI -->
 <div id="modal-reject" class="modal-overlay">
 <div class="modal-box" style="max-width: 440px;">
 <form method="POST" action="">
@@ -611,7 +546,7 @@ const tbody = document.getElementById('dt_tbody');
 tbody.innerHTML = '';
 const items = JSON.parse(p.items_json || '[]');
 items.forEach((it, idx) => {
-const appr = it.approved_quantity !== null ? it.approved_quantity : (it.pre_approved_quantity !== null ? it.pre_approved_quantity : '--');
+const appr = it.approved_quantity !== null ? it.approved_quantity : '--';
 tbody.innerHTML += `<tr>
 <td>${idx + 1}</td>
 <td><b>${it.item_name}</b> ${it.specification ? '('+it.specification+')' : ''}</td>
@@ -624,26 +559,6 @@ tbody.innerHTML += `<tr>
 openModal('modal-details');
 }
 
-function openPreApproveModal(p) {
-document.getElementById('pre_code').value = p.request_code;
-document.getElementById('pre_code_text').innerText = p.request_code;
-const tbody = document.getElementById('pre_tbody');
-tbody.innerHTML = '';
-const items = JSON.parse(p.items_json || '[]');
-items.forEach((it, idx) => {
-const def = it.pre_approved_quantity !== null ? it.pre_approved_quantity : it.quantity;
-tbody.innerHTML += `<tr>
-<td>${idx + 1}</td>
-<td><b>${it.item_name}</b> ${it.specification ? '('+it.specification+')' : ''}</td>
-<td>${it.unit}</td>
-<td style="text-align:center; font-weight:bold; color:#0284c7;">${it.quantity}</td>
-<td style="text-align:center;"><input type="number" name="pre_approved_quantities[${it.proposal_id}]" min="0" value="${def}" required style="width:70px; text-align:center; font-weight:bold; color:#4338ca;"></td>
-<td><input type="text" name="pre_item_notes[${it.proposal_id}]" value="${it.approval_note || ''}" placeholder="Ghi chú..."></td>
-</tr>`;
-});
-openModal('modal-pre-approve');
-}
-
 function openApproveModal(p) {
 document.getElementById('appr_code').value = p.request_code;
 document.getElementById('appr_code_text').innerText = p.request_code;
@@ -651,12 +566,12 @@ const tbody = document.getElementById('appr_tbody');
 tbody.innerHTML = '';
 const items = JSON.parse(p.items_json || '[]');
 items.forEach((it, idx) => {
-const def = it.pre_approved_quantity !== null ? it.pre_approved_quantity : it.quantity;
+const def = it.quantity;
 tbody.innerHTML += `<tr>
 <td>${idx + 1}</td>
 <td><b>${it.item_name}</b> ${it.specification ? '('+it.specification+')' : ''}</td>
 <td>${it.unit}</td>
-<td style="text-align:center; font-weight:bold; color:#4338ca;">${def}</td>
+<td style="text-align:center; font-weight:bold; color:#0284c7;">${def}</td>
 <td style="text-align:center;"><input type="number" name="approved_quantities[${it.proposal_id}]" min="0" value="${def}" required style="width:70px; text-align:center; font-weight:bold; color:#15803d;"></td>
 <td><input type="text" name="item_notes[${it.proposal_id}]" value="${it.approval_note || ''}" placeholder="Ghi chú..."></td>
 </tr>`;

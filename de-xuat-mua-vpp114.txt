@@ -4,1393 +4,652 @@
 
 require_once 'db_connect.php';
 
-
-
 $message = '';
-
 $error = '';
-
 $today = date('Y-m-d');
 
-
-
 if (!isset($DEFAULT_DEPARTMENTS) || !is_array($DEFAULT_DEPARTMENTS)) {
-
-$DEFAULT_DEPARTMENTS = [
-
-'Ban Giám Đốc', 'Phòng Hành Chính - Nhân Sự', 'Phòng Kế Toán - Tài Chính',
-
-'Phòng Kỹ Thuật - IT', 'Phòng Kinh Doanh - Marketing', 'Phòng Quản Lý Chất Lượng (QA/QC)',
-
-'Bộ Phận Sản Xuất / Kho Vận', 'Bộ Phận Bếp & Dịch Vụ'
-
-];
-
+    $DEFAULT_DEPARTMENTS = [
+        'Ban Giám Đốc',
+        'Phòng Hành Chính - Nhân Sự',
+        'Phòng Kế Toán - Tài Chính',
+        'Phòng Kỹ Thuật - IT',
+        'Phòng Kinh Doanh - Marketing',
+        'Phòng Quản Lý Chất Lượng (QA/QC)',
+        'Bộ Phận Sản Xuất / Kho Vận',
+        'Bộ Phận Bếp & Dịch Vụ'
+    ];
 }
-
-
 
 // ==================== HÀM NÉN ẢNH DƯỚI 100KB ====================
+function compressAndUploadImage($file, $targetDir = 'uploads/vpp/')
+{
+    if (!isset($file['tmp_name']) || empty($file['tmp_name'])) return '';
 
-function compressAndUploadImage($file, $targetDir = 'uploads/vpp/') {
+    if (!is_dir($targetDir)) {
+        mkdir($targetDir, 0777, true);
+    }
 
-if (!isset($file['tmp_name']) || empty($file['tmp_name'])) return '';
+    $fileInfo = @getimagesize($file['tmp_name']);
+    if ($fileInfo === false) return '';
 
-if (!is_dir($targetDir)) {
+    $mime = $fileInfo['mime'];
+    $srcImg = null;
 
-mkdir($targetDir, 0777, true);
+    if ($mime === 'image/jpeg') {
+        $srcImg = imagecreatefromjpeg($file['tmp_name']);
+    } elseif ($mime === 'image/png') {
+        $srcImg = imagecreatefrompng($file['tmp_name']);
+    } elseif ($mime === 'image/webp') {
+        $srcImg = imagecreatefromwebp($file['tmp_name']);
+    }
 
+    if (!$srcImg) return '';
+
+    $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
+    $newFileName = 'vpp_mua_' . uniqid() . '.' . ($ext ?: 'jpg');
+    $destination = $targetDir . $newFileName;
+
+    $quality = 85;
+
+    if ($mime === 'image/png') {
+        imagepng($srcImg, $destination, 8);
+    } else {
+        imagejpeg($srcImg, $destination, $quality);
+    }
+
+    while (filesize($destination) > 100 * 1024 && $quality > 20) {
+        $quality -= 15;
+
+        if ($mime === 'image/png') {
+            imagepng($srcImg, $destination, 9);
+        } else {
+            imagejpeg($srcImg, $destination, $quality);
+        }
+    }
+
+    imagedestroy($srcImg);
+
+    return $destination;
 }
-
-
-
-$fileInfo = @getimagesize($file['tmp_name']);
-
-if ($fileInfo === false) return '';
-
-
-
-$mime = $fileInfo['mime'];
-
-$srcImg = null;
-
-if ($mime === 'image/jpeg') {
-
-$srcImg = imagecreatefromjpeg($file['tmp_name']);
-
-} elseif ($mime === 'image/png') {
-
-$srcImg = imagecreatefrompng($file['tmp_name']);
-
-} elseif ($mime === 'image/webp') {
-
-$srcImg = imagecreatefromwebp($file['tmp_name']);
-
-}
-
-if (!$srcImg) return '';
-
-
-
-$ext = pathinfo($file['name'], PATHINFO_EXTENSION);
-
-$newFileName = 'vpp_mua_' . uniqid() . '.' . ($ext ?: 'jpg');
-
-$destination = $targetDir . $newFileName;
-
-
-
-$quality = 85;
-
-if ($mime === 'image/png') {
-
-imagepng($srcImg, $destination, 8);
-
-} else {
-
-imagejpeg($srcImg, $destination, $quality);
-
-}
-
-
-
-while (filesize($destination) > 100 * 1024 && $quality > 20) {
-
-$quality -= 15;
-
-if ($mime === 'image/png') {
-
-imagepng($srcImg, $destination, 9);
-
-} else {
-
-imagejpeg($srcImg, $destination, $quality);
-
-}
-
-}
-
-
-
-imagedestroy($srcImg);
-
-return $destination;
-
-}
-
-
 
 // Khởi tạo bảng đề xuất mua VPP và bổ sung cột custom_image nếu chưa có
-
 try {
 
-$pdo->exec("
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS `vpp_purchase_proposals` (
+            `id` INT AUTO_INCREMENT PRIMARY KEY,
+            `request_code` VARCHAR(60) DEFAULT '',
+            `employee_id` INT DEFAULT NULL,
+            `receiver_name` VARCHAR(150) NOT NULL,
+            `department` VARCHAR(100) NOT NULL,
+            `item_id` INT DEFAULT NULL,
+            `custom_item_name` VARCHAR(150) DEFAULT '',
+            `specification` VARCHAR(100) DEFAULT '',
+            `unit` VARCHAR(50) DEFAULT 'Cái',
+            `custom_image` VARCHAR(255) DEFAULT '',
+            `quantity` INT NOT NULL DEFAULT 1,
+            `pre_approved_quantity` INT DEFAULT NULL,
+            `approved_quantity` INT DEFAULT NULL,
+            `approval_note` VARCHAR(255) DEFAULT '',
+            `status` VARCHAR(50) DEFAULT 'Chờ duyệt',
+            `reject_reason` VARCHAR(255) DEFAULT '',
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX (`item_id`),
+            INDEX (`status`),
+            INDEX (`request_code`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    ");
 
-CREATE TABLE IF NOT EXISTS `vpp_purchase_proposals` (
+    $colsProp = $pdo
+        ->query("SHOW COLUMNS FROM `vpp_purchase_proposals`")
+        ->fetchAll(PDO::FETCH_COLUMN);
 
-`id` INT AUTO_INCREMENT PRIMARY KEY,
+    if (!in_array('custom_image', $colsProp)) {
+        $pdo->exec("
+            ALTER TABLE `vpp_purchase_proposals`
+            ADD COLUMN `custom_image` VARCHAR(255) DEFAULT ''
+            AFTER `unit`
+        ");
+    }
 
-`request_code` VARCHAR(60) DEFAULT '',
-
-`employee_id` INT DEFAULT NULL,
-
-`receiver_name` VARCHAR(150) NOT NULL,
-
-`department` VARCHAR(100) NOT NULL,
-
-`item_id` INT DEFAULT NULL,
-
-`custom_item_name` VARCHAR(150) DEFAULT '',
-
-`specification` VARCHAR(100) DEFAULT '',
-
-`unit` VARCHAR(50) DEFAULT 'Cái',
-
-`custom_image` VARCHAR(255) DEFAULT '',
-
-`quantity` INT NOT NULL DEFAULT 1,
-
-`pre_approved_quantity` INT DEFAULT NULL,
-
-`approved_quantity` INT DEFAULT NULL,
-
-`approval_note` VARCHAR(255) DEFAULT '',
-
-`status` VARCHAR(50) DEFAULT 'Chờ duyệt',
-
-`reject_reason` VARCHAR(255) DEFAULT '',
-
-`created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
-INDEX (`item_id`),
-
-INDEX (`status`),
-
-INDEX (`request_code`)
-
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-");
-
-
-
-$colsProp = $pdo->query("SHOW COLUMNS FROM `vpp_purchase_proposals`")->fetchAll(PDO::FETCH_COLUMN);
-
-if (!in_array('custom_image', $colsProp)) {
-
-$pdo->exec("ALTER TABLE `vpp_purchase_proposals` ADD COLUMN `custom_image` VARCHAR(255) DEFAULT '' AFTER `unit`");
-
+} catch (PDOException $e) {
 }
 
-} catch (PDOException $e) {}
-
-
-
-$allItems = $pdo->query("SELECT * FROM vpp_items ORDER BY item_name ASC")->fetchAll();
-
-
+$allItems = $pdo
+    ->query("SELECT * FROM vpp_items ORDER BY item_name ASC")
+    ->fetchAll();
 
 // Truy vấn danh sách nhân viên để hỗ trợ gợi ý ô nhập họ tên / mã số
-
 $employees = [];
 
 try {
-
-$employees = $pdo->query("SELECT id, fullname, department FROM employees WHERE status = 'Đang làm việc' ORDER BY fullname ASC")->fetchAll();
-
-} catch (PDOException $e) {}
-
-
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'submit_purchase_proposal') {
-
-$employee_id = !empty($_POST['employee_id']) ? intval($_POST['employee_id']) : null;
-
-$receiver_name = trim($_POST['receiver_name'] ?? '');
-
-$department = trim($_POST['department'] ?? '');
-
-$items_data = $_POST['items'] ?? [];
-
-
-
-try {
-
-if (empty($receiver_name) || empty($department)) {
-
-throw new Exception("Vui lòng điền đầy đủ Họ tên/Mã số người đề xuất và Bộ phận / Phòng ban!");
-
+    $employees = $pdo
+        ->query("
+            SELECT id, fullname, department
+            FROM employees
+            WHERE status = 'Đang làm việc'
+            ORDER BY fullname ASC
+        ")
+        ->fetchAll();
+} catch (PDOException $e) {
 }
 
-if (empty($items_data)) {
-
-throw new Exception("Vui lòng chọn hoặc điền ít nhất một mặt hàng cần đề xuất mua!");
-
-}
-
-
-
-$baseCode = 'MUA-' . date('dmYHis');
-
-$pdo->beginTransaction();
-
-
-
-$stmtIns = $pdo->prepare("
-
-INSERT INTO vpp_purchase_proposals
-
-(request_code, employee_id, receiver_name, department, item_id, custom_item_name, specification, unit, custom_image, quantity, status)
-
-VALUES (:code, :empid, :rec, :dept, :it_id, :c_name, :spec, :unit, :img, :qty, 'Chờ duyệt')
-
-");
-
-
-
-$insertedCount = 0;
-
-foreach ($items_data as $idx => $row) {
-
-$itemId = intval($row['item_id'] ?? 0);
-
-$qty = intval($row['quantity'] ?? 0);
-
-if ($qty <= 0) continue;
-
-
-
-$customName = trim($row['custom_item_name'] ?? '');
-
-$spec = trim($row['specification'] ?? '');
-
-$unit = trim($row['unit'] ?? 'Cái');
-
-$imgPath = '';
-
-
-
-// Xử lý nén ảnh nếu là mặt hàng mới ngoài kho và có upload file
-
-if ($itemId === 0 && isset($_FILES['items']['name'][$idx]['image']) && $_FILES['items']['error'][$idx]['image'] === UPLOAD_ERR_OK) {
-
-$fileData = [
-
-'name' => $_FILES['items']['name'][$idx]['image'],
-
-'tmp_name' => $_FILES['items']['tmp_name'][$idx]['image'],
-
-'error' => $_FILES['items']['error'][$idx]['image']
-
-];
-
-$imgPath = compressAndUploadImage($fileData);
-
-}
-
-
-
-$stmtIns->execute([
-
-':code' => $baseCode,
-
-':empid' => $employee_id,
-
-':rec' => $receiver_name,
-
-':dept' => $department,
-
-':it_id' => ($itemId > 0 ? $itemId : null),
-
-':c_name' => ($itemId > 0 ? '' : $customName),
-
-':spec' => $spec,
-
-':unit' => $unit,
-
-':img' => $imgPath,
-
-':qty' => $qty
-
-]);
-
-$insertedCount++;
-
-}
-
-
-
-if ($insertedCount === 0) {
-
-throw new Exception("Số lượng đề xuất của các mặt hàng không hợp lệ!");
-
-}
-
-
-
-$pdo->commit();
-
-$message = "Gửi đề xuất mua văn phòng phẩm thành công! Mã phiếu của bạn là: <strong>{$baseCode}</strong>";
-
-} catch (Exception $e) {
-
-if ($pdo->inTransaction()) $pdo->rollBack();
-
-$error = "Lỗi gửi đề xuất: " . $e->getMessage();
-
-}
-
+if (
+    $_SERVER['REQUEST_METHOD'] === 'POST' &&
+    isset($_POST['action']) &&
+    $_POST['action'] === 'submit_purchase_proposal'
+) {
+
+    $employee_id = !empty($_POST['employee_id'])
+        ? intval($_POST['employee_id'])
+        : null;
+
+    $receiver_name = trim($_POST['receiver_name'] ?? '');
+    $department = trim($_POST['department'] ?? '');
+    $items_data = $_POST['items'] ?? [];
+
+    try {
+
+        if (empty($receiver_name) || empty($department)) {
+            throw new Exception(
+                "Vui lòng điền đầy đủ Họ tên/Mã số người đề xuất và Bộ phận / Phòng ban!"
+            );
+        }
+
+        if (empty($items_data)) {
+            throw new Exception(
+                "Vui lòng chọn hoặc điền ít nhất một mặt hàng cần đề xuất mua!"
+            );
+        }
+
+        $baseCode = 'MUA-' . date('dmYHis');
+
+        $pdo->beginTransaction();
+
+        $stmtIns = $pdo->prepare("
+            INSERT INTO vpp_purchase_proposals
+            (
+                request_code,
+                employee_id,
+                receiver_name,
+                department,
+                item_id,
+                custom_item_name,
+                specification,
+                unit,
+                custom_image,
+                quantity,
+                status
+            )
+            VALUES
+            (
+                :code,
+                :empid,
+                :rec,
+                :dept,
+                :it_id,
+                :c_name,
+                :spec,
+                :unit,
+                :img,
+                :qty,
+                'Chờ duyệt'
+            )
+        ");
+
+        $insertedCount = 0;
+
+        foreach ($items_data as $idx => $row) {
+
+            $itemId = intval($row['item_id'] ?? 0);
+            $qty = intval($row['quantity'] ?? 0);
+
+            if ($qty <= 0) continue;
+
+            $customName = trim($row['custom_item_name'] ?? '');
+            $spec = trim($row['specification'] ?? '');
+            $unit = trim($row['unit'] ?? 'Cái');
+            $imgPath = '';
+
+            // Xử lý nén ảnh nếu là mặt hàng mới ngoài kho và có upload file
+            if (
+                $itemId === 0 &&
+                isset($_FILES['items']['name'][$idx]['image']) &&
+                $_FILES['items']['error'][$idx]['image'] === UPLOAD_ERR_OK
+            ) {
+
+                $fileData = [
+                    'name' => $_FILES['items']['name'][$idx]['image'],
+                    'tmp_name' => $_FILES['items']['tmp_name'][$idx]['image'],
+                    'error' => $_FILES['items']['error'][$idx]['image']
+                ];
+
+                $imgPath = compressAndUploadImage($fileData);
+            }
+
+            $stmtIns->execute([
+                ':code' => $baseCode,
+                ':empid' => $employee_id,
+                ':rec' => $receiver_name,
+                ':dept' => $department,
+                ':it_id' => ($itemId > 0 ? $itemId : null),
+                ':c_name' => ($itemId > 0 ? '' : $customName),
+                ':spec' => $spec,
+                ':unit' => $unit,
+                ':img' => $imgPath,
+                ':qty' => $qty
+            ]);
+
+            $insertedCount++;
+        }
+
+        if ($insertedCount === 0) {
+            throw new Exception(
+                "Số lượng đề xuất của các mặt hàng không hợp lệ!"
+            );
+        }
+
+        $pdo->commit();
+
+        $message =
+            "Gửi đề xuất mua văn phòng phẩm thành công! " .
+            "Mã phiếu của bạn là: <strong>{$baseCode}</strong>";
+
+    } catch (Exception $e) {
+
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+
+        $error = "Lỗi gửi đề xuất: " . $e->getMessage();
+    }
 }
 
 ?>
 
 <!DOCTYPE html>
-
 <html lang="vi">
 
 <head>
 
 <meta charset="UTF-8">
 
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <title>Đề Xuất Mua Văn Phòng Phẩm</title>
 
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+    rel="stylesheet"
+>
 
 <style>
 
-/* =========================================================
-   RESET
-   ========================================================= */
-
 * {
-
-box-sizing: border-box;
-
+    box-sizing: border-box;
 }
-
-
-
-html {
-
--webkit-text-size-adjust: 100%;
-
-}
-
-
 
 body {
-
-font-family: 'Inter', sans-serif;
-
-background: #f1f5f9;
-
-color: #1e293b;
-
-margin: 0;
-
-padding: 20px;
-
+    font-family: 'Inter', sans-serif;
+    background: #f1f5f9;
+    color: #1e293b;
+    margin: 0;
+    padding: 20px;
 }
-
-
 
 .container {
-
-width: 100%;
-
-max-width: 1080px;
-
-margin: 0 auto;
-
-background: #fff;
-
-border-radius: 10px;
-
-box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-
-padding: 30px;
-
-overflow: hidden;
-
+    max-width: 1080px;
+    margin: 0 auto;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    padding: 30px;
 }
-
-
 
 h1 {
-
-font-size: 1.5rem;
-
-color: #0f172a;
-
-margin-top: 0;
-
-text-align: center;
-
+    font-size: 1.5rem;
+    color: #0f172a;
+    margin-top: 0;
+    text-align: center;
 }
-
-
 
 .form-group {
-
-margin-bottom: 15px;
-
-position: relative;
-
+    margin-bottom: 15px;
+    position: relative;
 }
-
-
 
 label {
-
-display: block;
-
-font-weight: 600;
-
-font-size: 0.88rem;
-
-margin-bottom: 5px;
-
-color: #334155;
-
+    display: block;
+    font-weight: 600;
+    font-size: 0.88rem;
+    margin-bottom: 5px;
+    color: #334155;
 }
-
-
 
 input,
-
 select {
-
-width: 100%;
-
-max-width: 100%;
-
-padding: 9px 12px;
-
-border: 1px solid #cbd5e1;
-
-border-radius: 6px;
-
-box-sizing: border-box;
-
-font-size: 0.9rem;
-
-outline: none;
-
-background: #fff;
-
+    width: 100%;
+    padding: 9px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    box-sizing: border-box;
+    font-size: 0.9rem;
+    outline: none;
+    background: #fff;
 }
-
-
 
 input:focus,
-
 select:focus {
-
-border-color: #0284c7;
-
-box-shadow: 0 0 0 3px rgba(2,132,199,0.15);
-
+    border-color: #0284c7;
+    box-shadow: 0 0 0 3px rgba(2,132,199,0.15);
 }
-
-
-
-button {
-
-font-family: inherit;
-
-}
-
-
 
 .alert {
-
-padding: 12px 16px;
-
-border-radius: 6px;
-
-margin-bottom: 20px;
-
-font-size: 0.9rem;
-
+    padding: 12px 16px;
+    border-radius: 6px;
+    margin-bottom: 20px;
+    font-size: 0.9rem;
 }
-
-
 
 .alert-success {
-
-background: #dcfce7;
-
-color: #166534;
-
-border: 1px solid #bbf7d0;
-
+    background: #dcfce7;
+    color: #166534;
+    border: 1px solid #bbf7d0;
 }
-
-
 
 .alert-danger {
-
-background: #fee2e2;
-
-color: #991b1b;
-
-border: 1px solid #fecaca;
-
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fecaca;
 }
-
-
-
-/* =========================================================
-   BUTTON
-   ========================================================= */
 
 .btn {
-
-background: #0284c7;
-
-color: #fff;
-
-border: none;
-
-padding: 10px 20px;
-
-border-radius: 6px;
-
-font-weight: 600;
-
-cursor: pointer;
-
-font-size: 0.95rem;
-
+    background: #0284c7;
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 0.95rem;
 }
-
-
 
 .btn:hover {
-
-background: #0369a1;
-
+    background: #0369a1;
 }
 
-
-
-.btn-submit {
-
-min-width: 220px;
-
+.btn-add {
+    background: #10b981;
+    padding: 6px 12px;
+    font-size: 0.82rem;
 }
 
-
+.btn-add:hover {
+    background: #059669;
+}
 
 .btn-del {
-
-background: #ef4444;
-
-color: #fff;
-
-border: none;
-
-padding: 6px 10px;
-
-border-radius: 4px;
-
-cursor: pointer;
-
-font-size: 0.8rem;
-
+    background: #ef4444;
+    color: #fff;
+    border: none;
+    padding: 6px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
 }
-
-
-
-.btn-del:hover {
-
-background: #dc2626;
-
-}
-
-
-
-/* =========================================================
-   GỢI Ý NHÂN VIÊN
-   ========================================================= */
 
 .suggest-list {
-
-position: absolute;
-
-top: 100%;
-
-left: 0;
-
-right: 0;
-
-background: #ffffff;
-
-border: 1px solid #cbd5e1;
-
-border-radius: 8px;
-
-max-height: 200px;
-
-overflow-y: auto;
-
-z-index: 50;
-
-display: none;
-
-box-shadow: 0 10px 15px rgba(0,0,0,0.1);
-
-margin-top: 4px;
-
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 50;
+    display: none;
+    box-shadow: 0 10px 15px rgba(0,0,0,0.1);
+    margin-top: 4px;
 }
-
-
 
 .suggest-item {
-
-padding: 10px 14px;
-
-cursor: pointer;
-
-border-bottom: 1px solid #f1f5f9;
-
-font-size: 0.9rem;
-
+    padding: 10px 14px;
+    cursor: pointer;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 0.9rem;
 }
-
-
 
 .suggest-item:hover {
-
-background-color: #f0f9ff;
-
-color: #0284c7;
-
+    background-color: #f0f9ff;
+    color: #0284c7;
 }
-
-
 
 .hint-text {
-
-font-size: 0.78rem;
-
-color: #64748b;
-
-margin-top: 4px;
-
-display: block;
-
+    font-size: 0.78rem;
+    color: #64748b;
+    margin-top: 4px;
+    display: block;
 }
-
 
 
 /* =========================================================
-   KHU VỰC CHỌN CHẾ ĐỘ
-   ĐƯA RA NGOÀI BẢNG
+   CHỌN LOẠI MẶT HÀNG
    ========================================================= */
 
-.item-mode-section {
-
-background: #f8fafc;
-
-border: 1px solid #dbe3ec;
-
-border-radius: 9px;
-
-padding: 12px;
-
-margin-top: 18px;
-
-margin-bottom: 10px;
-
+.item-mode-panel {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
 }
 
-
-
-.item-mode-title {
-
-font-size: 0.85rem;
-
-font-weight: 700;
-
-color: #334155;
-
-margin-bottom: 7px;
-
+.item-mode-panel label {
+    margin-bottom: 7px;
 }
 
-
-
-.mode-select-main {
-
-width: 100%;
-
-font-weight: 600;
-
+.item-mode-select {
+    max-width: 430px;
 }
-
-
-
-.mode-description {
-
-font-size: 0.76rem;
-
-color: #64748b;
-
-margin-top: 5px;
-
-line-height: 1.4;
-
-}
-
 
 
 /* =========================================================
-   KHU VỰC TOOLBAR BẢNG
+   KHU VỰC CHỌN MẶT HÀNG CÓ SẴN
    ========================================================= */
 
-.items-toolbar {
-
-display: flex;
-
-align-items: center;
-
-justify-content: space-between;
-
-gap: 10px;
-
-margin-top: 15px;
-
-margin-bottom: 8px;
-
+.available-items-panel {
+    display: none;
+    margin-top: 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #fff;
 }
 
-
-
-.items-title {
-
-margin: 0;
-
-font-size: 0.9rem;
-
-font-weight: 700;
-
-color: #334155;
-
+.available-toolbar {
+    padding: 10px;
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
 }
 
-
-
-.items-counter {
-
-font-size: 0.76rem;
-
-color: #64748b;
-
-background: #f1f5f9;
-
-padding: 4px 8px;
-
-border-radius: 20px;
-
-white-space: nowrap;
-
+.available-toolbar input {
+    max-width: 420px;
 }
 
+.available-table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.available-items-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 720px;
+}
+
+.available-items-table th,
+.available-items-table td {
+    border-bottom: 1px solid #e2e8f0;
+    padding: 8px 10px;
+    font-size: 0.82rem;
+    vertical-align: middle;
+}
+
+.available-items-table th {
+    background: #f8fafc;
+    color: #475569;
+    font-weight: 600;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.available-items-table tr:last-child td {
+    border-bottom: none;
+}
+
+.available-items-table tr.selected {
+    background: #f0f9ff;
+}
+
+.available-items-table .check-col {
+    width: 45px;
+    text-align: center;
+}
+
+.available-items-table .qty-col {
+    width: 95px;
+}
+
+.available-items-table .qty-input {
+    width: 80px;
+    padding: 7px 6px;
+    text-align: center;
+}
+
+.available-item-check {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+.selected-count {
+    margin-top: 8px;
+    font-size: 0.78rem;
+    color: #64748b;
+}
 
 
 /* =========================================================
-   TÌM KIẾM SẢN PHẨM
+   MẶT HÀNG MỚI
    ========================================================= */
 
-.product-search-area {
-
-display: none;
-
-background: #f8fafc;
-
-border: 1px solid #e2e8f0;
-
-border-radius: 8px;
-
-padding: 9px;
-
-margin-bottom: 8px;
-
+.custom-item-panel {
+    display: none;
+    margin-top: 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 12px;
+    background: #fff;
 }
 
-
-
-.product-search-area.show {
-
-display: block;
-
+.custom-item-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) 110px minmax(150px, 0.8fr) 90px 45px;
+    gap: 8px;
+    align-items: end;
 }
 
-
-
-.product-search-row {
-
-display: flex;
-
-align-items: center;
-
-gap: 7px;
-
+.custom-item-field label {
+    margin-bottom: 4px;
+    font-size: 0.76rem;
 }
 
-
-
-.product-search-input {
-
-flex: 1;
-
-min-width: 0;
-
+.custom-item-field input {
+    font-size: 0.82rem;
+    padding: 8px;
 }
-
-
-
-.btn-select-all,
-
-.btn-clear-all {
-
-border: none;
-
-border-radius: 6px;
-
-padding: 8px 10px;
-
-font-size: 0.76rem;
-
-font-weight: 600;
-
-cursor: pointer;
-
-white-space: nowrap;
-
-}
-
-
-
-.btn-select-all {
-
-background: #dcfce7;
-
-color: #166534;
-
-}
-
-
-
-.btn-clear-all {
-
-background: #fee2e2;
-
-color: #991b1b;
-
-}
-
-
-
-.search-hint {
-
-font-size: 0.7rem;
-
-color: #64748b;
-
-margin-top: 5px;
-
-display: block;
-
-}
-
 
 
 /* =========================================================
-   BẢNG SẢN PHẨM
+   UPLOAD ẢNH
    ========================================================= */
-
-.table-items {
-
-width: 100%;
-
-border-collapse: collapse;
-
-margin-top: 0;
-
-margin-bottom: 15px;
-
-table-layout: fixed;
-
-}
-
-
-
-.table-items th,
-
-.table-items td {
-
-padding: 7px 8px;
-
-border: 1px solid #e2e8f0;
-
-vertical-align: middle;
-
-font-size: 0.82rem;
-
-}
-
-
-
-.table-items th {
-
-background: #f8fafc;
-
-color: #475569;
-
-font-weight: 600;
-
-text-align: left;
-
-}
-
-
-
-.table-items th:first-child,
-
-.table-items td:first-child {
-
-text-align: center;
-
-}
-
-
-
-/* Cột checkbox */
-
-.col-check {
-
-width: 7%;
-
-}
-
-
-
-.col-name {
-
-width: 27%;
-
-}
-
-
-
-.col-spec {
-
-width: 23%;
-
-}
-
-
-
-.col-unit {
-
-width: 10%;
-
-}
-
-
-
-.col-stock {
-
-width: 14%;
-
-}
-
-
-
-.col-qty {
-
-width: 19%;
-
-}
-
-
-
-/* Checkbox */
-
-.product-check {
-
-width: 18px !important;
-
-height: 18px;
-
-margin: 0;
-
-cursor: pointer;
-
-accent-color: #0284c7;
-
-}
-
-
-
-.qty-input {
-
-width: 80px !important;
-
-text-align: center;
-
-padding: 7px 5px !important;
-
-margin: 0 auto;
-
-}
-
-
-
-.stock-number {
-
-font-weight: 600;
-
-color: #475569;
-
-}
-
-
-
-.product-name-cell {
-
-font-weight: 600;
-
-color: #1e293b;
-
-}
-
-
-
-.product-spec-cell {
-
-color: #475569;
-
-}
-
-
-
-/* Chỉ hiện hàng phù hợp */
-
-.product-row.hidden-row {
-
-display: none;
-
-}
-
-
-
-/* =========================================================
-   CUSTOM ITEM
-   ========================================================= */
-
-.custom-only-table {
-
-display: none;
-
-}
-
-
-
-.custom-item-name {
-
-font-weight: 500;
-
-}
-
-
 
 .upload-container {
-
-position: relative;
-
-display: inline-block;
-
-width: 100%;
-
+    position: relative;
+    display: inline-block;
+    width: 100%;
 }
-
-
 
 .btn-upload-custom {
-
-background: #f8fafc;
-
-color: #0284c7;
-
-border: 1.5px dashed #0284c7;
-
-padding: 6px 10px;
-
-border-radius: 6px;
-
-font-size: 0.78rem;
-
-font-weight: 600;
-
-cursor: pointer;
-
-text-align: center;
-
-display: block;
-
-width: 100%;
-
-box-sizing: border-box;
-
-transition: all 0.2s;
-
+    background: #f8fafc;
+    color: #0284c7;
+    border: 1.5px dashed #0284c7;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    transition: all 0.2s;
 }
-
-
 
 .btn-upload-custom:hover {
-
-background: #f0f9ff;
-
-border-color: #0369a1;
-
-color: #0369a1;
-
+    background: #f0f9ff;
+    border-color: #0369a1;
+    color: #0369a1;
 }
-
-
 
 .preview-box {
-
-display: none;
-
-align-items: center;
-
-gap: 8px;
-
-justify-content: center;
-
+    display: none;
+    align-items: center;
+    gap: 8px;
+    justify-content: center;
 }
-
-
 
 .thumb-preview {
-
-width: 36px;
-
-height: 36px;
-
-object-fit: cover;
-
-border-radius: 4px;
-
-border: 1px solid #cbd5e1;
-
-cursor: pointer;
-
+    width: 36px;
+    height: 36px;
+    object-fit: cover;
+    border-radius: 4px;
+    border: 1px solid #cbd5e1;
+    cursor: pointer;
 }
-
-
 
 .img-action-group {
-
-display: flex;
-
-gap: 4px;
-
+    display: flex;
+    gap: 4px;
 }
-
-
 
 .btn-img-action {
-
-background: #f1f5f9;
-
-border: 1px solid #cbd5e1;
-
-font-size: 0.72rem;
-
-padding: 2px 6px;
-
-border-radius: 4px;
-
-cursor: pointer;
-
-font-weight: 600;
-
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    font-size: 0.72rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 600;
 }
-
-
 
 .btn-img-action.change {
-
-color: #0284c7;
-
+    color: #0284c7;
 }
-
-
 
 .btn-img-action.delete {
-
-color: #dc2626;
-
-border-color: #fecaca;
-
-background: #fee2e2;
-
+    color: #dc2626;
+    border-color: #fecaca;
+    background: #fee2e2;
 }
 
-
-
-/* =========================================================
-   EMPTY STATE
-   ========================================================= */
-
-.empty-state {
-
-text-align: center;
-
-padding: 18px 10px;
-
-color: #64748b;
-
-font-size: 0.8rem;
-
-background: #f8fafc;
-
-border: 1px dashed #cbd5e1;
-
-border-radius: 7px;
-
+.btn-img-action:hover {
+    opacity: 0.85;
 }
-
-
-
-.empty-state strong {
-
-color: #475569;
-
-}
-
-
-
-/* =========================================================
-   DESKTOP - CUSTOM TABLE
-   ========================================================= */
-
-.custom-table {
-
-width: 100%;
-
-border-collapse: collapse;
-
-table-layout: fixed;
-
-}
-
-
-
-.custom-table th,
-
-.custom-table td {
-
-border: 1px solid #e2e8f0;
-
-padding: 8px;
-
-vertical-align: middle;
-
-font-size: 0.82rem;
-
-}
-
-
-
-.custom-table th {
-
-background: #f8fafc;
-
-color: #475569;
-
-font-weight: 600;
-
-text-align: left;
-
-}
-
-
-
-.custom-table .custom-name-col {
-
-width: 27%;
-
-}
-
-
-
-.custom-table .custom-spec-col {
-
-width: 23%;
-
-}
-
-
-
-.custom-table .custom-unit-col {
-
-width: 12%;
-
-}
-
-
-
-.custom-table .custom-image-col {
-
-width: 20%;
-
-}
-
-
-
-.custom-table .custom-qty-col {
-
-width: 12%;
-
-}
-
-
-
-.custom-table .custom-delete-col {
-
-width: 6%;
-
-text-align: center;
-
-}
-
-
-
-.custom-table td input,
-
-.custom-table td select {
-
-width: 100%;
-
-}
-
-
-
-.custom-qty {
-
-text-align: center;
-
-}
-
 
 
 /* =========================================================
@@ -1399,664 +658,71 @@ text-align: center;
 
 @media (max-width: 700px) {
 
-body {
-
-padding: 8px;
-
-}
-
-
-
-.container {
-
-padding: 16px 11px;
-
-border-radius: 9px;
-
-}
-
-
-
-h1 {
-
-font-size: 1.18rem;
-
-line-height: 1.35;
-
-margin-bottom: 8px;
-
-}
-
-
-
-.container > p {
-
-font-size: 0.79rem !important;
-
-line-height: 1.45;
-
-margin-top: 0 !important;
-
-margin-bottom: 18px !important;
-
-}
-
-
-
-form > div[style*="grid-template-columns"] {
-
-display: grid !important;
-
-grid-template-columns: minmax(0, 1fr) !important;
-
-gap: 10px !important;
-
-}
-
-
-
-label {
-
-font-size: 0.82rem;
-
-}
-
-
-
-input,
-
-select {
-
-font-size: 0.84rem;
-
-padding: 9px 9px;
-
-}
-
-
-
-/* Chế độ */
-
-.item-mode-section {
-
-margin-top: 14px;
-
-padding: 10px;
-
-}
-
-
-
-.item-mode-title {
-
-font-size: 0.8rem;
-
-}
-
-
-
-.mode-description {
-
-font-size: 0.7rem;
-
-}
-
-
-
-/* Toolbar */
-
-.items-toolbar {
-
-margin-top: 12px;
-
-}
-
-
-
-.items-title {
-
-font-size: 0.81rem;
-
-}
-
-
-
-.items-counter {
-
-font-size: 0.68rem;
-
-}
-
-
-
-/* Search */
-
-.product-search-area {
-
-padding: 8px;
-
-}
-
-
-
-.product-search-row {
-
-gap: 5px;
-
-}
-
-
-
-.product-search-input {
-
-font-size: 0.78rem !important;
-
-}
-
-
-
-.btn-select-all,
-
-.btn-clear-all {
-
-padding: 7px 7px;
-
-font-size: 0.66rem;
-
-}
-
-
-
-/* =====================================================
-   Bảng sản phẩm vẫn là bảng,
-   nhưng mỗi dòng co giãn theo màn hình.
-   ===================================================== */
-
-.table-items {
-
-display: table;
-
-width: 100%;
-
-table-layout: fixed;
-
-}
-
-
-
-.table-items thead {
-
-display: table-header-group;
-
-}
-
-
-
-.table-items tbody {
-
-display: table-row-group;
-
-}
-
-
-
-.table-items tr {
-
-display: table-row;
-
-}
-
-
-
-.table-items th,
-
-.table-items td {
-
-display: table-cell;
-
-padding: 7px 4px;
-
-font-size: 0.69rem;
-
-line-height: 1.25;
-
-}
-
-
-
-.table-items th {
-
-font-size: 0.67rem;
-
-white-space: normal;
-
-}
-
-
-
-.col-check {
-
-width: 9%;
-
-}
-
-
-
-.col-name {
-
-width: 27%;
-
-}
-
-
-
-.col-spec {
-
-width: 22%;
-
-}
-
-
-
-.col-unit {
-
-width: 10%;
-
-}
-
-
-
-.col-stock {
-
-width: 13%;
-
-}
-
-
-
-.col-qty {
-
-width: 19%;
-
-}
-
-
-
-.product-check {
-
-width: 17px !important;
-
-height: 17px;
-
-}
-
-
-
-.product-name-cell,
-
-.product-spec-cell {
-
-word-break: normal;
-
-overflow-wrap: break-word;
-
-}
-
-
-
-.qty-input {
-
-width: 100% !important;
-
-max-width: 62px;
-
-font-size: 0.75rem !important;
-
-padding: 6px 3px !important;
-
-}
-
-
-
-.stock-number {
-
-font-size: 0.68rem;
-
-}
-
-
-
-/* Custom table */
-
-.custom-table {
-
-display: table;
-
-width: 100%;
-
-table-layout: fixed;
-
-}
-
-
-
-.custom-table th,
-
-.custom-table td {
-
-display: table-cell;
-
-padding: 6px 4px;
-
-font-size: 0.69rem;
-
-}
-
-
-
-.custom-table th {
-
-font-size: 0.65rem;
-
-}
-
-
-
-.custom-table .custom-name-col {
-
-width: 24%;
-
-}
-
-
-
-.custom-table .custom-spec-col {
-
-width: 22%;
-
-}
-
-
-
-.custom-table .custom-unit-col {
-
-width: 12%;
-
-}
-
-
-
-.custom-table .custom-image-col {
-
-width: 20%;
-
-}
-
-
-
-.custom-table .custom-qty-col {
-
-width: 14%;
-
-}
-
-
-
-.custom-table .custom-delete-col {
-
-width: 8%;
-
-}
-
-
-
-.custom-table input {
-
-font-size: 0.72rem !important;
-
-padding: 6px 4px !important;
-
-}
-
-
-
-.btn-upload-custom {
-
-font-size: 0.65rem;
-
-padding: 6px 3px;
-
-}
-
-
-
-.preview-box {
-
-gap: 3px;
-
-}
-
-
-
-.thumb-preview {
-
-width: 30px;
-
-height: 30px;
-
-}
-
-
-
-.img-action-group {
-
-gap: 2px;
-
-}
-
-
-
-.btn-img-action {
-
-font-size: 0.6rem;
-
-padding: 2px 4px;
-
-}
-
-
-
-/* Submit */
-
-.btn-submit {
-
-width: 100%;
-
-padding: 11px 12px;
-
-font-size: 0.88rem;
-
-}
-
-}
-
-
-
-/* =========================================================
-   MOBILE RẤT NHỎ
-   ========================================================= */
-
-@media (max-width: 380px) {
-
-body {
-
-padding: 5px;
-
-}
-
-
-
-.container {
-
-padding: 13px 8px;
-
-}
-
-
-
-h1 {
-
-font-size: 1.08rem;
-
-}
-
-
-
-.table-items th,
-
-.table-items td {
-
-padding: 6px 3px;
-
-font-size: 0.63rem;
-
-}
-
-
-
-.table-items th {
-
-font-size: 0.61rem;
-
-}
-
-
-
-.col-check {
-
-width: 9%;
-
-}
-
-
-
-.col-name {
-
-width: 28%;
-
-}
-
-
-
-.col-spec {
-
-width: 22%;
-
-}
-
-
-
-.col-unit {
-
-width: 10%;
-
-}
-
-
-
-.col-stock {
-
-width: 12%;
-
-}
-
-
-
-.col-qty {
-
-width: 19%;
-
-}
-
-
-
-.qty-input {
-
-max-width: 55px;
-
-font-size: 0.69rem !important;
-
-}
-
-
-
-.product-check {
-
-width: 15px !important;
-
-height: 15px;
-
-}
-
-
-
-.custom-table th,
-
-.custom-table td {
-
-font-size: 0.62rem;
-
-padding: 5px 2px;
-
-}
-
-}
-
-
-
-/* =========================================================
-   MOBILE XOAY NGANG
-   ========================================================= */
-
-@media (max-width: 700px) and (orientation: landscape) {
-
-.container {
-
-max-width: 100%;
-
-}
-
-
-
-form > div[style*="grid-template-columns"] {
-
-grid-template-columns: 1fr 1fr !important;
-
-gap: 12px !important;
-
-}
-
-
-
-.table-items th,
-
-.table-items td {
-
-font-size: 0.72rem;
-
-padding: 7px 5px;
-
-}
-
-
-
-.custom-table th,
-
-.custom-table td {
-
-font-size: 0.72rem;
-
-}
+    body {
+        padding: 8px;
+    }
+
+    .container {
+        padding: 14px;
+        border-radius: 8px;
+    }
+
+    h1 {
+        font-size: 1.2rem;
+    }
+
+    .container > p {
+        font-size: 0.8rem !important;
+        line-height: 1.45;
+    }
+
+    form > div[style*="grid-template-columns"] {
+        grid-template-columns: 1fr !important;
+        gap: 8px !important;
+    }
+
+    .item-mode-panel {
+        padding: 10px;
+    }
+
+    .item-mode-select {
+        max-width: none;
+    }
+
+    .available-items-panel {
+        border-radius: 7px;
+    }
+
+    .available-toolbar {
+        padding: 8px;
+    }
+
+    .available-toolbar input {
+        max-width: none;
+    }
+
+    .available-items-table {
+        min-width: 650px;
+    }
+
+    .custom-item-grid {
+        grid-template-columns:
+            minmax(0, 1.6fr)
+            minmax(0, 1fr)
+            75px
+            100px
+            70px
+            35px;
+    }
+
+    .custom-item-field input {
+        font-size: 0.76rem;
+        padding: 7px 5px;
+    }
+
+    .btn {
+        width: 100%;
+    }
 
 }
 
@@ -2070,808 +736,535 @@ font-size: 0.72rem;
 
 <h1>Đề Xuất Mua Sắm Văn Phòng Phẩm</h1>
 
-
-
 <p style="text-align: center; color: #64748b; font-size: 0.9rem; margin-bottom: 25px;">
-
-Biểu mẫu đăng ký nhu cầu mua sắm bổ sung văn phòng phẩm cho các phòng ban.
-
+    Biểu mẫu đăng ký nhu cầu mua sắm bổ sung văn phòng phẩm cho các phòng ban.
 </p>
 
-
-
 <?php if ($message): ?>
-
-<div class="alert alert-success"><?= $message ?></div>
-
+    <div class="alert alert-success"><?= $message ?></div>
 <?php endif; ?>
-
-
 
 <?php if ($error): ?>
-
-<div class="alert alert-danger"><?= $error ?></div>
-
+    <div class="alert alert-danger"><?= $error ?></div>
 <?php endif; ?>
-
 
 
 <form method="POST" action="" enctype="multipart/form-data">
 
-<input type="hidden" name="action" value="submit_purchase_proposal">
+<input
+    type="hidden"
+    name="action"
+    value="submit_purchase_proposal"
+>
 
-<input type="hidden" name="employee_id" id="hidden_emp_id">
-
+<input
+    type="hidden"
+    name="employee_id"
+    id="hidden_emp_id"
+>
 
 
 <!-- =====================================================
      THÔNG TIN NGƯỜI ĐỀ XUẤT
-     ===================================================== -->
-
-<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-
-<div class="form-group">
-
-<label>Họ và Tên / Mã số nhân viên: *</label>
-
-
-
-<input
-
-type="text"
-
-name="receiver_name"
-
-id="inp_receiver"
-
-required
-
-placeholder="Gõ tên hoặc mã nhân sự..."
-
-autocomplete="off">
-
-
-
-<div class="suggest-list" id="suggest_box"></div>
-
-
-
-<span class="hint-text">
-
-💡 Gõ tên hoặc mã ID để hệ thống tự điền thông tin
-
-</span>
-
-</div>
-
-
-
-<div class="form-group">
-
-<label>Bộ Phận / Phòng Ban: *</label>
-
-
-
-<select name="department" id="sel_dept" required>
-
-<option value="">-- Chọn phòng ban của bạn --</option>
-
-
-
-<?php foreach ($DEFAULT_DEPARTMENTS as $d): ?>
-
-<option value="<?= htmlspecialchars($d) ?>">
-
-<?= htmlspecialchars($d) ?>
-
-</option>
-
-<?php endforeach; ?>
-
-</select>
-
-</div>
-
-</div>
-
-
-
-<!-- =====================================================
-     CHỌN CHẾ ĐỘ - NẰM NGOÀI BẢNG
-     ===================================================== -->
-
-<div class="item-mode-section">
-
-<div class="item-mode-title">
-
-Loại đề xuất mua hàng: *
-
-</div>
-
-
-
-<select
-
-name="proposal_mode"
-
-id="proposal_mode"
-
-class="mode-select-main"
-
-required
-
-onchange="changeProposalMode(this.value)">
-
-<option value="" selected disabled>
-
-Vui lòng chọn
-
-</option>
-
-
-
-<option value="available">
-
-Chọn mặt hàng có sẵn trong kho
-
-</option>
-
-
-
-<option value="custom">
-
-Nhập mặt hàng mới bên ngoài
-
-</option>
-
-</select>
-
-
-
-<div class="mode-description" id="mode_description">
-
-Chọn một hình thức để bắt đầu nhập danh sách mặt hàng cần mua.
-
-</div>
-
-</div>
-
-
-
-<!-- =====================================================
-     CHẾ ĐỘ SẢN PHẨM CÓ SẴN
-     ===================================================== -->
-
-<div id="available_section" style="display: none;">
-
-<div class="items-toolbar">
-
-<h3 class="items-title">
-
-Danh sách mặt hàng trong kho
-
-</h3>
-
-
-
-<div class="items-counter" id="selected_counter">
-
-Đã chọn: 0
-
-</div>
-
-</div>
-
-
-
-<div class="product-search-area" id="product_search_area">
-
-<div class="product-search-row">
-
-<input
-
-type="text"
-
-id="product_search"
-
-class="product-search-input"
-
-placeholder="🔎 Tìm theo tên mặt hàng..."
-
-autocomplete="off"
-
-oninput="filterProducts(this)">
-
-
-
-<button
-
-type="button"
-
-class="btn-select-all"
-
-onclick="selectAllVisible()">
-
-✓ Chọn tất cả
-
-</button>
-
-
-
-<button
-
-type="button"
-
-class="btn-clear-all"
-
-onclick="clearAllProducts()">
-
-Bỏ chọn
-
-</button>
-
-</div>
-
-
-
-<span class="search-hint">
-
-Tick vào sản phẩm cần đề xuất và nhập số lượng ở cột cuối.
-
-</span>
-
-</div>
-
-
-
-<table class="table-items" id="available_table">
-
-<thead>
-
-<tr>
-
-<th class="col-check">
-
-Chọn
-
-</th>
-
-
-
-<th class="col-name">
-
-Mặt hàng
-
-</th>
-
-
-
-<th class="col-spec">
-
-Quy cách / Mô tả
-
-</th>
-
-
-
-<th class="col-unit">
-
-ĐVT
-
-</th>
-
-
-
-<th class="col-stock">
-
-Tồn kho
-
-</th>
-
-
-
-<th class="col-qty">
-
-Số lượng yêu cầu
-
-</th>
-
-</tr>
-
-</thead>
-
-
-
-<tbody id="available_tbody">
-
-<?php foreach ($allItems as $idx => $it): ?>
-
-<tr
-
-class="product-row"
-
-data-name="<?= htmlspecialchars(strtolower($it['item_name'])) ?>"
-
-data-spec="<?= htmlspecialchars(strtolower($it['specification'] ?? '')) ?>">
-
-
-
-<td>
-
-<input
-
-type="checkbox"
-
-class="product-check"
-
-data-index="<?= $idx ?>"
-
-onchange="toggleProductRow(this)">
-
-</td>
-
-
-
-<td class="product-name-cell">
-
-<?= htmlspecialchars($it['item_name']) ?>
-
-
-
-<input
-
-type="hidden"
-
-name="items[<?= $idx ?>][item_id]"
-
-value="<?= intval($it['id']) ?>"
-
-disabled
-
-class="item-id-input">
-
-
-
-<input
-
-type="hidden"
-
-name="items[<?= $idx ?>][custom_item_name]"
-
-value=""
-
-disabled
-
-class="custom-name-input">
-
-</td>
-
-
-
-<td class="product-spec-cell">
-
-<?= htmlspecialchars($it['specification'] ?? '') ?>
-
-
-
-<input
-
-type="hidden"
-
-name="items[<?= $idx ?>][specification]"
-
-value="<?= htmlspecialchars($it['specification'] ?? '') ?>"
-
-disabled
-
-class="spec-input">
-
-</td>
-
-
-
-<td>
-
-<?= htmlspecialchars($it['unit'] ?? 'Cái') ?>
-
-
-
-<input
-
-type="hidden"
-
-name="items[<?= $idx ?>][unit]"
-
-value="<?= htmlspecialchars($it['unit'] ?? 'Cái') ?>"
-
-disabled
-
-class="unit-input">
-
-</td>
-
-
-
-<td>
-
-<span class="stock-number">
-
-<?= intval($it['stock_qty']) ?>
-
-</span>
-
-<?= htmlspecialchars($it['unit'] ?? 'Cái') ?>
-
-</td>
-
-
-
-<td style="text-align: center;">
-
-<input
-
-type="number"
-
-name="items[<?= $idx ?>][quantity]"
-
-class="qty-input"
-
-min="1"
-
-value="1"
-
-disabled
-
-oninput="updateSelectedCounter()"
-
-aria-label="Số lượng yêu cầu">
-
-</td>
-
-</tr>
-
-<?php endforeach; ?>
-
-
-
-<?php if (empty($allItems)): ?>
-
-<tr>
-
-<td colspan="6">
-
-<div class="empty-state">
-
-<strong>Chưa có mặt hàng trong kho.</strong><br>
-
-Vui lòng chọn “Nhập mặt hàng mới bên ngoài”.
-
-</div>
-
-</td>
-
-</tr>
-
-<?php endif; ?>
-
-</tbody>
-
-</table>
-
-</div>
-
-
-
-<!-- =====================================================
-     CHẾ ĐỘ NHẬP MẶT HÀNG MỚI
-     ===================================================== -->
-
-<div id="custom_section" style="display: none;">
-
-<div class="items-toolbar">
-
-<h3 class="items-title">
-
-Mặt hàng mới cần mua
-
-</h3>
-
-</div>
-
-
-
-<table class="custom-table">
-
-<thead>
-
-<tr>
-
-<th class="custom-name-col">
-
-Tên mặt hàng
-
-</th>
-
-
-
-<th class="custom-spec-col">
-
-Quy cách / Tên mô tả
-
-</th>
-
-
-
-<th class="custom-unit-col">
-
-Đơn vị
-
-</th>
-
-
-
-<th class="custom-image-col">
-
-Hình ảnh
-
-</th>
-
-
-
-<th class="custom-qty-col">
-
-Số lượng
-
-</th>
-
-
-
-<th class="custom-delete-col">
-
-Xóa
-
-</th>
-
-</tr>
-
-</thead>
-
-
-
-<tbody>
-
-<tr>
-
-<td>
-
-<input
-
-type="text"
-
-name="items[0][custom_item_name]"
-
-id="custom_item_name"
-
-class="custom-item-name"
-
-placeholder="Nhập tên mặt hàng mới...">
-
-</td>
-
-
-
-<td>
-
-<input
-
-type="text"
-
-name="items[0][specification]"
-
-placeholder="VD: Ram 500 tờ...">
-
-</td>
-
-
-
-<td>
-
-<input
-
-type="text"
-
-name="items[0][unit]"
-
-value="Cái"
-
-placeholder="ĐVT...">
-
-</td>
-
-
-
-<td>
-
-<div class="upload-container">
-
-<input
-
-type="file"
-
-name="items[0][image]"
-
-id="file_0"
-
-accept="image/*"
-
-style="display: none;"
-
-onchange="handleImageChange(this, 0)">
-
-
-
-<div id="upload_btn_wrap_0">
-
-<button
-
-type="button"
-
-class="btn-upload-custom"
-
-onclick="document.getElementById('file_0').click()">
-
-📷 Tải ảnh lên
-
-</button>
-
-</div>
-
-
+====================================================== -->
 
 <div
+    style="
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+    "
+>
 
-class="preview-box"
+    <div class="form-group">
 
-id="preview_wrap_0">
+        <label>
+            Họ và Tên / Mã số nhân viên: *
+        </label>
 
+        <input
+            type="text"
+            name="receiver_name"
+            id="inp_receiver"
+            required
+            placeholder="Gõ tên hoặc mã nhân sự..."
+            autocomplete="off"
+        >
 
+        <div
+            class="suggest-list"
+            id="suggest_box"
+        ></div>
 
-<img
+        <span class="hint-text">
+            💡 Gõ tên hoặc mã ID để hệ thống tự điền thông tin
+        </span>
 
-src=""
-
-id="thumb_0"
-
-class="thumb-preview"
-
-title="Xem ảnh">
-
-
-
-<div class="img-action-group">
-
-<button
-
-type="button"
-
-class="btn-img-action change"
-
-onclick="document.getElementById('file_0').click()">
-
-Đổi
-
-</button>
-
-
-
-<button
-
-type="button"
-
-class="btn-img-action delete"
-
-onclick="removeImage(0)">
-
-Xóa
-
-</button>
-
-</div>
-
-</div>
-
-</div>
-
-</td>
+    </div>
 
 
+    <div class="form-group">
 
-<td>
+        <label>
+            Bộ Phận / Phòng Ban: *
+        </label>
 
-<input
+        <select
+            name="department"
+            id="sel_dept"
+            required
+        >
 
-type="number"
+            <option value="">
+                -- Chọn phòng ban của bạn --
+            </option>
 
-name="items[0][quantity]"
+            <?php foreach ($DEFAULT_DEPARTMENTS as $d): ?>
 
-class="custom-qty"
+                <option value="<?= htmlspecialchars($d) ?>">
+                    <?= htmlspecialchars($d) ?>
+                </option>
 
-min="1"
+            <?php endforeach; ?>
 
-value="1"
+        </select>
 
-required
-
-style="text-align:center;">
-
-</td>
-
-
-
-<td style="text-align:center;">
-
-<button
-
-type="button"
-
-class="btn-del"
-
-onclick="resetCustomItem()">
-
-✕
-
-</button>
-
-</td>
-
-</tr>
-
-</tbody>
-
-</table>
+    </div>
 
 </div>
 
+
+<!-- =====================================================
+     KHU VỰC MẶT HÀNG
+====================================================== -->
+
+<div
+    class="form-group"
+    style="margin-top: 20px;"
+>
+
+    <div
+        style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            gap: 10px;
+        "
+    >
+
+        <label style="margin:0;">
+            Danh Sách Mặt Hàng Cần Mua: *
+        </label>
+
+    </div>
+
+
+    <!-- =================================================
+         1. Ô VUI LÒNG CHỌN ĐƯA LÊN TRÊN
+    ================================================== -->
+
+    <div class="item-mode-panel">
+
+        <label>
+            Loại mặt hàng:
+        </label>
+
+        <select
+            id="global_mode_select"
+            class="item-mode-select"
+            onchange="handleGlobalModeChange(this)"
+            required
+        >
+
+            <option value="" selected disabled>
+                Vui lòng chọn
+            </option>
+
+            <option value="available">
+                Chọn mặt hàng có sẵn
+            </option>
+
+            <option value="custom">
+                Nhập mặt hàng mới bên ngoài
+            </option>
+
+        </select>
+
+    </div>
+
+
+    <!-- =================================================
+         2. MẶT HÀNG CÓ SẴN
+    ================================================== -->
+
+    <div
+        id="available_items_panel"
+        class="available-items-panel"
+    >
+
+        <div class="available-toolbar">
+
+            <input
+                type="text"
+                id="available_search"
+                placeholder="🔎 Tìm tên sản phẩm, quy cách, đơn vị..."
+                autocomplete="off"
+                oninput="filterAvailableItems()"
+            >
+
+            <div
+                class="selected-count"
+                id="selected_count"
+            >
+                Đã chọn: 0 sản phẩm
+            </div>
+
+        </div>
+
+
+        <div class="available-table-wrap">
+
+            <table class="available-items-table">
+
+                <thead>
+
+                    <tr>
+
+                        <th class="check-col">
+                            Chọn
+                        </th>
+
+                        <th>
+                            Tên mặt hàng
+                        </th>
+
+                        <th>
+                            Quy cách / Mô tả
+                        </th>
+
+                        <th>
+                            Đơn vị
+                        </th>
+
+                        <th>
+                            Tồn kho
+                        </th>
+
+                        <th class="qty-col">
+                            Số lượng
+                        </th>
+
+                    </tr>
+
+                </thead>
+
+                <tbody id="available_items_tbody">
+
+                    <?php foreach ($allItems as $it): ?>
+
+                        <tr
+                            class="available-product-row"
+                            data-search="<?= htmlspecialchars(
+                                strtolower(
+                                    ($it['item_name'] ?? '') . ' ' .
+                                    ($it['specification'] ?? '') . ' ' .
+                                    ($it['unit'] ?? '')
+                                )
+                            ) ?>"
+                        >
+
+                            <td class="check-col">
+
+                                <input
+                                    type="checkbox"
+                                    class="available-item-check"
+                                    data-id="<?= intval($it['id']) ?>"
+                                    data-name="<?= htmlspecialchars($it['item_name']) ?>"
+                                    data-spec="<?= htmlspecialchars($it['specification'] ?? '') ?>"
+                                    data-unit="<?= htmlspecialchars($it['unit'] ?? 'Cái') ?>"
+                                    data-stock="<?= intval($it['stock_qty']) ?>"
+                                    onchange="toggleAvailableItem(this)"
+                                >
+
+                            </td>
+
+
+                            <td>
+                                <strong>
+                                    <?= htmlspecialchars($it['item_name']) ?>
+                                </strong>
+                            </td>
+
+
+                            <td>
+                                <?= htmlspecialchars($it['specification'] ?? '') ?>
+                            </td>
+
+
+                            <td>
+                                <?= htmlspecialchars($it['unit'] ?? 'Cái') ?>
+                            </td>
+
+
+                            <td>
+                                <?= intval($it['stock_qty']) ?>
+                                <?= htmlspecialchars($it['unit'] ?? 'Cái') ?>
+                            </td>
+
+
+                            <td class="qty-col">
+
+                                <input
+                                    type="number"
+                                    class="qty-input available-qty-input"
+                                    min="1"
+                                    value="1"
+                                    disabled
+                                    data-id="<?= intval($it['id']) ?>"
+                                    onchange="updateSelectedItem(this)"
+                                >
+
+                            </td>
+
+                        </tr>
+
+                    <?php endforeach; ?>
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+    <!-- =================================================
+         3. MẶT HÀNG MỚI
+    ================================================== -->
+
+    <div
+        id="custom_item_panel"
+        class="custom-item-panel"
+    >
+
+        <div
+            style="
+                font-size: 0.82rem;
+                font-weight: 600;
+                color: #475569;
+                margin-bottom: 10px;
+            "
+        >
+            Nhập thông tin mặt hàng mới
+        </div>
+
+
+        <div class="custom-item-grid">
+
+            <div class="custom-item-field">
+
+                <label>
+                    Tên mặt hàng *
+                </label>
+
+                <input
+                    type="text"
+                    id="custom_item_name"
+                    placeholder="Nhập tên mặt hàng..."
+                >
+
+            </div>
+
+
+            <div class="custom-item-field">
+
+                <label>
+                    Quy cách / Tên mô tả
+                </label>
+
+                <input
+                    type="text"
+                    id="custom_specification"
+                    placeholder="VD: Ram 500 tờ..."
+                >
+
+            </div>
+
+
+            <div class="custom-item-field">
+
+                <label>
+                    Đơn vị
+                </label>
+
+                <input
+                    type="text"
+                    id="custom_unit"
+                    value="Cái"
+                    placeholder="ĐVT..."
+                >
+
+            </div>
+
+
+            <div class="custom-item-field">
+
+                <label>
+                    Hình ảnh
+                </label>
+
+                <div class="upload-container">
+
+                    <input
+                        type="file"
+                        id="custom_file"
+                        accept="image/*"
+                        style="display:none;"
+                        onchange="handleCustomImageChange(this)"
+                    >
+
+                    <div id="custom_upload_btn_wrap">
+
+                        <button
+                            type="button"
+                            class="btn-upload-custom"
+                            onclick="document.getElementById('custom_file').click()"
+                        >
+                            📷 Tải ảnh
+                        </button>
+
+                    </div>
+
+
+                    <div
+                        class="preview-box"
+                        id="custom_preview_wrap"
+                    >
+
+                        <img
+                            src=""
+                            id="custom_thumb"
+                            class="thumb-preview"
+                            title="Xem ảnh"
+                        >
+
+                        <div class="img-action-group">
+
+                            <button
+                                type="button"
+                                class="btn-img-action change"
+                                onclick="document.getElementById('custom_file').click()"
+                            >
+                                Đổi
+                            </button>
+
+                            <button
+                                type="button"
+                                class="btn-img-action delete"
+                                onclick="removeCustomImage()"
+                            >
+                                Xóa
+                            </button>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div class="custom-item-field">
+
+                <label>
+                    Số lượng
+                </label>
+
+                <input
+                    type="number"
+                    id="custom_quantity"
+                    min="1"
+                    value="1"
+                >
+
+            </div>
+
+
+            <div class="custom-item-field">
+
+                <button
+                    type="button"
+                    class="btn btn-add"
+                    style="width:100%;"
+                    onclick="addCustomItem()"
+                >
+                    + Thêm
+                </button>
+
+            </div>
+
+        </div>
+
+
+        <!-- Các mặt hàng mới đã thêm -->
+        <div
+            id="custom_items_list"
+            style="margin-top:12px;"
+        ></div>
+
+    </div>
+
+
+    <!-- =================================================
+         FORM DATA ẨN - ĐÂY LÀ PHẦN QUAN TRỌNG
+         Các dòng được chọn sẽ được tạo đúng:
+         items[index][item_id]
+         items[index][custom_item_name]
+         items[index][specification]
+         items[index][unit]
+         items[index][quantity]
+    ================================================== -->
+
+    <div id="hidden_items_container"></div>
+
+</div>
 
 
 <!-- =====================================================
      SUBMIT
-     ===================================================== -->
+====================================================== -->
 
-<div style="text-align: center; margin-top: 25px;">
+<div
+    style="
+        text-align: center;
+        margin-top: 25px;
+    "
+>
 
-<button
-
-type="submit"
-
-class="btn btn-submit"
-
-onclick="return validateBeforeSubmit()">
-
-Gửi Đề Xuất Mua VPP
-
-</button>
+    <button
+        type="submit"
+        class="btn"
+    >
+        Gửi Đề Xuất Mua VPP
+    </button>
 
 </div>
-
-
 
 </form>
 
 </div>
 
 
-
 <script>
 
 let rowIndex = 0;
 
+const allItemsData = <?= json_encode($allItems, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
 
-
-const allItemsData = <?= json_encode($allItems) ?>;
-
-const employees = <?= json_encode($employees) ?>;
-
+const employees = <?= json_encode($employees, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
 
 
 // =========================================================
@@ -2879,720 +1272,959 @@ const employees = <?= json_encode($employees) ?>;
 // =========================================================
 
 const inpReceiver = document.getElementById('inp_receiver');
-
 const suggestBox = document.getElementById('suggest_box');
-
 const selDept = document.getElementById('sel_dept');
-
 const hiddenEmpId = document.getElementById('hidden_emp_id');
-
-
 
 inpReceiver.addEventListener('input', function() {
 
-const val = this.value.trim().toLowerCase();
+    const val = this.value.trim().toLowerCase();
 
+    suggestBox.innerHTML = '';
 
+    if (!val) {
 
-suggestBox.innerHTML = '';
+        suggestBox.style.display = 'none';
+        hiddenEmpId.value = '';
 
+        return;
+    }
 
+    const matched = employees.filter(e =>
 
-if (!val) {
+        e.fullname.toLowerCase().includes(val) ||
 
-suggestBox.style.display = 'none';
+        e.id.toString() === val ||
 
-hiddenEmpId.value = '';
+        ('id:' + e.id).includes(val) ||
 
-return;
+        ('#' + e.id).includes(val)
 
-}
+    );
 
+    if (matched.length > 0) {
 
+        matched.slice(0, 8).forEach(emp => {
 
-const matched = employees.filter(e =>
+            const div = document.createElement('div');
 
-e.fullname.toLowerCase().includes(val) ||
+            div.className = 'suggest-item';
 
-e.id.toString() === val ||
+            div.innerHTML =
+                `<strong>#${emp.id} - ${escapeHtml(emp.fullname)}</strong>
+                (${escapeHtml(emp.department || 'Chưa phân bổ')})`;
 
-('id:' + e.id).includes(val) ||
+            div.onclick = function() {
 
-('#' + e.id).includes(val)
+                inpReceiver.value = emp.fullname;
 
-);
+                hiddenEmpId.value = emp.id;
 
+                if (emp.department) {
+                    selDept.value = emp.department;
+                }
 
+                suggestBox.style.display = 'none';
+            };
 
-if (matched.length > 0) {
+            suggestBox.appendChild(div);
 
-matched.slice(0, 8).forEach(emp => {
+        });
 
-const div = document.createElement('div');
+        suggestBox.style.display = 'block';
 
-div.className = 'suggest-item';
+    } else {
 
+        suggestBox.style.display = 'none';
+        hiddenEmpId.value = '';
 
-
-div.innerHTML = `<strong>#${emp.id} - ${emp.fullname}</strong> (${emp.department || 'Chưa phân bổ'})`;
-
-
-
-div.onclick = function() {
-
-inpReceiver.value = emp.fullname;
-
-hiddenEmpId.value = emp.id;
-
-
-
-if (emp.department) {
-
-selDept.value = emp.department;
-
-}
-
-
-
-suggestBox.style.display = 'none';
-
-};
-
-
-
-suggestBox.appendChild(div);
+    }
 
 });
-
-
-
-suggestBox.style.display = 'block';
-
-} else {
-
-suggestBox.style.display = 'none';
-
-hiddenEmpId.value = '';
-
-}
-
-});
-
 
 
 document.addEventListener('click', function(e) {
 
-if (!e.target.closest('#inp_receiver') &&
+    if (
+        !e.target.closest('#inp_receiver') &&
+        !e.target.closest('#suggest_box')
+    ) {
 
-!e.target.closest('#suggest_box')) {
+        suggestBox.style.display = 'none';
 
-suggestBox.style.display = 'none';
-
-}
-
-});
-
-
-
-// =========================================================
-// CHUYỂN CHẾ ĐỘ ĐỀ XUẤT
-// =========================================================
-
-function changeProposalMode(mode) {
-
-const availableSection = document.getElementById('available_section');
-
-const customSection = document.getElementById('custom_section');
-
-const description = document.getElementById('mode_description');
-
-
-
-if (mode === 'available') {
-
-availableSection.style.display = 'block';
-
-customSection.style.display = 'none';
-
-
-
-description.innerHTML =
-
-'Tick vào các mặt hàng có sẵn trong kho và nhập số lượng yêu cầu ở cột cuối.';
-
-
-
-/*
- * Khi chuyển sang sản phẩm có sẵn,
- * tắt toàn bộ field custom để không gửi nhầm dữ liệu.
- */
-
-disableCustomFields();
-
-updateSelectedCounter();
-
-
-
-} else if (mode === 'custom') {
-
-availableSection.style.display = 'none';
-
-customSection.style.display = 'block';
-
-
-
-description.innerHTML =
-
-'Nhập tên, quy cách, đơn vị, hình ảnh và số lượng của mặt hàng cần mua bên ngoài.';
-
-
-
-/*
- * Khi chuyển sang custom,
- * tắt toàn bộ field của danh sách sản phẩm có sẵn.
- */
-
-disableAvailableFields();
-
-
-
-} else {
-
-availableSection.style.display = 'none';
-
-customSection.style.display = 'none';
-
-description.innerHTML =
-
-'Chọn một hình thức để bắt đầu nhập danh sách mặt hàng cần mua.';
-
-}
-
-}
-
-
-
-// =========================================================
-// TẮT FIELD CUSTOM
-// =========================================================
-
-function disableCustomFields() {
-
-const customSection = document.getElementById('custom_section');
-
-
-
-if (!customSection) return;
-
-
-
-customSection.querySelectorAll('input, select, textarea').forEach(function(input) {
-
-input.disabled = true;
+    }
 
 });
 
-}
-
-
 
 // =========================================================
-// TẮT FIELD SẢN PHẨM CÓ SẴN
+// ESCAPE HTML
 // =========================================================
 
-function disableAvailableFields() {
+function escapeHtml(value) {
 
-const availableSection = document.getElementById('available_section');
-
-
-
-if (!availableSection) return;
-
-
-
-availableSection.querySelectorAll('input, select, textarea').forEach(function(input) {
-
-input.disabled = true;
-
-});
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
 
 }
 
 
-
 // =========================================================
-// CHECK / UNCHECK SẢN PHẨM
-// =========================================================
-
-function toggleProductRow(checkbox) {
-
-const row = checkbox.closest('tr');
-
-
-
-if (!row) return;
-
-
-
-const inputs = row.querySelectorAll('input');
-
-
-
-inputs.forEach(function(input) {
-
-if (input === checkbox) return;
-
-
-
-/*
- * Checkbox được tick:
- * bật item_id, specification, unit và quantity.
- */
-
-input.disabled = !checkbox.checked;
-
-});
-
-
-
-if (checkbox.checked) {
-
-const qty = row.querySelector('.qty-input');
-
-
-
-if (qty) {
-
-qty.focus();
-
-qty.select();
-
-}
-
-}
-
-
-
-updateSelectedCounter();
-
-}
-
-
-
-// =========================================================
-// ĐẾM SẢN PHẨM ĐÃ CHỌN
+// CHUYỂN LOẠI MẶT HÀNG
 // =========================================================
 
-function updateSelectedCounter() {
+function handleGlobalModeChange(select) {
 
-const counter = document.getElementById('selected_counter');
+    const availablePanel =
+        document.getElementById('available_items_panel');
 
+    const customPanel =
+        document.getElementById('custom_item_panel');
 
+    if (select.value === 'available') {
 
-if (!counter) return;
+        availablePanel.style.display = 'block';
+        customPanel.style.display = 'none';
 
+        // Khi chuyển sang mặt hàng có sẵn,
+        // xóa các mặt hàng mới chưa thêm
+        clearCustomPanel();
 
+        updateHiddenItems();
 
-const selected = document.querySelectorAll(
+    }
 
-'#available_tbody .product-check:checked'
+    else if (select.value === 'custom') {
 
-);
+        availablePanel.style.display = 'none';
+        customPanel.style.display = 'block';
 
+        // Không xóa dữ liệu backend đã tạo.
+        // Chỉ bỏ trạng thái chọn ở giao diện.
+        updateHiddenItems();
 
-
-counter.textContent = 'Đã chọn: ' + selected.length;
-
-}
-
-
-
-// =========================================================
-// CHỌN TẤT CẢ SẢN PHẨM ĐANG HIỂN THỊ
-// =========================================================
-
-function selectAllVisible() {
-
-const rows = document.querySelectorAll(
-
-'#available_tbody .product-row:not(.hidden-row)'
-
-);
-
-
-
-rows.forEach(function(row) {
-
-const checkbox = row.querySelector('.product-check');
-
-
-
-if (checkbox && !checkbox.checked) {
-
-checkbox.checked = true;
-
-toggleProductRow(checkbox);
+    }
 
 }
-
-});
-
-
-
-updateSelectedCounter();
-
-}
-
-
-
-// =========================================================
-// BỎ CHỌN TẤT CẢ
-// =========================================================
-
-function clearAllProducts() {
-
-const checkboxes = document.querySelectorAll(
-
-'#available_tbody .product-check'
-
-);
-
-
-
-checkboxes.forEach(function(checkbox) {
-
-if (checkbox.checked) {
-
-checkbox.checked = false;
-
-toggleProductRow(checkbox);
-
-}
-
-});
-
-
-
-updateSelectedCounter();
-
-}
-
 
 
 // =========================================================
 // TÌM KIẾM SẢN PHẨM
 // =========================================================
 
-function filterProducts(input) {
+function filterAvailableItems() {
 
-const keyword = input.value.trim().toLowerCase();
+    const keyword =
+        document
+            .getElementById('available_search')
+            .value
+            .trim()
+            .toLowerCase();
+
+    const rows =
+        document.querySelectorAll('.available-product-row');
+
+    rows.forEach(row => {
+
+        const searchText =
+            row.getAttribute('data-search') || '';
+
+        row.style.display =
+            !keyword || searchText.includes(keyword)
+                ? ''
+                : 'none';
+
+    });
+
+}
 
 
+// =========================================================
+// TICK SẢN PHẨM CÓ SẴN
+// =========================================================
 
-const rows = document.querySelectorAll(
+function toggleAvailableItem(checkbox) {
 
-'#available_tbody .product-row'
+    const row = checkbox.closest('tr');
 
+    const qtyInput =
+        row.querySelector('.available-qty-input');
+
+    if (checkbox.checked) {
+
+        qtyInput.disabled = false;
+
+        if (
+            !qtyInput.value ||
+            parseInt(qtyInput.value, 10) <= 0
+        ) {
+            qtyInput.value = 1;
+        }
+
+        row.classList.add('selected');
+
+    } else {
+
+        qtyInput.disabled = true;
+        row.classList.remove('selected');
+
+    }
+
+    updateHiddenItems();
+
+}
+
+
+// =========================================================
+// THAY ĐỔI SỐ LƯỢNG
+// =========================================================
+
+function updateSelectedItem(input) {
+
+    if (parseInt(input.value, 10) <= 0) {
+        input.value = 1;
+    }
+
+    updateHiddenItems();
+
+}
+
+
+// =========================================================
+// TẠO CÁC INPUT ẨN ĐÚNG CẤU TRÚC PHP
+//
+// Đây là phần sửa lỗi chính.
+//
+// PHP đang đọc:
+//
+// $_POST['items']
+//
+// và:
+//
+// $row['item_id']
+// $row['quantity']
+// $row['custom_item_name']
+// $row['specification']
+// $row['unit']
+//
+// Vì vậy frontend phải gửi đúng cấu trúc này.
+// =========================================================
+
+function updateHiddenItems() {
+
+    const container =
+        document.getElementById('hidden_items_container');
+
+    container.innerHTML = '';
+
+    let index = 0;
+
+
+    // -----------------------------------------------------
+    // MẶT HÀNG CÓ SẴN
+    // -----------------------------------------------------
+
+    const checkedItems =
+        document.querySelectorAll(
+            '.available-item-check:checked'
+        );
+
+    checkedItems.forEach(checkbox => {
+
+        const row = checkbox.closest('tr');
+
+        const qtyInput =
+            row.querySelector('.available-qty-input');
+
+        const itemId =
+            checkbox.getAttribute('data-id');
+
+        const spec =
+            checkbox.getAttribute('data-spec') || '';
+
+        const unit =
+            checkbox.getAttribute('data-unit') || 'Cái';
+
+        let qty =
+            parseInt(qtyInput.value, 10);
+
+        if (!qty || qty <= 0) {
+            qty = 1;
+        }
+
+
+        addHiddenInput(
+            container,
+            `items[${index}][item_id]`,
+            itemId
+        );
+
+        addHiddenInput(
+            container,
+            `items[${index}][custom_item_name]`,
+            ''
+        );
+
+        addHiddenInput(
+            container,
+            `items[${index}][specification]`,
+            spec
+        );
+
+        addHiddenInput(
+            container,
+            `items[${index}][unit]`,
+            unit
+        );
+
+        addHiddenInput(
+            container,
+            `items[${index}][quantity]`,
+            qty
+        );
+
+
+        index++;
+
+    });
+
+
+    // -----------------------------------------------------
+    // MẶT HÀNG MỚI
+    // -----------------------------------------------------
+
+    const customRows =
+        document.querySelectorAll('.custom-added-row');
+
+    customRows.forEach(row => {
+
+        const name =
+            row.getAttribute('data-name') || '';
+
+        const spec =
+            row.getAttribute('data-spec') || '';
+
+        const unit =
+            row.getAttribute('data-unit') || 'Cái';
+
+        const qty =
+            parseInt(
+                row.getAttribute('data-quantity') || '1',
+                10
+            );
+
+        const fileInput =
+            row.querySelector('.custom-row-file');
+
+
+        addHiddenInput(
+            container,
+            `items[${index}][item_id]`,
+            '0'
+        );
+
+        addHiddenInput(
+            container,
+            `items[${index}][custom_item_name]`,
+            name
+        );
+
+        addHiddenInput(
+            container,
+            `items[${index}][specification]`,
+            spec
+        );
+
+        addHiddenInput(
+            container,
+            `items[${index}][unit]`,
+            unit
+        );
+
+        addHiddenInput(
+            container,
+            `items[${index}][quantity]`,
+            qty
+        );
+
+
+        // File không thể chuyển bằng input hidden.
+        // Input file thật được đặt trong form với đúng
+        // name items[index][image].
+        if (fileInput) {
+            fileInput.name =
+                `items[${index}][image]`;
+        }
+
+
+        index++;
+
+    });
+
+
+    updateSelectedCount();
+
+}
+
+
+// =========================================================
+// THÊM INPUT ẨN
+// =========================================================
+
+function addHiddenInput(container, name, value) {
+
+    const input =
+        document.createElement('input');
+
+    input.type = 'hidden';
+    input.name = name;
+    input.value = value;
+
+    container.appendChild(input);
+
+}
+
+
+// =========================================================
+// ĐẾM SẢN PHẨM ĐÃ CHỌN
+// =========================================================
+
+function updateSelectedCount() {
+
+    const count =
+        document.querySelectorAll(
+            '.available-item-check:checked'
+        ).length;
+
+    const element =
+        document.getElementById('selected_count');
+
+    if (element) {
+
+        element.textContent =
+            'Đã chọn: ' +
+            count +
+            ' sản phẩm';
+
+    }
+
+}
+
+
+// =========================================================
+// THÊM MẶT HÀNG MỚI
+// =========================================================
+
+function addCustomItem() {
+
+    const nameInput =
+        document.getElementById('custom_item_name');
+
+    const specInput =
+        document.getElementById('custom_specification');
+
+    const unitInput =
+        document.getElementById('custom_unit');
+
+    const quantityInput =
+        document.getElementById('custom_quantity');
+
+    const fileInput =
+        document.getElementById('custom_file');
+
+
+    const name =
+        nameInput.value.trim();
+
+    const spec =
+        specInput.value.trim();
+
+    const unit =
+        unitInput.value.trim() || 'Cái';
+
+    let quantity =
+        parseInt(quantityInput.value, 10);
+
+    if (!name) {
+
+        alert(
+            'Vui lòng nhập tên mặt hàng mới!'
+        );
+
+        nameInput.focus();
+
+        return;
+    }
+
+    if (!quantity || quantity <= 0) {
+        quantity = 1;
+    }
+
+
+    const list =
+        document.getElementById(
+            'custom_items_list'
+        );
+
+
+    const row =
+        document.createElement('div');
+
+    row.className =
+        'custom-added-row';
+
+
+    row.setAttribute(
+        'data-name',
+        name
+    );
+
+    row.setAttribute(
+        'data-spec',
+        spec
+    );
+
+    row.setAttribute(
+        'data-unit',
+        unit
+    );
+
+    row.setAttribute(
+        'data-quantity',
+        quantity
+    );
+
+
+    row.style.cssText = `
+        display:grid;
+        grid-template-columns:minmax(0,1.5fr)
+                           minmax(0,1fr)
+                           90px
+                           80px
+                           170px
+                           40px;
+        gap:8px;
+        align-items:center;
+        padding:8px;
+        margin-bottom:6px;
+        border:1px solid #e2e8f0;
+        border-radius:7px;
+        background:#f8fafc;
+        font-size:0.82rem;
+    `;
+
+
+    let fileHtml = '';
+
+
+    // -----------------------------------------------------
+    // Chuyển file input thật vào dòng sản phẩm
+    // -----------------------------------------------------
+
+    if (fileInput.files && fileInput.files[0]) {
+
+        const clonedFile =
+            fileInput.cloneNode(true);
+
+        clonedFile.className =
+            'custom-row-file';
+
+        clonedFile.style.display =
+            'none';
+
+        // Xóa input cũ khỏi form
+        // và chuyển bản clone vào row.
+
+        row.appendChild(
+            document.createElement('span')
+        );
+
+        const fileContainer =
+            document.createElement('div');
+
+        fileContainer.style.display =
+            'contents';
+
+        fileContainer.appendChild(
+            clonedFile
+        );
+
+        row.appendChild(fileContainer);
+
+        fileHtml =
+            '📷 ' +
+            escapeHtml(
+                fileInput.files[0].name
+            );
+
+    } else {
+
+        fileHtml = 'Không có ảnh';
+
+    }
+
+
+    // -----------------------------------------------------
+    // Tạo giao diện dòng
+    // -----------------------------------------------------
+
+    const content =
+        document.createElement('div');
+
+    content.style.display =
+        'contents';
+
+
+    const nameDiv =
+        document.createElement('div');
+
+    nameDiv.innerHTML =
+        '<strong>' +
+        escapeHtml(name) +
+        '</strong>';
+
+
+    const specDiv =
+        document.createElement('div');
+
+    specDiv.textContent =
+        spec || '—';
+
+
+    const unitDiv =
+        document.createElement('div');
+
+    unitDiv.textContent =
+        unit;
+
+
+    const qtyDiv =
+        document.createElement('div');
+
+    qtyDiv.textContent =
+        quantity;
+
+
+    const imageDiv =
+        document.createElement('div');
+
+    imageDiv.innerHTML =
+        fileHtml;
+
+
+    const deleteDiv =
+        document.createElement('div');
+
+
+    const deleteBtn =
+        document.createElement('button');
+
+    deleteBtn.type =
+        'button';
+
+    deleteBtn.className =
+        'btn-del';
+
+    deleteBtn.textContent =
+        '✕';
+
+    deleteBtn.onclick =
+        function() {
+
+            row.remove();
+
+            updateHiddenItems();
+
+        };
+
+
+    deleteDiv.appendChild(
+        deleteBtn
+    );
+
+
+    row.appendChild(nameDiv);
+    row.appendChild(specDiv);
+    row.appendChild(unitDiv);
+    row.appendChild(qtyDiv);
+    row.appendChild(imageDiv);
+    row.appendChild(deleteDiv);
+
+
+    // Nếu có file thì đưa input file thật
+    // vào trong row.
+    if (fileInput.files && fileInput.files[0]) {
+
+        const realFileInput =
+            fileInput.cloneNode(true);
+
+        realFileInput.className =
+            'custom-row-file';
+
+        realFileInput.style.display =
+            'none';
+
+        // Clone file input bằng cloneNode
+        // không giữ được FileList trong một số trình duyệt.
+        // Vì vậy sử dụng DataTransfer để sao chép file.
+        try {
+
+            const dt =
+                new DataTransfer();
+
+            dt.items.add(
+                fileInput.files[0]
+            );
+
+            realFileInput.files =
+                dt.files;
+
+        } catch (e) {
+        }
+
+
+        realFileInput.name =
+            'items[temp][image]';
+
+        row.appendChild(
+            realFileInput
+        );
+
+    }
+
+
+    list.appendChild(row);
+
+
+    // -----------------------------------------------------
+    // Reset form nhập
+    // -----------------------------------------------------
+
+    nameInput.value = '';
+    specInput.value = '';
+    unitInput.value = 'Cái';
+    quantityInput.value = '1';
+
+
+    removeCustomImage();
+
+
+    updateHiddenItems();
+
+}
+
+
+// =========================================================
+// PREVIEW ẢNH MẶT HÀNG MỚI
+// =========================================================
+
+function handleCustomImageChange(input) {
+
+    if (
+        input.files &&
+        input.files[0]
+    ) {
+
+        const reader =
+            new FileReader();
+
+        reader.onload =
+            function(e) {
+
+                const thumb =
+                    document.getElementById(
+                        'custom_thumb'
+                    );
+
+                const btnWrap =
+                    document.getElementById(
+                        'custom_upload_btn_wrap'
+                    );
+
+                const previewWrap =
+                    document.getElementById(
+                        'custom_preview_wrap'
+                    );
+
+
+                if (thumb) {
+                    thumb.src =
+                        e.target.result;
+                }
+
+                if (btnWrap) {
+                    btnWrap.style.display =
+                        'none';
+                }
+
+                if (previewWrap) {
+                    previewWrap.style.display =
+                        'flex';
+                }
+
+            };
+
+        reader.readAsDataURL(
+            input.files[0]
+        );
+
+    }
+
+}
+
+
+// =========================================================
+// XÓA ẢNH MẶT HÀNG MỚI
+// =========================================================
+
+function removeCustomImage() {
+
+    const fileInput =
+        document.getElementById(
+            'custom_file'
+        );
+
+    const btnWrap =
+        document.getElementById(
+            'custom_upload_btn_wrap'
+        );
+
+    const previewWrap =
+        document.getElementById(
+            'custom_preview_wrap'
+        );
+
+    const thumb =
+        document.getElementById(
+            'custom_thumb'
+        );
+
+
+    if (fileInput) {
+        fileInput.value = '';
+    }
+
+    if (thumb) {
+        thumb.src = '';
+    }
+
+    if (btnWrap) {
+        btnWrap.style.display =
+            'block';
+    }
+
+    if (previewWrap) {
+        previewWrap.style.display =
+            'none';
+    }
+
+}
+
+
+// =========================================================
+// XÓA TOÀN BỘ KHU VỰC NHẬP MẶT HÀNG MỚI
+// =========================================================
+
+function clearCustomPanel() {
+
+    const list =
+        document.getElementById(
+            'custom_items_list'
+        );
+
+    if (list) {
+        list.innerHTML = '';
+    }
+
+    document.getElementById(
+        'custom_item_name'
+    ).value = '';
+
+    document.getElementById(
+        'custom_specification'
+    ).value = '';
+
+    document.getElementById(
+        'custom_unit'
+    ).value = 'Cái';
+
+    document.getElementById(
+        'custom_quantity'
+    ).value = '1';
+
+    removeCustomImage();
+
+}
+
+
+// =========================================================
+// KHI SUBMIT
+//
+// Chắc chắn cập nhật hidden inputs trước khi gửi.
+// =========================================================
+
+document.querySelector('form').addEventListener(
+    'submit',
+    function(e) {
+
+        updateHiddenItems();
+
+
+        const mode =
+            document.getElementById(
+                'global_mode_select'
+            ).value;
+
+
+        const checkedCount =
+            document.querySelectorAll(
+                '.available-item-check:checked'
+            ).length;
+
+
+        const customCount =
+            document.querySelectorAll(
+                '.custom-added-row'
+            ).length;
+
+
+        if (
+            mode === 'available' &&
+            checkedCount === 0
+        ) {
+
+            e.preventDefault();
+
+            alert(
+                'Vui lòng tick chọn ít nhất một mặt hàng có sẵn và nhập số lượng!'
+            );
+
+            return false;
+        }
+
+
+        if (
+            mode === 'custom' &&
+            customCount === 0
+        ) {
+
+            e.preventDefault();
+
+            alert(
+                'Vui lòng thêm ít nhất một mặt hàng mới!'
+            );
+
+            return false;
+        }
+
+    }
 );
-
-
-
-rows.forEach(function(row) {
-
-const name = row.getAttribute('data-name') || '';
-
-const spec = row.getAttribute('data-spec') || '';
-
-
-
-if (!keyword ||
-
-name.includes(keyword) ||
-
-spec.includes(keyword)) {
-
-row.classList.remove('hidden-row');
-
-} else {
-
-row.classList.add('hidden-row');
-
-}
-
-});
-
-}
-
-
-
-// =========================================================
-// UPLOAD ẢNH
-// =========================================================
-
-function handleImageChange(input, idx) {
-
-if (input.files && input.files[0]) {
-
-const reader = new FileReader();
-
-
-
-reader.onload = function(e) {
-
-const thumb = document.getElementById('thumb_' + idx);
-
-const btnWrap = document.getElementById('upload_btn_wrap_' + idx);
-
-const previewWrap = document.getElementById('preview_wrap_' + idx);
-
-
-
-if (thumb) {
-
-thumb.src = e.target.result;
-
-}
-
-
-
-if (btnWrap) {
-
-btnWrap.style.display = 'none';
-
-}
-
-
-
-if (previewWrap) {
-
-previewWrap.style.display = 'flex';
-
-}
-
-};
-
-
-
-reader.readAsDataURL(input.files[0]);
-
-}
-
-}
-
-
-
-// =========================================================
-// XÓA ẢNH
-// =========================================================
-
-function removeImage(idx) {
-
-const fileInput = document.getElementById('file_' + idx);
-
-const btnWrap = document.getElementById('upload_btn_wrap_' + idx);
-
-const previewWrap = document.getElementById('preview_wrap_' + idx);
-
-
-
-if (fileInput) {
-
-fileInput.value = '';
-
-}
-
-
-
-if (btnWrap) {
-
-btnWrap.style.display = 'block';
-
-}
-
-
-
-if (previewWrap) {
-
-previewWrap.style.display = 'none';
-
-}
-
-}
-
-
-
-// =========================================================
-// RESET MẶT HÀNG CUSTOM
-// =========================================================
-
-function resetCustomItem() {
-
-const customName = document.getElementById('custom_item_name');
-
-
-
-if (customName) {
-
-customName.value = '';
-
-}
-
-
-
-const customSection = document.getElementById('custom_section');
-
-
-
-if (customSection) {
-
-const inputs = customSection.querySelectorAll('input, select, textarea');
-
-
-
-inputs.forEach(function(input) {
-
-if (input.type === 'file') {
-
-input.value = '';
-
-} else if (input.type === 'number') {
-
-input.value = '1';
-
-} else if (input.name.includes('[unit]')) {
-
-input.value = 'Cái';
-
-} else {
-
-input.value = '';
-
-}
-
-});
-
-}
-
-
-
-removeImage(0);
-
-}
-
-
-
-// =========================================================
-// VALIDATE TRƯỚC KHI SUBMIT
-// =========================================================
-
-function validateBeforeSubmit() {
-
-const mode = document.getElementById('proposal_mode').value;
-
-
-
-if (!mode) {
-
-alert('Vui lòng chọn loại đề xuất mua hàng!');
-
-return false;
-
-}
-
-
-
-if (mode === 'available') {
-
-const selected = document.querySelectorAll(
-
-'#available_tbody .product-check:checked'
-
-);
-
-
-
-if (selected.length === 0) {
-
-alert('Vui lòng tick chọn ít nhất một mặt hàng cần đề xuất!');
-
-return false;
-
-}
-
-
-
-let invalidQuantity = false;
-
-
-
-selected.forEach(function(checkbox) {
-
-const row = checkbox.closest('tr');
-
-const qty = row.querySelector('.qty-input');
-
-
-
-if (!qty || parseInt(qty.value, 10) <= 0) {
-
-invalidQuantity = true;
-
-}
-
-});
-
-
-
-if (invalidQuantity) {
-
-alert('Vui lòng nhập số lượng lớn hơn 0 cho tất cả mặt hàng đã chọn!');
-
-return false;
-
-}
-
-}
-
-
-
-if (mode === 'custom') {
-
-const customName = document.getElementById('custom_item_name');
-
-
-
-if (!customName || !customName.value.trim()) {
-
-alert('Vui lòng nhập tên mặt hàng mới!');
-
-return false;
-
-}
-
-}
-
-
-
-return true;
-
-}
-
-
-
-// =========================================================
-// KHỞI TẠO TRẠNG THÁI
-// =========================================================
-
-document.addEventListener('DOMContentLoaded', function() {
-
-disableAvailableFields();
-
-disableCustomFields();
-
-});
 
 </script>
 
 </body>
-
 </html>

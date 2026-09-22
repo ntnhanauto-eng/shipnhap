@@ -1,0 +1,2078 @@
+<?php
+
+// de-xuat-mua-vpp.php
+
+require_once 'db_connect.php';
+
+
+
+$message = '';
+
+$error = '';
+
+$today = date('Y-m-d');
+
+
+
+if (!isset($DEFAULT_DEPARTMENTS) || !is_array($DEFAULT_DEPARTMENTS)) {
+
+$DEFAULT_DEPARTMENTS = [
+
+'Ban Giám Đốc', 'Phòng Hành Chính - Nhân Sự', 'Phòng Kế Toán - Tài Chính',
+
+'Phòng Kỹ Thuật - IT', 'Phòng Kinh Doanh - Marketing', 'Phòng Quản Lý Chất Lượng (QA/QC)',
+
+'Bộ Phận Sản Xuất / Kho Vận', 'Bộ Phận Bếp & Dịch Vụ'
+
+];
+
+}
+
+
+
+// ==================== HÀM NÉN ẢNH DƯỚI 100KB ====================
+
+function compressAndUploadImage($file, $targetDir = 'uploads/vpp/') {
+
+if (!isset($file['tmp_name']) || empty($file['tmp_name'])) return '';
+
+if (!is_dir($targetDir)) {
+
+mkdir($targetDir, 0777, true);
+
+}
+
+
+
+$fileInfo = @getimagesize($file['tmp_name']);
+
+if ($fileInfo === false) return '';
+
+
+
+$mime = $fileInfo['mime'];
+
+$srcImg = null;
+
+if ($mime === 'image/jpeg') {
+
+$srcImg = imagecreatefromjpeg($file['tmp_name']);
+
+} elseif ($mime === 'image/png') {
+
+$srcImg = imagecreatefrompng($file['tmp_name']);
+
+} elseif ($mime === 'image/webp') {
+
+$srcImg = imagecreatefromwebp($file['tmp_name']);
+
+}
+
+if (!$srcImg) return '';
+
+
+
+$ext = pathinfo($file['name'], PATHINFO_EXTENSION);
+
+$newFileName = 'vpp_mua_' . uniqid() . '.' . ($ext ?: 'jpg');
+
+$destination = $targetDir . $newFileName;
+
+
+
+$quality = 85;
+
+if ($mime === 'image/png') {
+
+imagepng($srcImg, $destination, 8);
+
+} else {
+
+imagejpeg($srcImg, $destination, $quality);
+
+}
+
+
+
+while (filesize($destination) > 100 * 1024 && $quality > 20) {
+
+$quality -= 15;
+
+if ($mime === 'image/png') {
+
+imagepng($srcImg, $destination, 9);
+
+} else {
+
+imagejpeg($srcImg, $destination, $quality);
+
+}
+
+}
+
+
+
+imagedestroy($srcImg);
+
+return $destination;
+
+}
+
+
+
+// Khởi tạo bảng đề xuất mua VPP và bổ sung cột custom_image nếu chưa có
+
+try {
+
+$pdo->exec("
+
+CREATE TABLE IF NOT EXISTS `vpp_purchase_proposals` (
+
+`id` INT AUTO_INCREMENT PRIMARY KEY,
+
+`request_code` VARCHAR(60) DEFAULT '',
+
+`employee_id` INT DEFAULT NULL,
+
+`receiver_name` VARCHAR(150) NOT NULL,
+
+`department` VARCHAR(100) NOT NULL,
+
+`item_id` INT DEFAULT NULL,
+
+`custom_item_name` VARCHAR(150) DEFAULT '',
+
+`specification` VARCHAR(100) DEFAULT '',
+
+`unit` VARCHAR(50) DEFAULT 'Cái',
+
+`custom_image` VARCHAR(255) DEFAULT '',
+
+`quantity` INT NOT NULL DEFAULT 1,
+
+`pre_approved_quantity` INT DEFAULT NULL,
+
+`approved_quantity` INT DEFAULT NULL,
+
+`approval_note` VARCHAR(255) DEFAULT '',
+
+`status` VARCHAR(50) DEFAULT 'Chờ duyệt',
+
+`reject_reason` VARCHAR(255) DEFAULT '',
+
+`created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+INDEX (`item_id`),
+
+INDEX (`status`),
+
+INDEX (`request_code`)
+
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+");
+
+
+
+$colsProp = $pdo->query("SHOW COLUMNS FROM `vpp_purchase_proposals`")->fetchAll(PDO::FETCH_COLUMN);
+
+if (!in_array('custom_image', $colsProp)) {
+
+$pdo->exec("ALTER TABLE `vpp_purchase_proposals` ADD COLUMN `custom_image` VARCHAR(255) DEFAULT '' AFTER `unit`");
+
+}
+
+} catch (PDOException $e) {}
+
+
+
+$allItems = $pdo->query("SELECT * FROM vpp_items ORDER BY item_name ASC")->fetchAll();
+
+
+
+// Truy vấn danh sách nhân viên để hỗ trợ gợi ý ô nhập họ tên / mã số
+
+$employees = [];
+
+try {
+
+$employees = $pdo->query("SELECT id, fullname, department FROM employees WHERE status = 'Đang làm việc' ORDER BY fullname ASC")->fetchAll();
+
+} catch (PDOException $e) {}
+
+
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'submit_purchase_proposal') {
+
+$employee_id = !empty($_POST['employee_id']) ? intval($_POST['employee_id']) : null;
+
+$receiver_name = trim($_POST['receiver_name'] ?? '');
+
+$department = trim($_POST['department'] ?? '');
+
+$items_data = $_POST['items'] ?? [];
+
+
+
+try {
+
+if (empty($receiver_name) || empty($department)) {
+
+throw new Exception("Vui lòng điền đầy đủ Họ tên/Mã số người đề xuất và Bộ phận / Phòng ban!");
+
+}
+
+if (empty($items_data)) {
+
+throw new Exception("Vui lòng chọn hoặc điền ít nhất một mặt hàng cần đề xuất mua!");
+
+}
+
+
+
+$baseCode = 'MUA-' . date('dmYHis');
+
+$pdo->beginTransaction();
+
+
+
+$stmtIns = $pdo->prepare("
+
+INSERT INTO vpp_purchase_proposals
+
+(request_code, employee_id, receiver_name, department, item_id, custom_item_name, specification, unit, custom_image, quantity, status)
+
+VALUES (:code, :empid, :rec, :dept, :it_id, :c_name, :spec, :unit, :img, :qty, 'Chờ duyệt')
+
+");
+
+
+
+$insertedCount = 0;
+
+foreach ($items_data as $idx => $row) {
+
+$itemId = intval($row['item_id'] ?? 0);
+
+$qty = intval($row['quantity'] ?? 0);
+
+if ($qty <= 0) continue;
+
+
+
+$customName = trim($row['custom_item_name'] ?? '');
+
+$spec = trim($row['specification'] ?? '');
+
+$unit = trim($row['unit'] ?? 'Cái');
+
+$imgPath = '';
+
+
+
+// Xử lý nén ảnh nếu là mặt hàng mới ngoài kho và có upload file
+
+if ($itemId === 0 && isset($_FILES['items']['name'][$idx]['image']) && $_FILES['items']['error'][$idx]['image'] === UPLOAD_ERR_OK) {
+
+$fileData = [
+
+'name' => $_FILES['items']['name'][$idx]['image'],
+
+'tmp_name' => $_FILES['items']['tmp_name'][$idx]['image'],
+
+'error' => $_FILES['items']['error'][$idx]['image']
+
+];
+
+$imgPath = compressAndUploadImage($fileData);
+
+}
+
+
+
+$stmtIns->execute([
+
+':code' => $baseCode,
+
+':empid' => $employee_id,
+
+':rec' => $receiver_name,
+
+':dept' => $department,
+
+':it_id' => ($itemId > 0 ? $itemId : null),
+
+':c_name' => ($itemId > 0 ? '' : $customName),
+
+':spec' => $spec,
+
+':unit' => $unit,
+
+':img' => $imgPath,
+
+':qty' => $qty
+
+]);
+
+$insertedCount++;
+
+}
+
+
+
+if ($insertedCount === 0) {
+
+throw new Exception("Số lượng đề xuất của các mặt hàng không hợp lệ!");
+
+}
+
+
+
+$pdo->commit();
+
+$message = "Gửi đề xuất mua văn phòng phẩm thành công! Mã phiếu của bạn là: <strong>{$baseCode}</strong>";
+
+} catch (Exception $e) {
+
+if ($pdo->inTransaction()) $pdo->rollBack();
+
+$error = "Lỗi gửi đề xuất: " . $e->getMessage();
+
+}
+
+}
+
+?>
+
+<!DOCTYPE html>
+
+<html lang="vi">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+
+<title>Đề Xuất Mua Văn Phòng Phẩm</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+
+/* =========================================================
+   GIAO DIỆN CHUNG
+   ========================================================= */
+
+* {
+
+box-sizing: border-box;
+
+}
+
+
+
+html {
+
+-webkit-text-size-adjust: 100%;
+
+}
+
+
+
+body {
+
+font-family: 'Inter', sans-serif;
+
+background: #f1f5f9;
+
+color: #1e293b;
+
+margin: 0;
+
+padding: 20px;
+
+}
+
+
+
+.container {
+
+width: 100%;
+
+max-width: 1080px;
+
+margin: 0 auto;
+
+background: #fff;
+
+border-radius: 10px;
+
+box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+
+padding: 30px;
+
+overflow: hidden;
+
+}
+
+
+
+h1 {
+
+font-size: 1.5rem;
+
+color: #0f172a;
+
+margin-top: 0;
+
+text-align: center;
+
+}
+
+
+
+.form-group {
+
+margin-bottom: 15px;
+
+position: relative;
+
+}
+
+
+
+label {
+
+display: block;
+
+font-weight: 600;
+
+font-size: 0.88rem;
+
+margin-bottom: 5px;
+
+color: #334155;
+
+}
+
+
+
+input,
+
+select {
+
+width: 100%;
+
+max-width: 100%;
+
+padding: 9px 12px;
+
+border: 1px solid #cbd5e1;
+
+border-radius: 6px;
+
+box-sizing: border-box;
+
+font-size: 0.9rem;
+
+outline: none;
+
+background: #fff;
+
+}
+
+
+
+input:focus,
+
+select:focus {
+
+border-color: #0284c7;
+
+box-shadow: 0 0 0 3px rgba(2,132,199,0.15);
+
+}
+
+
+
+.alert {
+
+padding: 12px 16px;
+
+border-radius: 6px;
+
+margin-bottom: 20px;
+
+font-size: 0.9rem;
+
+}
+
+
+
+.alert-success {
+
+background: #dcfce7;
+
+color: #166534;
+
+border: 1px solid #bbf7d0;
+
+}
+
+
+
+.alert-danger {
+
+background: #fee2e2;
+
+color: #991b1b;
+
+border: 1px solid #fecaca;
+
+}
+
+
+
+/* =========================================================
+   BẢNG MẶT HÀNG - DESKTOP
+   ========================================================= */
+
+.table-items {
+
+width: 100%;
+
+border-collapse: collapse;
+
+margin-top: 15px;
+
+margin-bottom: 15px;
+
+table-layout: fixed;
+
+}
+
+
+
+.table-items th,
+
+.table-items td {
+
+padding: 8px 10px;
+
+border: 1px solid #e2e8f0;
+
+vertical-align: middle;
+
+font-size: 0.88rem;
+
+}
+
+
+
+.table-items th {
+
+background: #f8fafc;
+
+color: #475569;
+
+font-weight: 600;
+
+text-align: left;
+
+}
+
+
+
+.table-items td input,
+
+.table-items td select {
+
+min-width: 0;
+
+}
+
+
+
+.btn {
+
+background: #0284c7;
+
+color: #fff;
+
+border: none;
+
+padding: 10px 20px;
+
+border-radius: 6px;
+
+font-weight: 600;
+
+cursor: pointer;
+
+font-size: 0.95rem;
+
+}
+
+
+
+.btn:hover {
+
+background: #0369a1;
+
+}
+
+
+
+.btn-add {
+
+background: #10b981;
+
+padding: 6px 12px;
+
+font-size: 0.82rem;
+
+}
+
+
+
+.btn-add:hover {
+
+background: #059669;
+
+}
+
+
+
+.btn-del {
+
+background: #ef4444;
+
+color: #fff;
+
+border: none;
+
+padding: 6px 10px;
+
+border-radius: 4px;
+
+cursor: pointer;
+
+font-size: 0.8rem;
+
+}
+
+
+
+/* =========================================================
+   GỢI Ý NHÂN VIÊN
+   ========================================================= */
+
+.suggest-list {
+
+position: absolute;
+
+top: 100%;
+
+left: 0;
+
+right: 0;
+
+background: #ffffff;
+
+border: 1px solid #cbd5e1;
+
+border-radius: 8px;
+
+max-height: 200px;
+
+overflow-y: auto;
+
+z-index: 50;
+
+display: none;
+
+box-shadow: 0 10px 15px rgba(0,0,0,0.1);
+
+margin-top: 4px;
+
+}
+
+
+
+.suggest-item {
+
+padding: 10px 14px;
+
+cursor: pointer;
+
+border-bottom: 1px solid #f1f5f9;
+
+font-size: 0.9rem;
+
+}
+
+
+
+.suggest-item:hover {
+
+background-color: #f0f9ff;
+
+color: #0284c7;
+
+}
+
+
+
+.hint-text {
+
+font-size: 0.78rem;
+
+color: #64748b;
+
+margin-top: 4px;
+
+display: block;
+
+}
+
+
+
+/* =========================================================
+   UPLOAD ẢNH
+   ========================================================= */
+
+.upload-container {
+
+position: relative;
+
+display: inline-block;
+
+width: 100%;
+
+}
+
+
+
+.btn-upload-custom {
+
+background: #f8fafc;
+
+color: #0284c7;
+
+border: 1.5px dashed #0284c7;
+
+padding: 6px 10px;
+
+border-radius: 6px;
+
+font-size: 0.8rem;
+
+font-weight: 600;
+
+cursor: pointer;
+
+text-align: center;
+
+display: block;
+
+width: 100%;
+
+box-sizing: border-box;
+
+transition: all 0.2s;
+
+}
+
+
+
+.btn-upload-custom:hover {
+
+background: #f0f9ff;
+
+border-color: #0369a1;
+
+color: #0369a1;
+
+}
+
+
+
+.preview-box {
+
+display: none;
+
+align-items: center;
+
+gap: 8px;
+
+justify-content: center;
+
+}
+
+
+
+.thumb-preview {
+
+width: 36px;
+
+height: 36px;
+
+object-fit: cover;
+
+border-radius: 4px;
+
+border: 1px solid #cbd5e1;
+
+cursor: pointer;
+
+}
+
+
+
+.img-action-group {
+
+display: flex;
+
+gap: 4px;
+
+}
+
+
+
+.btn-img-action {
+
+background: #f1f5f9;
+
+border: 1px solid #cbd5e1;
+
+font-size: 0.72rem;
+
+padding: 2px 6px;
+
+border-radius: 4px;
+
+cursor: pointer;
+
+font-weight: 600;
+
+}
+
+
+
+.btn-img-action.change {
+
+color: #0284c7;
+
+}
+
+
+
+.btn-img-action.delete {
+
+color: #dc2626;
+
+border-color: #fecaca;
+
+background: #fee2e2;
+
+}
+
+
+
+.btn-img-action:hover {
+
+opacity: 0.85;
+
+}
+
+
+
+/* =========================================================
+   TABLET
+   ========================================================= */
+
+@media (max-width: 900px) {
+
+body {
+
+padding: 12px;
+
+}
+
+
+
+.container {
+
+padding: 22px;
+
+}
+
+
+
+.table-items th,
+
+.table-items td {
+
+padding: 7px 8px;
+
+font-size: 0.82rem;
+
+}
+
+
+
+.table-items input,
+
+.table-items select {
+
+font-size: 0.82rem;
+
+padding: 8px 8px;
+
+}
+
+}
+
+
+
+/* =========================================================
+   MOBILE
+   - Không cho bảng ép ngang màn hình
+   - Mỗi dòng mặt hàng thành CARD
+   - Nhãn bên trái, nội dung bên phải
+   - Hạn chế xuống dòng
+   ========================================================= */
+
+@media (max-width: 700px) {
+
+body {
+
+padding: 8px;
+
+}
+
+
+
+.container {
+
+width: 100%;
+
+padding: 16px 12px;
+
+border-radius: 9px;
+
+box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+
+}
+
+
+
+h1 {
+
+font-size: 1.2rem;
+
+line-height: 1.35;
+
+margin-bottom: 8px;
+
+}
+
+
+
+.container > p {
+
+font-size: 0.8rem !important;
+
+line-height: 1.45;
+
+margin-top: 0 !important;
+
+margin-bottom: 18px !important;
+
+}
+
+
+
+/* Hai ô thông tin đầu trang chuyển thành 1 cột */
+
+form > div[style*="grid-template-columns"] {
+
+display: grid !important;
+
+grid-template-columns: minmax(0, 1fr) !important;
+
+gap: 10px !important;
+
+}
+
+
+
+.form-group {
+
+margin-bottom: 12px;
+
+}
+
+
+
+label {
+
+font-size: 0.82rem;
+
+}
+
+
+
+input,
+
+select {
+
+font-size: 0.88rem;
+
+padding: 9px 10px;
+
+}
+
+
+
+/* Header danh sách */
+
+.form-group[style*="margin-top: 20px"] > div {
+
+gap: 8px;
+
+align-items: center !important;
+
+}
+
+
+
+.form-group[style*="margin-top: 20px"] > div label {
+
+font-size: 0.82rem;
+
+line-height: 1.3;
+
+}
+
+
+
+/* =====================================================
+   Chuyển table thành card
+   ===================================================== */
+
+.table-items {
+
+display: block;
+
+width: 100%;
+
+border: 0;
+
+margin-top: 10px;
+
+overflow: visible;
+
+}
+
+
+
+.table-items thead {
+
+display: none;
+
+}
+
+
+
+.table-items tbody {
+
+display: block;
+
+width: 100%;
+
+}
+
+
+
+.table-items tbody tr {
+
+display: block;
+
+width: 100%;
+
+background: #ffffff;
+
+border: 1px solid #dbe3ec;
+
+border-radius: 9px;
+
+margin-bottom: 12px;
+
+padding: 5px 0;
+
+box-shadow: 0 2px 6px rgba(15,23,42,0.04);
+
+overflow: hidden;
+
+}
+
+
+
+.table-items tbody tr:last-child {
+
+margin-bottom: 5px;
+
+}
+
+
+
+.table-items tbody td {
+
+display: grid;
+
+grid-template-columns: minmax(88px, 31%) minmax(0, 69%);
+
+align-items: center;
+
+width: 100%;
+
+padding: 8px 9px;
+
+border: 0;
+
+border-bottom: 1px solid #eef2f7;
+
+font-size: 0.82rem;
+
+min-width: 0;
+
+}
+
+
+
+.table-items tbody td:last-child {
+
+border-bottom: 0;
+
+}
+
+
+
+.table-items tbody td::before {
+
+font-weight: 600;
+
+color: #475569;
+
+font-size: 0.77rem;
+
+line-height: 1.25;
+
+padding-right: 8px;
+
+min-width: 0;
+
+}
+
+
+
+/* Tên cột tự động cho từng ô */
+
+.table-items tbody td:nth-child(1)::before {
+
+content: "Mặt hàng";
+
+}
+
+
+
+.table-items tbody td:nth-child(2)::before {
+
+content: "Quy cách";
+
+}
+
+
+
+.table-items tbody td:nth-child(3)::before {
+
+content: "Đơn vị";
+
+}
+
+
+
+.table-items tbody td:nth-child(4)::before {
+
+content: "Hình ảnh";
+
+}
+
+
+
+.table-items tbody td:nth-child(5)::before {
+
+content: "Số lượng";
+
+}
+
+
+
+.table-items tbody td:nth-child(6)::before {
+
+content: "Thao tác";
+
+}
+
+
+
+/* Nội dung trong cell không được làm tràn card */
+
+.table-items tbody td > * {
+
+min-width: 0;
+
+max-width: 100%;
+
+}
+
+
+
+.table-items tbody td input,
+
+.table-items tbody td select {
+
+width: 100% !important;
+
+min-width: 0 !important;
+
+max-width: 100% !important;
+
+font-size: 0.82rem;
+
+padding: 8px 8px;
+
+}
+
+
+
+.table-items tbody td:nth-child(5) input {
+
+max-width: 90px !important;
+
+}
+
+
+
+.table-items tbody td:nth-child(6) {
+
+grid-template-columns: minmax(88px, 31%) minmax(0, 69%);
+
+}
+
+
+
+.table-items tbody td:nth-child(6) .btn-del {
+
+justify-self: start;
+
+}
+
+
+
+/* Select mặt hàng */
+
+.table-items .available-items-select {
+
+margin-top: 5px !important;
+
+}
+
+
+
+/* Upload */
+
+.table-items .upload-container {
+
+width: 100%;
+
+}
+
+
+
+.table-items .btn-upload-custom {
+
+font-size: 0.76rem;
+
+padding: 7px 8px;
+
+white-space: nowrap;
+
+overflow: hidden;
+
+text-overflow: ellipsis;
+
+}
+
+
+
+.table-items .preview-box {
+
+justify-content: flex-start;
+
+}
+
+
+
+/* Không để tên mặt hàng / option làm vỡ layout */
+
+.table-items select {
+
+text-overflow: ellipsis;
+
+overflow: hidden;
+
+white-space: nowrap;
+
+}
+
+
+
+/* Khu vực nút gửi */
+
+form > div[style*="text-align: center"][style*="margin-top: 25px"] {
+
+margin-top: 18px !important;
+
+}
+
+
+
+form > div[style*="text-align: center"][style*="margin-top: 25px"] .btn {
+
+width: 100%;
+
+padding: 11px 14px;
+
+font-size: 0.9rem;
+
+}
+
+
+
+.btn-add {
+
+padding: 7px 9px;
+
+font-size: 0.76rem;
+
+white-space: nowrap;
+
+}
+
+
+
+.alert {
+
+font-size: 0.82rem;
+
+line-height: 1.45;
+
+padding: 10px 12px;
+
+}
+
+}
+
+
+
+/* =========================================================
+   MOBILE RẤT NHỎ
+   ========================================================= */
+
+@media (max-width: 380px) {
+
+body {
+
+padding: 5px;
+
+}
+
+
+
+.container {
+
+padding: 13px 9px;
+
+}
+
+
+
+h1 {
+
+font-size: 1.08rem;
+
+}
+
+
+
+.table-items tbody td {
+
+grid-template-columns: minmax(76px, 29%) minmax(0, 71%);
+
+padding: 7px 7px;
+
+}
+
+
+
+.table-items tbody td::before {
+
+font-size: 0.72rem;
+
+}
+
+
+
+.table-items tbody td input,
+
+.table-items tbody td select {
+
+font-size: 0.78rem;
+
+padding: 7px 7px;
+
+}
+
+
+
+.hint-text {
+
+font-size: 0.7rem;
+
+}
+
+}
+
+
+
+/* =========================================================
+   ĐIỆN THOẠI XOAY NGANG
+   ========================================================= */
+
+@media (max-width: 700px) and (orientation: landscape) {
+
+.container {
+
+max-width: 100%;
+
+}
+
+
+
+form > div[style*="grid-template-columns"] {
+
+grid-template-columns: 1fr 1fr !important;
+
+gap: 12px !important;
+
+}
+
+
+
+.table-items tbody td {
+
+grid-template-columns: 24% 76%;
+
+}
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>Đề Xuất Mua Sắm Văn Phòng Phẩm</h1>
+
+<p style="text-align: center; color: #64748b; font-size: 0.9rem; margin-bottom: 25px;">Biểu mẫu đăng ký nhu cầu mua sắm bổ sung văn phòng phẩm cho các phòng ban.</p>
+
+
+
+<?php if ($message): ?><div class="alert alert-success"><?= $message ?></div><?php endif; ?>
+
+<?php if ($error): ?><div class="alert alert-danger"><?= $error ?></div><?php endif; ?>
+
+
+
+<form method="POST" action="" enctype="multipart/form-data">
+
+<input type="hidden" name="action" value="submit_purchase_proposal">
+
+<input type="hidden" name="employee_id" id="hidden_emp_id">
+
+
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+
+<div class="form-group">
+
+<label>Họ và Tên / Mã số nhân viên: *</label>
+
+<input type="text" name="receiver_name" id="inp_receiver" required placeholder="Gõ tên hoặc mã nhân sự..." autocomplete="off">
+
+<div class="suggest-list" id="suggest_box"></div>
+
+<span class="hint-text">💡 Gõ tên hoặc mã ID để hệ thống tự điền thông tin</span>
+
+</div>
+
+<div class="form-group">
+
+<label>Bộ Phận / Phòng Ban: *</label>
+
+<select name="department" id="sel_dept" required>
+
+<option value="">-- Chọn phòng ban của bạn --</option>
+
+<?php foreach ($DEFAULT_DEPARTMENTS as $d): ?>
+
+<option value="<?= htmlspecialchars($d) ?>"><?= htmlspecialchars($d) ?></option>
+
+<?php endforeach; ?>
+
+</select>
+
+</div>
+
+</div>
+
+
+
+<div class="form-group" style="margin-top: 20px;">
+
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+
+<label style="margin:0;">Danh Sách Mặt Hàng Cần Mua: *</label>
+
+<button type="button" class="btn btn-add" onclick="addItemRow()">+ Thêm dòng</button>
+
+</div>
+
+
+
+<table class="table-items" id="items_table">
+
+<thead>
+
+<tr>
+
+<th style="width: 28%;">Chọn mặt hàng có sẵn / Hoặc nhập mới</th>
+
+<th style="width: 20%;">Quy cách / Tên mô tả</th>
+
+<th style="width: 12%;">Đơn vị tính</th>
+
+<th style="width: 20%;">Hình ảnh đính kèm</th>
+
+<th style="width: 10%; text-align: center;">Số lượng</th>
+
+<th style="width: 10%; text-align: center;">Xóa</th>
+
+</tr>
+
+</thead>
+
+<tbody id="items_tbody">
+
+<tr>
+
+<td>
+
+<select name="items[0][mode_select]" class="mode-select" onchange="handleModeChange(this)" required>
+
+<option value="" disabled selected>Vui lòng chọn</option>
+
+<option value="available">Chọn mặt hàng có sẵn</option>
+
+<option value="custom">Nhập mặt hàng mới bên ngoài</option>
+
+</select>
+
+
+
+<select name="items[0][item_id]" class="available-items-select" style="display: none; margin-top: 5px;" onchange="handleItemSelect(this)">
+
+<option value="">-- Chọn mặt hàng có sẵn trong kho --</option>
+
+<?php foreach ($allItems as $it): ?>
+
+<option value="<?= $it['id'] ?>" data-name="<?= htmlspecialchars($it['item_name']) ?>" data-spec="<?= htmlspecialchars($it['specification']) ?>" data-unit="<?= htmlspecialchars($it['unit']) ?>">
+
+<?= htmlspecialchars($it['item_name']) ?> (Tồn kho: <?= intval($it['stock_qty']) ?> <?= htmlspecialchars($it['unit']) ?>)
+
+</option>
+
+<?php endforeach; ?>
+
+</select>
+
+
+
+<input type="text" name="items[0][custom_item_name]" class="custom-item-input" placeholder="Nhập tên mặt hàng mới..." style="display: none; margin-top: 5px;">
+
+</td>
+
+<td><input type="text" name="items[0][specification]" placeholder="VD: Ram 500 tờ..."></td>
+
+<td><input type="text" name="items[0][unit]" value="Cái" placeholder="ĐVT..."></td>
+
+<td>
+
+<div class="upload-container">
+
+<input type="file" name="items[0][image]" id="file_0" accept="image/*" style="display: none;" onchange="handleImageChange(this, 0)">
+
+<div id="upload_btn_wrap_0">
+
+<button type="button" class="btn-upload-custom" onclick="document.getElementById('file_0').click()">📷 Tải ảnh lên</button>
+
+</div>
+
+<div class="preview-box" id="preview_wrap_0">
+
+<img src="" id="thumb_0" class="thumb-preview" title="Xem ảnh">
+
+<div class="img-action-group">
+
+<button type="button" class="btn-img-action change" onclick="document.getElementById('file_0').click()">Đổi</button>
+
+<button type="button" class="btn-img-action delete" onclick="removeImage(0)">Xóa</button>
+
+</div>
+
+</div>
+
+</div>
+
+</td>
+
+<td style="text-align: center;"><input type="number" name="items[0][quantity]" min="1" value="1" required style="text-align: center;"></td>
+
+<td style="text-align: center;"><button type="button" class="btn-del" onclick="removeRow(this)">✕</button></td>
+
+</tr>
+
+</tbody>
+
+</table>
+
+</div>
+
+
+
+<div style="text-align: center; margin-top: 25px;">
+
+<button type="submit" class="btn">Gửi Đề Xuất Mua VPP</button>
+
+</div>
+
+</form>
+
+</div>
+
+
+
+<script>
+
+let rowIndex = 0;
+
+const allItemsData = <?= json_encode($allItems) ?>;
+
+const employees = <?= json_encode($employees) ?>;
+
+
+
+// Gợi ý nhân viên
+
+const inpReceiver = document.getElementById('inp_receiver');
+
+const suggestBox = document.getElementById('suggest_box');
+
+const selDept = document.getElementById('sel_dept');
+
+const hiddenEmpId = document.getElementById('hidden_emp_id');
+
+
+
+inpReceiver.addEventListener('input', function() {
+
+const val = this.value.trim().toLowerCase();
+
+suggestBox.innerHTML = '';
+
+if (!val) {
+
+suggestBox.style.display = 'none';
+
+hiddenEmpId.value = '';
+
+return;
+
+}
+
+
+
+const matched = employees.filter(e =>
+
+e.fullname.toLowerCase().includes(val) ||
+
+e.id.toString() === val ||
+
+('id:' + e.id).includes(val) ||
+
+('#' + e.id).includes(val)
+
+);
+
+
+
+if (matched.length > 0) {
+
+matched.slice(0, 8).forEach(emp => {
+
+const div = document.createElement('div');
+
+div.className = 'suggest-item';
+
+div.innerHTML = `<strong>#${emp.id} - ${emp.fullname}</strong> (${emp.department || 'Chưa phân bổ'})`;
+
+div.onclick = function() {
+
+inpReceiver.value = emp.fullname;
+
+hiddenEmpId.value = emp.id;
+
+if (emp.department) {
+
+selDept.value = emp.department;
+
+}
+
+suggestBox.style.display = 'none';
+
+};
+
+suggestBox.appendChild(div);
+
+});
+
+suggestBox.style.display = 'block';
+
+} else {
+
+suggestBox.style.display = 'none';
+
+hiddenEmpId.value = '';
+
+}
+
+});
+
+
+
+document.addEventListener('click', function(e) {
+
+if (!e.target.closest('#inp_receiver') && !e.target.closest('#suggest_box')) {
+
+suggestBox.style.display = 'none';
+
+}
+
+});
+
+
+
+function handleModeChange(modeSelect) {
+
+const row = modeSelect.closest('tr');
+
+const mode = modeSelect.value;
+
+const availableSelect = row.querySelector('.available-items-select');
+
+const customInput = row.querySelector('.custom-item-input');
+
+const specInput = row.querySelector('input[name*="[specification]"]');
+
+const unitInput = row.querySelector('input[name*="[unit]"]');
+
+const uploadWrap = row.querySelector('.upload-container');
+
+const itemIdInput = row.querySelector('input[name*="[item_id]"]');
+
+
+
+// Đảm bảo item_id field tồn tại ẩn khi chọn custom hoặc ngược lại
+
+if (!itemIdInput) {
+
+// Tạo input ẩn lưu item_id nếu form submit backend cần
+
+}
+
+
+
+if (mode === 'available') {
+
+availableSelect.style.display = 'block';
+
+availableSelect.required = true;
+
+customInput.style.display = 'none';
+
+customInput.required = false;
+
+customInput.value = '';
+
+specInput.value = '';
+
+unitInput.value = 'Cái';
+
+if(uploadWrap) {
+
+uploadWrap.style.opacity = '0.4';
+
+uploadWrap.style.pointerEvents = 'none';
+
+}
+
+} else if (mode === 'custom') {
+
+availableSelect.style.display = 'none';
+
+availableSelect.required = false;
+
+availableSelect.value = '';
+
+customInput.style.display = 'block';
+
+customInput.required = true;
+
+customInput.value = '';
+
+specInput.value = '';
+
+unitInput.value = 'Cái';
+
+if(uploadWrap) {
+
+uploadWrap.style.opacity = '1';
+
+uploadWrap.style.pointerEvents = 'auto';
+
+}
+
+}
+
+}
+
+
+
+function handleItemSelect(select) {
+
+const row = select.closest('tr');
+
+const customInput = row.querySelector('.custom-item-input');
+
+const specInput = row.querySelector('input[name*="[specification]"]');
+
+const unitInput = row.querySelector('input[name*="[unit]"]');
+
+
+
+if (select.value !== "") {
+
+const selectedOption = select.options[select.selectedIndex];
+
+customInput.value = selectedOption.getAttribute('data-name') || '';
+
+specInput.value = selectedOption.getAttribute('data-spec') || '';
+
+unitInput.value = selectedOption.getAttribute('data-unit') || 'Cái';
+
+}
+
+}
+
+
+
+// Xử lý hiển thị preview ảnh sau khi chọn file
+
+function handleImageChange(input, idx) {
+
+if (input.files && input.files[0]) {
+
+const reader = new FileReader();
+
+reader.onload = function(e) {
+
+const thumb = document.getElementById('thumb_' + idx);
+
+const btnWrap = document.getElementById('upload_btn_wrap_' + idx);
+
+const previewWrap = document.getElementById('preview_wrap_' + idx);
+
+if(thumb) thumb.src = e.target.result;
+
+if(btnWrap) btnWrap.style.display = 'none';
+
+if(previewWrap) previewWrap.style.display = 'flex';
+
+}
+
+reader.readAsDataURL(input.files[0]);
+
+}
+
+}
+
+
+
+function removeImage(idx) {
+
+const fileInput = document.getElementById('file_' + idx);
+
+const btnWrap = document.getElementById('upload_btn_wrap_' + idx);
+
+const previewWrap = document.getElementById('preview_wrap_' + idx);
+
+if(fileInput) fileInput.value = '';
+
+if(btnWrap) btnWrap.style.display = 'block';
+
+if(previewWrap) previewWrap.style.display = 'none';
+
+}
+
+
+
+function addItemRow() {
+
+rowIndex++;
+
+const tbody = document.getElementById('items_tbody');
+
+const tr = document.createElement('tr');
+
+let optionsHtml = '<option value="">-- Chọn mặt hàng có sẵn trong kho --</option>';
+
+allItemsData.forEach(it => {
+
+optionsHtml += `<option value="${it.id}" data-name="${it.item_name}" data-spec="${it.specification || ''}" data-unit="${it.unit || 'Cái'}">${it.item_name} (Tồn kho: ${it.stock_qty} ${it.unit})</option>`;
+
+});
+
+
+
+tr.innerHTML = `
+
+<td>
+
+<select name="items[${rowIndex}][mode_select]" class="mode-select" onchange="handleModeChange(this)" required>
+
+<option value="" disabled selected>Vui lòng chọn</option>
+
+<option value="available">Chọn mặt hàng có sẵn</option>
+
+<option value="custom">Nhập mặt hàng mới bên ngoài</option>
+
+</select>
+
+
+
+<select name="items[${rowIndex}][item_id]" class="available-items-select" style="display: none; margin-top: 5px;" onchange="handleItemSelect(this)">
+
+${optionsHtml}
+
+</select>
+
+
+
+<input type="text" name="items[${rowIndex}][custom_item_name]" class="custom-item-input" placeholder="Nhập tên mặt hàng mới..." style="display: none; margin-top: 5px;">
+
+</td>
+
+<td><input type="text" name="items[${rowIndex}][specification]" placeholder="VD: Ram 500 tờ..."></td>
+
+<td><input type="text" name="items[${rowIndex}][unit]" value="Cái" placeholder="ĐVT..."></td>
+
+<td>
+
+<div class="upload-container">
+
+<input type="file" name="items[${rowIndex}][image]" id="file_${rowIndex}" accept="image/*" style="display: none;" onchange="handleImageChange(this, ${rowIndex})">
+
+<div id="upload_btn_wrap_${rowIndex}">
+
+<button type="button" class="btn-upload-custom" onclick="document.getElementById('file_${rowIndex}').click()">📷 Tải ảnh lên</button>
+
+</div>
+
+<div class="preview-box" id="preview_wrap_${rowIndex}">
+
+<img src="" id="thumb_${rowIndex}" class="thumb-preview" title="Xem ảnh">
+
+<div class="img-action-group">
+
+<button type="button" class="btn-img-action change" onclick="document.getElementById('file_${rowIndex}').click()">Đổi</button>
+
+<button type="button" class="btn-img-action delete" onclick="removeImage(${rowIndex})">Xóa</button>
+
+</div>
+
+</div>
+
+</div>
+
+</td>
+
+<td style="text-align: center;"><input type="number" name="items[${rowIndex}][quantity]" min="1" value="1" required style="text-align: center;"></td>
+
+<td style="text-align: center;"><button type="button" class="btn-del" onclick="removeRow(this)">✕</button></td>
+
+`;
+
+tbody.appendChild(tr);
+
+}
+
+
+
+function removeRow(btn) {
+
+const tbody = document.getElementById('items_tbody');
+
+if (tbody.rows.length > 1) {
+
+btn.closest('tr').remove();
+
+} else {
+
+alert("Cần phải có ít nhất một mặt hàng đề xuất!");
+
+}
+
+}
+
+</script>
+
+</body>
+
+</html>
+
